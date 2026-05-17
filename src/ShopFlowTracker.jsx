@@ -3384,12 +3384,14 @@ export default function ShopFlowTracker() {
     // Zone 3: per-cell inner height (available height for cards inside padding)
     const rowHeightPx    = (window.innerHeight * 0.52 - 3 - (nTechs - 1) * 3) / nTechs;
     const cellInnerHeight = Math.floor(rowHeightPx - 12); // 6px padding top + bottom
-    // Helper: given how many cards are in a cell, what height does each card get?
+    // Max cards that keep each card ≥ 56px (vehicle always readable)
+    const maxFitCards = Math.max(1, Math.floor((cellInnerHeight + 4) / 60));
+    // Given actual count in a cell, return the height each card gets
     function calcCardHeight(count) {
       if (count === 0) return cellInnerHeight;
-      const capped = Math.min(count, 4);
+      const capped = Math.min(count, maxFitCards);
       const gaps   = (capped - 1) * 4;
-      return Math.max(24, Math.floor((cellInnerHeight - gaps) / capped));
+      return Math.floor((cellInnerHeight - gaps) / capped);
     }
     // Zone 4/5 card heights (horizontal rows, height fixed by zone)
     const partsCardH = Math.max(40, Math.floor(window.innerHeight * 0.12 - 8));
@@ -3470,7 +3472,7 @@ export default function ShopFlowTracker() {
                 {/* Kanban cells — each cell computes its own cardHeight from ids.length */}
                 {COLS.map(col => {
                   const ids    = state.grid[tech.id] ? (state.grid[tech.id][col.id]||[]) : [];
-                  const shown  = ids.slice(0, 4);
+                  const shown  = ids.slice(0, maxFitCards);
                   const extra  = ids.length - shown.length;
                   const ch     = calcCardHeight(ids.length);
                   const single = ids.length === 1;
