@@ -1,1459 +1,1488 @@
-import { useSaveToFirebase, useLoadFromFirebase } from "./useFirebaseSync";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { doc, setDoc, onSnapshot } from 'firebase/firestore'
+import { db } from './firebase'
 
-if (typeof document !== "undefined" && !document.getElementById("sft-font")) {
-  const l = document.createElement("link");
-  l.id = "sft-font";
-  l.rel = "stylesheet";
-  l.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap";
-  document.head.appendChild(l);
-}
-if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
-  const s = document.createElement("style");
-  s.id = "sft-styles";
-  s.textContent = [
-    "@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }",
-    "@keyframes fade-in { from{opacity:0;transform:translateY(6px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }",
-    "@keyframes slide-up { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }",
-    "@keyframes card-in { from{opacity:0;transform:translateY(10px) scale(0.96)} to{opacity:1;transform:translateY(0) scale(1)} }",
-    "@keyframes urgent-glow { 0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,0)} 50%{box-shadow:0 0 0 3px rgba(255,69,58,0.3)} }",
-    "@keyframes shimmer { from{background-position:-200px 0} to{background-position:200px 0} }",
-    "@keyframes count-up { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }",
-    "@keyframes snap-in { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }",
-    "@keyframes tick { 0%{opacity:1} 49%{opacity:1} 50%{opacity:0.7} 100%{opacity:1} }",
-    "@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }",
-    "* { -webkit-tap-highlight-color: transparent; }",
-    "input, select, textarea { color-scheme: dark; }",
-    "::-webkit-scrollbar { width: 0px; }",
-    ".card-press:active { transform: scale(0.97) !important; transition: transform 0.08s ease !important; }",
-    ".col-snap { scroll-snap-type: x mandatory; }",
-    ".col-snap-item { scroll-snap-align: start; }",
-    ".pad-btn { -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }",
-    ".pad-btn:active { transform: scale(0.88) !important; background: rgba(255,255,255,0.18) !important; }",
-  ].join(" ");
-  document.head.appendChild(s);
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PIN_MAP = {
+  '052513': { name: 'AD',        role: 'admin'   },
+  '1000':   { name: 'Jay',       role: 'manager' },
+  '2000':   { name: 'Mario',     role: 'advisor' },
+  '1111':   { name: 'Type S',    role: 'tech'    },
+  '2222':   { name: 'LA',        role: 'tech'    },
+  '3333':   { name: 'Darcheezy', role: 'tech'    },
+  '4444':   { name: 'Jason',     role: 'tech'    },
 }
 
-const BG = "#000000";
-const SURFACE = "rgba(255,255,255,0.05)";
-const SURFACE2 = "rgba(255,255,255,0.09)";
-const BORDER = "rgba(255,255,255,0.08)";
-const BORDER2 = "rgba(255,255,255,0.14)";
-const TEXT = "#FFFFFF";
-const TEXT2 = "rgba(255,255,255,0.7)";
-const TEXT3 = "rgba(255,255,255,0.4)";
-const ACCENT = "#0A84FF";
-const ACCENT2 = "rgba(10,132,255,0.15)";
-const SUCCESS = "#30D158";
-const WARN = "#FF9F0A";
-const DANGER = "#FF453A";
-const CARD_BG = "rgba(28,32,48,0.95)";
-const CARD_TOP = "rgba(255,255,255,0.13)";
-const CARD_BORDER = "rgba(255,255,255,0.07)";
-const CARD_SHADOW = "0 1px 0 rgba(255,255,255,0.10) inset, 0 -1px 0 rgba(0,0,0,0.4) inset, 0 4px 20px rgba(0,0,0,0.3)";
-const CELL_BG = "rgba(8,10,18,0.7)";
-const CELL_SHADOW = "inset 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 3px rgba(0,0,0,0.6)";
-const TECH_BG = "rgba(22,26,42,0.98)";
-const SHEET_BG = "#13161F";
-const INPUT_BG = "rgba(255,255,255,0.06)";
-const SUB = "rgba(255,255,255,0.5)";
-const MUTED = "rgba(255,255,255,0.28)";
+const TECHS = ['Type S', 'LA', 'Darcheezy', 'Jason']
 
-const COLS = [
-  { id:"ondeck",    label:"On Deck",        color:"#0A84FF", bg:"rgba(10,132,255,0.07)",   border:"rgba(10,132,255,0.15)" },
-  { id:"inprogress",label:"In Progress",    color:"#FF9F0A", bg:"rgba(255,159,10,0.07)",   border:"rgba(255,159,10,0.15)" },
-  { id:"completed", label:"Completed / QC", color:"#30D158", bg:"rgba(48,209,88,0.07)",    border:"rgba(48,209,88,0.15)"  },
-  { id:"delivered", label:"Delivered",      color:"#636366", bg:"rgba(99,99,102,0.07)",    border:"rgba(99,99,102,0.15)"  },
-];
+const SVC_META = {
+  'Main Shop': { color: '#EF4444' },
+  'PDI':       { color: '#9333EA' },
+  'Used Cars': { color: '#16A34A' },
+}
 
-const PARTS_COL = { id:"waiting", color:"#BF5AF2", bg:"rgba(191,90,242,0.07)", border:"rgba(191,90,242,0.15)" };
+const COLUMNS = [
+  { id: 'onDeck',      label: 'On Deck'       },
+  { id: 'inProgress',  label: 'In Progress'   },
+  { id: 'completedQC', label: 'Completed / QC' },
+  { id: 'delivered',   label: 'Delivered'     },
+]
 
-const USERS = [
-  { id:"admin",   name:"AD",         role:"admin",   pin:"052513" },
-  { id:"manager", name:"Jay",        role:"manager", pin:"1000"   },
-  { id:"advisor", name:"Mario",      role:"advisor", pin:"2000"   },
-  { id:"t1",      name:"Type S",     role:"tech",    pin:"1111"   },
-  { id:"t2",      name:"LA",         role:"tech",    pin:"2222"   },
-  { id:"t3",      name:"Darcheezy",  role:"tech",    pin:"3333"   },
-  { id:"t4",      name:"Jason",      role:"tech",    pin:"4444"   },
-];
+const PRIORITY_META = {
+  normal: { label: 'Normal', color: '#8E8E93' },
+  high:   { label: 'High',   color: '#FF9F0A' },
+  urgent: { label: 'Urgent', color: '#FF453A' },
+}
+
+const NOW = Date.now()
 
 const SAMPLE_ROS = [
-  { id:"ro-1001", roNum:"RO-1001", promiseTime:"", roNotes:[], serviceType:"st-main", year:"2021", make:"Toyota",  model:"Camry",   customer:"John Smith",   priority:"NORMAL", jobs:"Oil Change, Tire Rotation", hours:"1.5", waitStatus:"dropoff" },
-  { id:"ro-1002", roNum:"RO-1002", promiseTime:"", roNotes:[], serviceType:"st-main", year:"2019", make:"Honda",   model:"Accord",  customer:"Sarah Jones",  priority:"HIGH",   jobs:"Brake Pads, Brake Rotors", hours:"3",   waitStatus:"waiting"  },
-  { id:"ro-1003", roNum:"RO-1003", promiseTime:"", roNotes:[], serviceType:"st-pdi",  year:"2024", make:"Ford",    model:"F-150",   customer:"Stock #4421",  priority:"NORMAL", jobs:"PDI",              hours:"1",   waitStatus:"none"     },
-  { id:"ro-1004", roNum:"RO-1004", promiseTime:"", roNotes:[], serviceType:"st-used", year:"2018", make:"Chevy",   model:"Malibu",  customer:"Used Recon",   priority:"LOW",    jobs:"Diagnostic, Detail",       hours:"2",   waitStatus:"none"     },
-  { id:"ro-1005", roNum:"RO-1005", promiseTime:"", roNotes:[], serviceType:"st-main", year:"2022", make:"Nissan",  model:"Altima",  customer:"Mike Davis",   priority:"NORMAL", jobs:"Alignment, Shocks/Struts", hours:"2.5", waitStatus:"dropoff"  },
-  { id:"ro-87045",roNum:"RO-87045",promiseTime:"", roNotes:[], serviceType:"st-main", year:"2020", make:"BMW",     model:"330i",    customer:"Chris Lee",    priority:"HIGH",   jobs:"Diagnostic",               hours:"1",   waitStatus:"waiting"  },
-  { id:"ro-55922",roNum:"RO-55922",promiseTime:"", roNotes:[], serviceType:"st-main", year:"2023", make:"Mercedes",model:"C300",    customer:"Amy Wilson",   priority:"NORMAL", jobs:"Oil Change",               hours:"0.5", waitStatus:"dropoff"  },
-  { id:"ro-56003",roNum:"RO-56003",promiseTime:"", roNotes:[], serviceType:"st-main", year:"2017", make:"Jeep",    model:"Wrangler",customer:"Tom Brown",    priority:"LOW",    jobs:"Tire Rotation, Wiper Blades",hours:"1", waitStatus:"none"     },
-];
+  {
+    id: 'RO-1001', roNumber: 'RO-1001', serviceType: 'Main Shop',
+    vehicle: '2022 Toyota Camry', customer: 'John Smith',
+    priority: 'normal', flatRateHours: 2.5, jobs: ['Oil Change', 'Tire Rotation'],
+    promiseTime: '3:00 PM', concern: 'Customer reports noise from front',
+    column: 'onDeck', tech: null, timerStart: null, timerElapsed: 0,
+    notes: [], cause: '', correction: '', waitingOnParts: false, createdAt: NOW - 3600000,
+  },
+  {
+    id: 'RO-1002', roNumber: 'RO-1002', serviceType: 'PDI',
+    vehicle: '2024 Honda Accord', customer: 'New Delivery',
+    priority: 'high', flatRateHours: 3.0, jobs: ['PDI Inspection'],
+    promiseTime: '2:00 PM', concern: 'Pre-delivery inspection',
+    column: 'inProgress', tech: 'Type S', timerStart: NOW - 3600000, timerElapsed: 0,
+    notes: [], cause: '', correction: '', waitingOnParts: false, createdAt: NOW - 7200000,
+  },
+  {
+    id: 'RO-1003', roNumber: 'RO-1003', serviceType: 'Used Cars',
+    vehicle: '2019 Ford F-150', customer: 'Used Car Lot',
+    priority: 'normal', flatRateHours: 4.0, jobs: ['Brake Inspection', 'Oil Change'],
+    promiseTime: '5:00 PM', concern: 'Full inspection needed',
+    column: 'inProgress', tech: 'LA', timerStart: NOW - 7200000, timerElapsed: 0,
+    notes: [], cause: '', correction: '', waitingOnParts: false, createdAt: NOW - 10800000,
+  },
+  {
+    id: 'RO-1004', roNumber: 'RO-1004', serviceType: 'Main Shop',
+    vehicle: '2021 Chevrolet Silverado', customer: 'Mike Johnson',
+    priority: 'urgent', flatRateHours: 1.5, jobs: ['Battery Replacement'],
+    promiseTime: '1:00 PM', concern: "Vehicle won't start",
+    column: 'completedQC', tech: 'Darcheezy', timerStart: null, timerElapsed: 5400000,
+    notes: [], cause: 'Dead battery', correction: 'Replaced battery',
+    waitingOnParts: false, createdAt: NOW - 14400000,
+  },
+  {
+    id: 'RO-1005', roNumber: 'RO-1005', serviceType: 'Main Shop',
+    vehicle: '2020 BMW 3 Series', customer: 'Sarah Davis',
+    priority: 'normal', flatRateHours: 2.0, jobs: ['Alignment'],
+    promiseTime: '4:00 PM', concern: 'Pulling to the right',
+    column: 'onDeck', tech: null, timerStart: null, timerElapsed: 0,
+    notes: [], cause: '', correction: '', waitingOnParts: false, createdAt: NOW - 1800000,
+  },
+  {
+    id: 'RO-87045', roNumber: 'RO-87045', serviceType: 'Main Shop',
+    vehicle: '2023 Mercedes C300', customer: 'Robert Wilson',
+    priority: 'high', flatRateHours: 3.5, jobs: ['Engine Diagnostics', 'Oil Change'],
+    promiseTime: '3:30 PM', concern: 'Check engine light on',
+    column: 'inProgress', tech: 'Jason', timerStart: NOW - 1800000, timerElapsed: 0,
+    notes: [], cause: '', correction: '', waitingOnParts: false, createdAt: NOW - 5400000,
+  },
+  {
+    id: 'RO-55922', roNumber: 'RO-55922', serviceType: 'PDI',
+    vehicle: '2024 Lexus ES350', customer: 'New Delivery',
+    priority: 'normal', flatRateHours: 2.5, jobs: ['PDI Inspection', 'Detail'],
+    promiseTime: '11:00 AM', concern: 'Pre-delivery inspection',
+    column: 'onDeck', tech: null, timerStart: null, timerElapsed: 0,
+    notes: [], cause: '', correction: '', waitingOnParts: false, createdAt: NOW - 900000,
+  },
+  {
+    id: 'RO-56003', roNumber: 'RO-56003', serviceType: 'Used Cars',
+    vehicle: '2018 Jeep Wrangler', customer: 'Used Car Lot',
+    priority: 'normal', flatRateHours: 5.0,
+    jobs: ['Full Inspection', 'Tire Replacement', 'Brake Service'],
+    promiseTime: '6:00 PM', concern: 'Reconditioning needed',
+    column: 'onDeck', tech: null, timerStart: null, timerElapsed: 0,
+    notes: [], cause: '', correction: '', waitingOnParts: false, createdAt: NOW - 600000,
+  },
+]
 
-const DEFAULT_TECHS = USERS.filter(u => u.role === "tech").map(u => ({ id: u.id, name: u.name }));
-const DEFAULT_QUEUES = [
-  { id:"q-main", name:"Main Shop Work", subtitle:"Priority #1",            color:"#EF4444", icon:"🔴" },
-  { id:"q-pdi",  name:"PDIs",           subtitle:"Pre-Delivery Inspections",color:"#9333EA", icon:"🟣" },
-  { id:"q-used", name:"Used Cars",      subtitle:"Secondary Priority",      color:"#16A34A", icon:"🟢" },
-];
-const STORAGE_KEY = "sft-v20";
-const GOAL_HOURS = 40;
-
-const DEFAULT_SERVICE_TYPES = [
-  { id:"st-main", name:"Main Shop", color:"#EF4444", bg:"rgba(239,68,68,0.08)"  },
-  { id:"st-pdi",  name:"PDI",       color:"#9333EA", bg:"#FAF5FF"               },
-  { id:"st-used", name:"Used Cars", color:"#16A34A", bg:"#F0FDF4"               },
-];
-
-const DEFAULT_JOB_PRESETS = [
-  "Oil Change","Tire Rotation","Brake Pads","Brake Rotors","Alignment",
-  "Diagnostic","Battery","Air Filter","Cabin Filter","Spark Plugs",
-  "Trans Flush","Coolant Flush","Brake Flush","Fuel Filter","Wiper Blades",
-  "Serpentine Belt","Timing Belt","Water Pump","Alternator","Starter",
-  "A/C Service","Shocks/Struts","Wheel Bearing","CV Axle","Tie Rod",
-  "General Inspection","PDI","Detail",
-];
-
-function freshState() {
-  return {
-    techs: DEFAULT_TECHS,
-    queues: DEFAULT_QUEUES,
-    ros: SAMPLE_ROS,
-    nextNum: 1006,
-    grid: {
-      t1: { ondeck:[],          inprogress:[], completed:[], delivered:[] },
-      t2: { ondeck:["ro-1005"], inprogress:[], completed:[], delivered:[] },
-      t3: { ondeck:["ro-1003"], inprogress:[], completed:[], delivered:[] },
-      t4: { ondeck:["ro-1002"], inprogress:[], completed:[], delivered:[] },
-    },
-    partsSlots: [],
-    completedByTech: {},
-    activityLog: [],
-    timeClockLog: [],
-    qSlots: { "q-main":["ro-87045","ro-55922","ro-56003"], "q-pdi":[], "q-used":["ro-1004","ro-1001"] },
-    timers: {},
-    archived: [],
-    serviceTypes: DEFAULT_SERVICE_TYPES,
-    jobPresets: DEFAULT_JOB_PRESETS,
-  };
+const DEFAULT_STATE = {
+  ros: SAMPLE_ROS,
+  techClocks: {
+    'Type S':    { in: false, start: null, total: 0 },
+    'LA':        { in: false, start: null, total: 0 },
+    'Darcheezy': { in: false, start: null, total: 0 },
+    'Jason':     { in: false, start: null, total: 0 },
+  },
+  activity: { movingCars: false, movingStart: null, partsRun: false, partsStart: null },
+  pins: { AD: '052513', Jay: '1000', Mario: '2000', 'Type S': '1111', LA: '2222', Darcheezy: '3333', Jason: '4444' },
+  settings: {
+    serviceTypes: ['Main Shop', 'PDI', 'Used Cars'],
+    jobPresets: [
+      'Oil Change', 'Tire Rotation', 'PDI Inspection', 'Brake Inspection',
+      'Engine Diagnostics', 'Alignment', 'Battery Replacement', 'Detail',
+      'Full Inspection', 'Tire Replacement', 'Brake Service',
+    ],
+  },
+  archive: [],
 }
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const p = JSON.parse(raw);
-      return { ...freshState(), ...p, techs: p.techs || DEFAULT_TECHS, queues: p.queues || DEFAULT_QUEUES };
-    }
-  } catch(e) {}
-  return freshState();
+// ─── Design tokens ────────────────────────────────────────────────────────────
+
+const C = {
+  bg:        '#000000',
+  surface:   '#1C1C1E',
+  surface2:  '#2C2C2E',
+  surface3:  '#3A3A3C',
+  text:      '#FFFFFF',
+  text2:     '#EBEBF5',
+  muted:     '#8E8E93',
+  sep:       '#38383A',
+  blue:      '#0A84FF',
+  green:     '#30D158',
+  red:       '#FF453A',
+  orange:    '#FF9F0A',
+  purple:    '#BF5AF2',
 }
 
-function saveState(s) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch(e) {}
+const GLOBAL_STYLE = `
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #000; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #3A3A3C; border-radius: 2px; }
+  input, select, textarea, button { font-family: 'Space Grotesk', sans-serif; }
+  textarea { resize: vertical; }
+`
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtElapsed(ms) {
+  if (!ms) return '0:00'
+  const s = Math.floor(ms / 1000)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+  return `${m}:${String(sec).padStart(2, '0')}`
 }
 
-function initials(name) {
-  return name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+function getLiveElapsed(ro) {
+  return ro.timerElapsed + (ro.timerStart ? Date.now() - ro.timerStart : 0)
 }
 
-function fmtTime(secs) {
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return m + "m " + String(s).padStart(2,"0") + "s";
+function genROId() {
+  return 'RO-' + String(Math.floor(Math.random() * 90000 + 10000))
 }
 
-function abbrevJob(j) {
-  const v = j.toLowerCase().trim();
-  if (v.includes("oil"))    return { label:"Oil",   bg:"#FFF7ED", color:"#C2410C" };
-  if (v.includes("brake"))  return { label:"Brks",  bg:"#FFF1F2", color:"#BE123C" };
-  if (v.includes("diag"))   return { label:"Diag",  bg:"#EEF4FF", color:"#1D4ED8" };
-  if (v.includes("trans"))  return { label:"Trans", bg:"#FAF5FF", color:"#7E22CE" };
-  if (v.includes("tire"))   return { label:"Tires", bg:"#F0FDF4", color:"#15803D" };
-  if (v.includes("align"))  return { label:"Algn",  bg:"#F0FDF4", color:"#15803D" };
-  if (v.includes("coolant"))return { label:"Cool",  bg:"#ECFEFF", color:"#0E7490" };
-  if (v.includes("flush"))  return { label:"Flush", bg:"#ECFEFF", color:"#0E7490" };
-  if (v.includes("filter")) return { label:"Fltr",  bg:"#FFF7ED", color:"#C2410C" };
-  if (v.includes("spark"))  return { label:"Plugs", bg:"#FFFBEB", color:"#B45309" };
-  if (v.includes("battery"))return { label:"Batt",  bg:"#FFFBEB", color:"#B45309" };
-  if (v.includes("inspect"))return { label:"Insp",  bg:"#F8FAFC", color:"#475569" };
-  if (v.includes("pdi"))    return { label:"PDI",   bg:"#FAF5FF", color:"#7E22CE" };
-  if (v.includes("ac") || v.includes("a/c")) return { label:"A/C", bg:"#ECFEFF", color:"#0E7490" };
-  if (v.includes("rotat"))  return { label:"Rot",   bg:"#F0FDF4", color:"#15803D" };
-  if (v.includes("wiper"))  return { label:"Wprs",  bg:"#F8FAFC", color:"#475569" };
-  if (v.includes("belt"))   return { label:"Belt",  bg:"#FFFBEB", color:"#B45309" };
-  if (v.includes("pump"))   return { label:"Pump",  bg:"#ECFEFF", color:"#0E7490" };
-  if (v.includes("axle") || v.includes("cv")) return { label:"Axle", bg:"#FEF2F2", color:"#991B1B" };
-  if (v.includes("shocks") || v.includes("strut")) return { label:"Susp", bg:"#FEF2F2", color:"#991B1B" };
-  if (v.includes("wheel"))  return { label:"WhlB",  bg:"#FEF2F2", color:"#991B1B" };
-  if (v.includes("detail")) return { label:"Dtl",   bg:"#F8FAFC", color:"#475569" };
-  if (v.includes("general"))return { label:"Gen",   bg:"#F8FAFC", color:"#475569" };
-  return { label: j.slice(0,4), bg:"#F8FAFC", color:"#475569" };
+function getDefaultRole(name) {
+  for (const u of Object.values(PIN_MAP)) if (u.name === name) return u.role
+  return 'tech'
 }
 
-function priorityBorder(p) {
-  if (p === "HIGH") return "#EF4444";
-  if (p === "LOW")  return "#94A3B8";
-  return "#1D6BF3";
-}
+// ─── Primitive UI ─────────────────────────────────────────────────────────────
 
-function totalFlaggedHours(state) {
-  let sum = 0;
-  Object.values(state.grid).forEach(cols => {
-    Object.values(cols).forEach(ids => {
-      ids.forEach(id => {
-        const ro = state.ros.find(r => r.id === id);
-        if (ro && ro.hours) sum += parseFloat(String(ro.hours).replace(/[^0-9.]/g,"")) || 0;
-      });
-    });
-  });
-  return sum;
-}
-
-function useIsWide() {
-  const [wide, setWide] = useState(window.innerWidth >= 768);
-  useEffect(() => {
-    const fn = () => setWide(window.innerWidth >= 768);
-    window.addEventListener("resize", fn);
-    return () => window.removeEventListener("resize", fn);
-  }, []);
-  return wide;
-}
-
-// Icons
-function PlusIcon()    { return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>; }
-function PlayIcon()    { return <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>; }
-function PauseIcon()   { return <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>; }
-function XIcon()       { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>; }
-function ClockIcon()   { return <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>; }
-function DollarIcon()  { return <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>; }
-function EditIcon()    { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>; }
-function TrashIcon()   { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>; }
-function ArchiveIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>; }
-function LogoutIcon()  { return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>; }
-function BoxIcon()     { return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>; }
-function SettingsIcon(){ return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>; }
-function ChevDownIcon(){ return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>; }
-function ChevUpIcon()  { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>; }
-
-const labelStyle = {
-  display:"block", fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.35)",
-  textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:6,
-};
-const inputStyle = {
-  padding:"13px 14px", border:"none", borderRadius:12, fontSize:15,
-  color:TEXT, background:INPUT_BG, outline:"none",
-  fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif",
-  width:"100%", boxSizing:"border-box", colorScheme:"dark", letterSpacing:"-0.1px",
-  boxShadow:"inset 0 0 0 0.5px rgba(255,255,255,0.1)",
-};
-
-function JobFieldTrigger({ value, onOpen }) {
-  const jobs = value ? value.split(",").map(j => j.trim()).filter(Boolean) : [];
+function Overlay({ onClick, children, sheet }) {
   return (
-    <div>
-      <label style={labelStyle}>Job Types</label>
-      <button onClick={onOpen} style={{ width:"100%", padding:"12px 14px", border:"1.5px solid "+BORDER, borderRadius:12, background:INPUT_BG, display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
-        {jobs.length === 0 ? (
-          <span style={{ color:MUTED, fontSize:14 }}>Tap to select job types…</span>
-        ) : (
-          <div style={{ display:"flex", gap:5, flexWrap:"wrap", flex:1 }}>
-            {jobs.map((j,i) => {
-              const ab = abbrevJob(j);
-              return <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:11, fontWeight:600, padding:"3px 8px", borderRadius:6 }}>{j}</span>;
-            })}
-          </div>
-        )}
-        <span style={{ color:MUTED, fontSize:18, flexShrink:0 }}>›</span>
-      </button>
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClick() }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.82)',
+        display: 'flex',
+        alignItems: sheet ? 'flex-end' : 'center',
+        justifyContent: 'center',
+        padding: sheet ? 0 : 16,
+      }}
+    >
+      {children}
     </div>
-  );
+  )
 }
 
-function JobPicker({ value, onChange, presets, onClose }) {
-  const selected = value ? value.split(",").map(j => j.trim()).filter(Boolean) : [];
-  const [custom, setCustom] = useState("");
-  function toggle(job) {
-    const exists = selected.includes(job);
-    const next = exists ? selected.filter(j => j !== job) : [...selected, job];
-    onChange(next.join(", "));
+function Modal({ title, onClose, children, wide }) {
+  return (
+    <Overlay onClick={onClose}>
+      <div style={{
+        background: C.surface, borderRadius: 18,
+        width: wide ? 660 : 380, maxWidth: '100%', maxHeight: '88vh',
+        display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 72px rgba(0,0,0,0.9)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 20px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0,
+        }}>
+          <span style={{ color: C.text, fontWeight: 700, fontSize: 18 }}>{title}</span>
+          <button onClick={onClose} style={xBtnStyle}>✕</button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '20px', flex: 1 }}>{children}</div>
+      </div>
+    </Overlay>
+  )
+}
+
+const xBtnStyle = {
+  background: C.surface2, border: 'none', color: C.muted,
+  width: 28, height: 28, borderRadius: 14, cursor: 'pointer',
+  fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  flexShrink: 0,
+}
+
+function Btn({ onClick, children, variant = 'primary', small, full, disabled, style: extra }) {
+  const map = {
+    primary:   { bg: C.blue,    fg: '#fff'   },
+    secondary: { bg: C.surface2, fg: C.text  },
+    danger:    { bg: C.red,     fg: '#fff'   },
+    ghost:     { bg: 'transparent', fg: C.blue },
+    orange:    { bg: '#FF9F0A22', fg: C.orange },
   }
-  function addCustom() {
-    const j = custom.trim();
-    if (!j) return;
-    if (!selected.includes(j)) onChange([...selected, j].join(", "));
-    setCustom("");
-  }
-  function removeJob(job) { onChange(selected.filter(j => j !== job).join(", ")); }
+  const { bg, fg } = map[variant] || map.primary
   return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:4000, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div style={{ background:SHEET_BG, borderRadius:"22px 22px 0 0", width:"100%", maxWidth:540, maxHeight:"80vh", display:"flex", flexDirection:"column" }}>
-        <div style={{ width:36, height:4, background:"#E5E7EB", borderRadius:2, margin:"12px auto 0" }} />
-        <div style={{ padding:"12px 18px 10px", borderBottom:"1px solid "+BORDER, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div>
-            <div style={{ fontWeight:800, fontSize:17, color:"#F0F4FF" }}>Job Types</div>
-            <div style={{ fontSize:11, color:"rgba(255,255,255,0.35)", marginTop:1 }}>Tap to toggle</div>
-          </div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.08)", border:"1px solid "+BORDER, borderRadius:8, padding:"6px 10px", color:TEXT2, cursor:"pointer" }}><XIcon /></button>
-        </div>
-        {selected.length > 0 && (
-          <div style={{ padding:"10px 18px 8px", borderBottom:"1px solid "+BORDER, flexShrink:0 }}>
-            <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.35)", textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:6 }}>Selected</div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              {selected.map(j => {
-                const ab = abbrevJob(j);
-                return (
-                  <span key={j} style={{ background:ab.bg, color:ab.color, fontSize:12, fontWeight:600, padding:"4px 10px", borderRadius:8, display:"flex", alignItems:"center", gap:4 }}>
-                    {j}
-                    <button onClick={() => removeJob(j)} style={{ background:"none", border:"none", cursor:"pointer", color:ab.color, padding:0, fontSize:12 }}>×</button>
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        <div style={{ overflowY:"auto", flex:1, padding:"10px 18px", WebkitOverflowScrolling:"touch" }}>
-          <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.35)", textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:8 }}>Presets</div>
-          <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-            {presets.map(j => {
-              const isSelected = selected.includes(j);
-              const ab = abbrevJob(j);
-              return (
-                <button key={j} onClick={() => toggle(j)} style={{ padding:"8px 14px", borderRadius:20, border:"1.5px solid "+(isSelected?ab.color:BORDER), background:isSelected?ab.bg:"transparent", color:isSelected?ab.color:TEXT2, fontSize:13, fontWeight:isSelected?600:400, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}>
-                  {isSelected && <span style={{ fontSize:11, lineHeight:1 }}>✓</span>}
-                  {j}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div style={{ padding:"10px 18px 36px", borderTop:"1px solid "+BORDER, flexShrink:0 }}>
-          <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.35)", textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:8 }}>Custom</div>
-          <div style={{ display:"flex", gap:8 }}>
-            <input placeholder="e.g. Control Arms, Strut Mounts…" value={custom} onChange={e => setCustom(e.target.value)} onKeyDown={e => e.key === "Enter" && addCustom()} style={{ ...inputStyle, flex:1, padding:"11px 14px", fontSize:14 }} />
-            <button onClick={addCustom} style={{ background:ACCENT, color:"#fff", border:"none", borderRadius:10, padding:"0 18px", fontWeight:600, cursor:"pointer" }}>Add</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        background: disabled ? C.surface3 : bg,
+        color: disabled ? C.muted : fg,
+        border: 'none', borderRadius: small ? 9 : 13,
+        padding: small ? '6px 12px' : '12px 18px',
+        fontSize: small ? 13 : 15, fontWeight: 600,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        width: full ? '100%' : undefined,
+        transition: 'opacity 0.15s',
+        ...extra,
+      }}
+    >
+      {children}
+    </button>
+  )
 }
 
-function HoursPicker({ ro, onHoursChange, onClose }) {
-  const [val, setVal] = useState(String(ro.hours||"").replace(/h$/i,""));
-  const presets = ["0.5","1","1.5","2","2.5","3","4","5","6","8"];
-  function commit() { onHoursChange(ro.id, val.replace(/[^0-9.]/g,"").trim()); onClose(); }
+function Label({ children }) {
   return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:4000, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div style={{ background:"#fff", borderRadius:"24px 24px 0 0", width:"100%", maxWidth:400, padding:"20px 20px 40px" }}>
-        <div style={{ width:36, height:4, background:"#E5E7EB", borderRadius:2, margin:"0 auto 16px" }} />
-        <div style={{ fontWeight:800, fontSize:18, color:"#111", marginBottom:2 }}>Flat Rate Hours</div>
-        <div style={{ fontSize:12, color:"#888", marginBottom:18 }}>{ro.roNum}</div>
-        <div style={{ display:"flex", gap:10, marginBottom:16 }}>
-          <input autoFocus type="number" min="0" step="0.5" value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => { if(e.key==="Enter")commit(); if(e.key==="Escape")onClose(); }} placeholder="0.0" style={{ flex:1, padding:14, border:"2px solid "+ACCENT, borderRadius:12, fontSize:18, fontWeight:700, outline:"none" }} />
-          <button onClick={commit} style={{ background:SUCCESS, color:"#fff", border:"none", borderRadius:12, padding:"0 20px", fontWeight:700, cursor:"pointer" }}>Set</button>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:8, marginBottom:16 }}>
-          {presets.map(v => (
-            <button key={v} onClick={() => { onHoursChange(ro.id, v); onClose(); }} style={{ padding:"10px 4px", background:ro.hours===v?"#DCFCE7":"#F8FAFC", color:ro.hours===v?"#16A34A":"#374151", borderRadius:10, border:"1px solid #E5E7EB", fontWeight:600, cursor:"pointer" }}>{v}h</button>
-          ))}
-        </div>
-        <div style={{ display:"flex", gap:8 }}>
-          {ro.hours && <button onClick={() => { onHoursChange(ro.id,""); onClose(); }} style={{ flex:1, padding:12, background:"#FEF2F2", color:"#EF4444", border:"none", borderRadius:10, fontWeight:600, cursor:"pointer" }}>Clear</button>}
-          <button onClick={onClose} style={{ flex:1, padding:12, background:"#F1F5F9", color:"#64748B", border:"none", borderRadius:10, fontWeight:600, cursor:"pointer" }}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  );
+    <div style={{
+      color: C.muted, fontSize: 11, fontWeight: 600,
+      textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6,
+    }}>{children}</div>
+  )
 }
 
-function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
-  const holdRef = useRef(null);
-  const didHold = useRef(false);
-  const vehicle = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
-  const svcType = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
-  const leftColor = isMoving ? ACCENT : (svcType ? svcType.color : priorityBorder(ro.priority));
-  const timerRunning = timer && timer.running;
-  const elapsed = timer ? (timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt)/1000) : timer.elapsed) : 0;
-  const allJobs = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
-  const visibleJobs = allJobs.slice(0,3);
-  const extraJobs = allJobs.length - visibleJobs.length;
-
-  function startHold() {
-    if (canMove === false) return;
-    didHold.current = false;
-    holdRef.current = setTimeout(() => { didHold.current = true; onMove(); if (navigator.vibrate) navigator.vibrate(40); }, 600);
-  }
-  function cancelHold() { if (holdRef.current) clearTimeout(holdRef.current); }
-  function handleClick() {
-    if (didHold.current) { didHold.current = false; return; }
-    if (isMoving) { onMove(); return; }
-    onTap();
-  }
-
-  return (
-    <div onMouseDown={startHold} onMouseUp={cancelHold} onMouseLeave={cancelHold} onTouchStart={startHold} onTouchEnd={cancelHold} onTouchCancel={cancelHold} onClick={handleClick} className="card-press"
-      style={{ background:isMoving?"rgba(10,132,255,0.12)":CARD_BG, borderRadius:14, padding:"12px 13px", marginBottom:7, boxShadow:isMoving?"0 0 0 1.5px #0A84FF, 0 8px 32px rgba(10,132,255,0.2)":CARD_SHADOW, animation:"card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)", border:"1px solid "+CARD_BORDER, borderLeft:"2.5px solid "+leftColor, cursor:"pointer", userSelect:"none", width:"100%", boxSizing:"border-box", transform:isMoving?"scale(1.01)":"scale(1)", transition:"box-shadow 0.2s, transform 0.2s, background 0.2s", WebkitTouchCallout:"none", WebkitUserSelect:"none" }}>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:3 }}>
-        <span style={{ fontWeight:700, fontSize:14, color:TEXT }}>{ro.roNum}</span>
-        <div style={{ display:"flex", alignItems:"center", gap:3, flexShrink:0 }}>
-          {ro.roNotes && ro.roNotes.length > 0 && <span style={{ background:"rgba(10,132,255,0.2)", color:ACCENT, fontSize:8, fontWeight:700, padding:"2px 5px", borderRadius:4 }}>💬{ro.roNotes.length}</span>}
-          {ro.priority === "HIGH" && <span style={{ background:"rgba(255,69,58,0.15)", color:DANGER, fontSize:8, fontWeight:700, padding:"2px 6px", borderRadius:4 }}>🔴 URGENT</span>}
-          {ro.priority === "LOW"  && <span style={{ background:"rgba(99,99,102,0.3)",  color:"rgba(255,255,255,0.45)", fontSize:8, fontWeight:700, padding:"2px 6px", borderRadius:4 }}>LOW</span>}
-        </div>
-      </div>
-      {ro.promiseTime && (() => {
-        const now = Date.now();
-        const promise = new Date(ro.promiseTime).getTime();
-        const diff = promise - now;
-        const overdue = diff < 0;
-        const soon = diff > 0 && diff < 3600000;
-        const timeStr = new Date(ro.promiseTime).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
-        return (
-          <div style={{ display:"flex", alignItems:"center", gap:3, marginBottom:3 }}>
-            <span style={{ background:overdue?"rgba(255,69,58,0.15)":soon?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", color:overdue?DANGER:soon?WARN:TEXT3, fontSize:9, fontWeight:600, padding:"2px 6px", borderRadius:5 }}>
-              🕐 {overdue?"OVERDUE — ":soon?"Due soon — ":""}{timeStr}
-            </span>
-          </div>
-        );
-      })()}
-      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
-        <span style={{ background:timerRunning?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", color:timerRunning?WARN:TEXT3, fontSize:9, fontWeight:500, padding:"2px 7px", borderRadius:5, display:"flex", alignItems:"center", gap:3 }}>
-          <span style={{ width:4, height:4, borderRadius:"50%", background:timerRunning?WARN:TEXT3, display:"inline-block" }}/>
-          {fmtTime(elapsed)}
-        </span>
-        {ro.hours && <span style={{ background:"rgba(48,209,88,0.12)", color:SUCCESS, fontSize:8, fontWeight:600, padding:"2px 6px", borderRadius:5 }}>{String(ro.hours).replace(/h$/i,"")}h</span>}
-      </div>
-      <div style={{ fontSize:11, fontWeight:400, color:"rgba(255,255,255,0.55)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{vehicle}</div>
-      <div style={{ fontSize:10, fontWeight:400, color:"rgba(255,255,255,0.35)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom:4 }}>{ro.customer || "No customer"}</div>
-      <div style={{ display:"flex", alignItems:"center", gap:3, overflow:"hidden", height:18 }}>
-        {visibleJobs.map((j,i) => { const ab = abbrevJob(j); return <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:8, fontWeight:500, padding:"2px 5px", borderRadius:4, flexShrink:0 }}>{ab.label}</span>; })}
-        {extraJobs > 0 && <span style={{ fontSize:8, color:TEXT3, flexShrink:0 }}>+{extraJobs}</span>}
-        {allJobs.length === 0 && <span style={{ fontSize:8, color:"rgba(255,255,255,0.12)" }}>No jobs</span>}
-      </div>
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", height:18, marginTop:4 }}>
-        <div>
-          {ro.waitStatus === "waiting" && <span style={{ background:"rgba(255,159,10,0.15)", color:WARN, fontSize:8, fontWeight:600, padding:"2px 6px", borderRadius:4 }}>⏳ Waiting</span>}
-          {ro.waitStatus === "dropoff" && <span style={{ background:"rgba(255,255,255,0.07)", color:TEXT3, fontSize:8, fontWeight:500, padding:"2px 6px", borderRadius:4 }}>🚗 Drop-Off</span>}
-        </div>
-        {svcType && <span style={{ background:svcType.color, color:"#fff", fontSize:8, fontWeight:600, padding:"2px 6px", borderRadius:4 }}>{svcType.name}</span>}
-      </div>
-      {isMoving && <div style={{ marginTop:6, fontSize:9, color:"#0A84FF", fontWeight:400, textAlign:"center" }}>● MOVING — tap a column to place</div>}
-    </div>
-  );
-}
-
-function Sheet({ title, subtitle, onClose, children, wide }) {
-  return (
-    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.35)", zIndex:2000, display:"flex", alignItems:wide?"center":"flex-end", justifyContent:"center" }}>
-      <div style={{ background:SHEET_BG, borderRadius:wide?"20px":"22px 22px 0 0", width:"100%", maxWidth:wide?560:"100%", maxHeight:"92vh", display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        {!wide && <div style={{ width:36, height:5, background:"rgba(255,255,255,0.25)", borderRadius:3, margin:"10px auto 0", flexShrink:0 }} />}
-        <div style={{ padding:"14px 20px 12px", borderBottom:"0.5px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
-          <div>
-            <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif", fontWeight:700, fontSize:17, color:TEXT }}>{title}</div>
-            {subtitle && <div style={{ fontSize:12, color:"rgba(255,255,255,0.35)", marginTop:2 }}>{subtitle}</div>}
-          </div>
-          <button onClick={onClose} style={{ background:BG, border:"none", borderRadius:10, width:30, height:30, display:"flex", alignItems:"center", justifyContent:"center", color:TEXT3, cursor:"pointer" }}><XIcon /></button>
-        </div>
-        <div style={{ padding:"16px 20px 36px", overflowY:"auto", WebkitOverflowScrolling:"touch", flex:1 }}>{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function WFLogo({ size=40, radius=10 }) {
-  const s = size, r = radius;
-  return (
-    <svg width={s} height={s} viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="wfBg" x1="0" y1="0" x2="96" y2="96" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#0C1830"/><stop offset="100%" stopColor="#060010"/></linearGradient>
-        <linearGradient id="wfRing" x1="10" y1="10" x2="78" y2="78" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#A0D4FF"/><stop offset="100%" stopColor="#0A84FF"/></linearGradient>
-        <linearGradient id="wfTail" x1="58" y1="56" x2="82" y2="80" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#0A84FF"/><stop offset="100%" stopColor="#E040FB"/></linearGradient>
-        <linearGradient id="wfBar" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop offset="0%" stopColor="white"/><stop offset="100%" stopColor="rgba(255,255,255,0.6)"/></linearGradient>
-        <radialGradient id="wfGlow" cx="50%" cy="0%" r="60%" gradientUnits="objectBoundingBox"><stop offset="0%" stopColor="rgba(10,132,255,0.2)"/><stop offset="100%" stopColor="transparent"/></radialGradient>
-        <filter id="wfBlur"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-      </defs>
-      <rect width="96" height="96" rx={r*2.2} fill="url(#wfBg)"/>
-      <rect width="96" height="96" rx={r*2.2} fill="url(#wfGlow)" opacity="0.5"/>
-      <rect x="16" y="0" width="64" height="1" rx="0.5" fill="rgba(255,255,255,0.18)"/>
-      <circle cx="44" cy="42" r="22" stroke="url(#wfRing)" strokeWidth="5" fill="none" filter="url(#wfBlur)"/>
-      <rect x="30" y="39" width="6" height="12" rx="3" fill="url(#wfBar)" opacity="0.4"/>
-      <rect x="41" y="33" width="6" height="18" rx="3" fill="url(#wfBar)" opacity="0.65"/>
-      <rect x="52" y="26" width="6" height="25" rx="3" fill="url(#wfBar)" filter="url(#wfBlur)"/>
-      <line x1="60" y1="58" x2="79" y2="77" stroke="url(#wfTail)" strokeWidth="5.5" strokeLinecap="round"/>
-    </svg>
-  );
-}
-
-function LiveClock() {
-  const [time, setTime] = useState(new Date());
-  useEffect(() => { const t = setInterval(() => setTime(new Date()), 1000); return () => clearInterval(t); }, []);
-  const h = time.getHours(), m = String(time.getMinutes()).padStart(2,"0");
-  const ampm = h >= 12 ? "PM" : "AM", h12 = h % 12 || 12;
-  return (
-    <div style={{ display:"flex", alignItems:"baseline", gap:2 }}>
-      <span style={{ fontSize:14, fontWeight:600, color:"rgba(255,255,255,0.7)" }}>{h12}:{m}</span>
-      <span style={{ fontSize:10, fontWeight:500, color:"rgba(255,255,255,0.35)" }}>{ampm}</span>
-    </div>
-  );
-}
-
-function SkeletonCard() {
-  return (
-    <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:14, padding:"12px 13px", marginBottom:7 }}>
-      <div style={{ height:12, background:"rgba(255,255,255,0.07)", borderRadius:6, width:"50%", marginBottom:8 }}/>
-      <div style={{ height:10, background:"rgba(255,255,255,0.05)", borderRadius:6, width:"80%", marginBottom:6 }}/>
-      <div style={{ height:10, background:"rgba(255,255,255,0.04)", borderRadius:6, width:"60%", marginBottom:8 }}/>
-      <div style={{ display:"flex", gap:6 }}>
-        <div style={{ height:16, background:"rgba(255,255,255,0.05)", borderRadius:8, width:40 }}/>
-        <div style={{ height:16, background:"rgba(255,255,255,0.05)", borderRadius:8, width:50 }}/>
-      </div>
-    </div>
-  );
-}
-
-function NoteThread({ ro, currentUser2, onAddNote }) {
-  const [text, setText] = useState("");
-  const notes = ro.roNotes || [];
-  function fmtAgo(ts) {
-    const diff = Date.now() - ts;
-    const m = Math.floor(diff/60000);
-    if (m < 1) return "Just now";
-    if (m < 60) return m+"m ago";
-    const h = Math.floor(m/60);
-    if (h < 24) return h+"h ago";
-    return new Date(ts).toLocaleDateString([],{month:"short",day:"numeric"});
+function Field({ label, value, onChange, type = 'text', placeholder, rows, children }) {
+  const inputStyle = {
+    width: '100%', background: C.surface2, border: `1px solid ${C.sep}`,
+    borderRadius: 10, color: C.text, fontSize: 15, padding: '10px 12px', outline: 'none',
   }
   return (
-    <div style={{ marginBottom:16 }}>
-      <div style={{ fontSize:10, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:8 }}>
-        Notes {notes.length > 0 && <span style={{ color:ACCENT }}>· {notes.length}</span>}
-      </div>
-      {notes.length > 0 && (
-        <div style={{ marginBottom:10 }}>
-          {notes.map(note => (
-            <div key={note.id} style={{ marginBottom:8, display:"flex", gap:8, alignItems:"flex-start" }}>
-              <div style={{ width:26, height:26, borderRadius:"50%", background:"linear-gradient(135deg,#0A84FF,#5E5CE6)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, color:"#fff", flexShrink:0 }}>
-                {note.author ? note.author.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() : "?"}
-              </div>
-              <div style={{ flex:1, background:"rgba(255,255,255,0.05)", borderRadius:10, padding:"8px 10px" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                  <span style={{ fontSize:11, fontWeight:600, color:TEXT2 }}>{note.author}</span>
-                  <span style={{ fontSize:10, color:TEXT3 }}>{fmtAgo(note.time)}</span>
-                </div>
-                <div style={{ fontSize:13, color:TEXT2, lineHeight:1.4 }}>{note.text}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+    <div style={{ marginBottom: 14 }}>
+      {label && <Label>{label}</Label>}
+      {children || (
+        rows
+          ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows} style={inputStyle} />
+          : <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
       )}
-      <div style={{ display:"flex", gap:8 }}>
-        <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if(e.key==="Enter" && text.trim()) { onAddNote(ro.id, text, currentUser2?.name||"Unknown"); setText(""); }}} placeholder="Add a note…" style={{ ...inputStyle, flex:1, padding:"10px 12px", fontSize:13 }} />
-        <button onClick={() => { if(text.trim()) { onAddNote(ro.id, text, currentUser2?.name||"Unknown"); setText(""); }}} style={{ background:text.trim()?ACCENT:"rgba(255,255,255,0.06)", color:text.trim()?"#fff":TEXT3, border:"none", borderRadius:10, padding:"0 16px", fontWeight:600, cursor:"pointer" }}>Send</button>
-      </div>
     </div>
-  );
+  )
 }
 
-function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, onHoursChange, wide, isAdmin, isTech, serviceTypes, jobPresets, currentUser2, onAddNote, colId }) {
-  const [editing, setEditing] = useState(false);
-  const [showJobPickerEdit, setShowJobPickerEdit] = useState(false);
-  const [f, setF] = useState({ ...ro, serviceType: ro.serviceType||"st-main" });
-  const jobPresetsForEdit = jobPresets || DEFAULT_JOB_PRESETS;
-  const elapsed = timer ? (timer.running ? timer.elapsed + Math.floor((Date.now()-timer.startedAt)/1000) : timer.elapsed) : 0;
-  const [techEditing, setTechEditing] = useState(false);
-
-  if (techEditing && isTech) {
-    return (
-      <Sheet title="Update RO" subtitle={ro.roNum} onClose={onClose} wide={wide}>
-        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-          <div style={{ background:"rgba(10,132,255,0.08)", borderRadius:12, padding:"10px 14px", fontSize:12, color:TEXT2 }}>✏️ You can update mileage out, cause, correction and flat rate hours</div>
-          <div><label style={labelStyle}>Mileage Out</label><input type="number" placeholder="e.g. 45010" value={f.mileageOut||""} onChange={e => setF(p=>({...p,mileageOut:e.target.value}))} style={inputStyle}/></div>
-          <div><label style={labelStyle}>Flat Rate Hours</label><input type="number" min="0" step="0.5" placeholder="e.g. 2.5" value={String(f.hours||"").replace(/h$/i,"")} onChange={e => setF(p=>({...p,hours:e.target.value}))} style={inputStyle}/></div>
-          <div><label style={labelStyle}>Cause — What you found</label><textarea placeholder="Root cause identified…" value={f.cause||""} onChange={e => setF(p=>({...p,cause:e.target.value}))} style={{ ...inputStyle, minHeight:80, resize:"vertical" }}/></div>
-          <div><label style={labelStyle}>Correction — Work performed</label><textarea placeholder="What was done to fix it…" value={f.correction||""} onChange={e => setF(p=>({...p,correction:e.target.value}))} style={{ ...inputStyle, minHeight:80, resize:"vertical" }}/></div>
-          <div><label style={labelStyle}>Tech Notes</label><textarea placeholder="Any additional notes…" value={f.notes||""} onChange={e => setF(p=>({...p,notes:e.target.value}))} style={{ ...inputStyle, minHeight:60, resize:"vertical" }}/></div>
-          <div style={{ display:"flex", gap:10 }}>
-            <button onClick={() => setTechEditing(false)} style={{ flex:1, padding:13, background:"rgba(255,255,255,0.06)", color:TEXT2, border:"none", borderRadius:12, fontWeight:600, cursor:"pointer" }}>Cancel</button>
-            <button onClick={() => { onSave(f); setTechEditing(false); }} style={{ flex:2, padding:13, background:ACCENT, color:"#fff", border:"none", borderRadius:12, fontWeight:700, cursor:"pointer" }}>Save Updates</button>
-          </div>
-        </div>
-      </Sheet>
-    );
-  }
-
-  if (editing) {
-    const inp = (key, placeholder, type="text") => (
-      <input type={type} placeholder={placeholder} value={f[key]||""} onChange={e => setF(p=>({...p,[key]:e.target.value}))} style={inputStyle}/>
-    );
-    const sec = (title) => <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"0.8px", marginTop:8, marginBottom:6 }}>{title}</div>;
-    return (
-      <Sheet title="Edit RO" subtitle={ro.roNum} onClose={onClose} wide={wide}>
-        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-          {sec("Service Type")}
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            {serviceTypes && serviceTypes.map(st => (
-              <button key={st.id} onClick={() => setF(p=>({...p,serviceType:st.id}))} style={{ flex:"1 1 auto", padding:"9px 8px", borderRadius:10, border:"2px solid "+(f.serviceType===st.id?st.color:BORDER), background:f.serviceType===st.id?st.bg:"transparent", color:f.serviceType===st.id?st.color:TEXT2, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:6, justifyContent:"center" }}>
-                <span style={{ width:8, height:8, borderRadius:"50%", background:st.color, display:"inline-block" }}/>{st.name}
-              </button>
-            ))}
-          </div>
-          {sec("Vehicle Info")}
-          <div style={{ display:"grid", gridTemplateColumns:"72px 1fr 1fr", gap:8 }}>{inp("year","Year")}{inp("make","Make")}{inp("model","Model")}</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-            <div><label style={labelStyle}>Color</label>{inp("color","e.g. White")}</div>
-            <div><label style={labelStyle}>License Plate</label>{inp("plate","e.g. ABC1234")}</div>
-          </div>
-          <div><label style={labelStyle}>VIN</label>{inp("vin","Vehicle Identification Number")}</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-            <div><label style={labelStyle}>Mileage In</label>{inp("mileageIn","e.g. 45000","number")}</div>
-            <div><label style={labelStyle}>Mileage Out</label>{inp("mileageOut","e.g. 45010","number")}</div>
-          </div>
-          {sec("Customer Info")}
-          <div><label style={labelStyle}>Customer Name</label>{inp("customer","Full name or stock #")}</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-            <div><label style={labelStyle}>Phone</label>{inp("phone","555-0000","tel")}</div>
-            <div><label style={labelStyle}>Email</label>{inp("email","email@email.com","email")}</div>
-          </div>
-          <div>
-            <label style={labelStyle}>Customer Status</label>
-            <div style={{ display:"flex", gap:8 }}>
-              {[["none","— None"],["dropoff","🚗 Drop-Off"],["waiting","⏳ Waiting"]].map(([v,l]) => (
-                <button key={v} onClick={() => setF(p=>({...p,waitStatus:v}))} style={{ flex:1, padding:"10px 0", borderRadius:12, border:"2px solid "+(f.waitStatus===v?ACCENT:BORDER), background:f.waitStatus===v?ACCENT2:"transparent", color:f.waitStatus===v?ACCENT:TEXT2, fontWeight:600, cursor:"pointer" }}>{l}</button>
-              ))}
-            </div>
-          </div>
-          {sec("Promise Time")}
-          <div>
-            <label style={labelStyle}>Promised By (date & time)</label>
-            <input type="datetime-local" value={f.promiseTime||""} onChange={e => setF(p=>({...p,promiseTime:e.target.value}))} style={{ ...inputStyle, colorScheme:"dark" }}/>
-            {f.promiseTime && <button onClick={() => setF(p=>({...p,promiseTime:""}))} style={{ marginTop:6, background:"none", border:"none", color:DANGER, fontSize:12, cursor:"pointer" }}>Clear promise time</button>}
-          </div>
-          {sec("Job Info")}
-          <div>
-            <label style={labelStyle}>Priority</label>
-            <select value={f.priority} onChange={e => setF(p=>({...p,priority:e.target.value}))} style={{ ...inputStyle, appearance:"auto" }}>
-              <option value="LOW">Low</option><option value="NORMAL">Normal</option><option value="HIGH">High — Urgent</option>
-            </select>
-          </div>
-          <div><label style={labelStyle}>Flat Rate Hours</label><input type="number" min="0" step="0.5" placeholder="e.g. 2.5" value={f.hours||""} onChange={e => setF(p=>({...p,hours:e.target.value}))} style={inputStyle}/></div>
-          <JobFieldTrigger value={f.jobs} onOpen={() => setShowJobPickerEdit(true)} />
-          {showJobPickerEdit && <JobPicker value={f.jobs} onChange={v => setF(p=>({...p,jobs:v}))} presets={jobPresetsForEdit} onClose={() => setShowJobPickerEdit(false)} />}
-          {sec("3 C's — Technician Notes")}
-          <div><label style={labelStyle}>Concern</label><textarea placeholder="Customer complaint…" value={f.concern||""} onChange={e => setF(p=>({...p,concern:e.target.value}))} style={{ ...inputStyle, minHeight:60, resize:"vertical" }}/></div>
-          <div><label style={labelStyle}>Cause</label><textarea placeholder="What tech found…" value={f.cause||""} onChange={e => setF(p=>({...p,cause:e.target.value}))} style={{ ...inputStyle, minHeight:60, resize:"vertical" }}/></div>
-          <div><label style={labelStyle}>Correction</label><textarea placeholder="Work performed…" value={f.correction||""} onChange={e => setF(p=>({...p,correction:e.target.value}))} style={{ ...inputStyle, minHeight:60, resize:"vertical" }}/></div>
-          <div style={{ display:"flex", gap:10, marginTop:4 }}>
-            <button onClick={() => setEditing(false)} style={{ flex:1, padding:13, background:"rgba(255,255,255,0.06)", color:TEXT2, border:"none", borderRadius:12, fontWeight:600, cursor:"pointer" }}>Cancel</button>
-            <button onClick={() => { onSave(f); setEditing(false); }} style={{ flex:2, padding:13, background:ACCENT, color:"#fff", border:"none", borderRadius:12, fontWeight:700, cursor:"pointer" }}>Save Changes</button>
-          </div>
-        </div>
-      </Sheet>
-    );
-  }
-
+function NativeSelect({ label, value, onChange, options }) {
   return (
-    <Sheet title={ro.roNum} subtitle={[ro.year,ro.make,ro.model].filter(Boolean).join(" ")} onClose={onClose} wide={wide}>
-      <div>
-        {(() => {
-          const st = (ro.serviceType && serviceTypes) ? serviceTypes.find(s => s.id === ro.serviceType) : null;
-          return st ? (
-            <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:st.bg, borderRadius:8, padding:"5px 10px", marginBottom:16 }}>
-              <span style={{ width:8, height:8, borderRadius:"50%", background:st.color }}/><span style={{ color:st.color, fontWeight:700, fontSize:12 }}>{st.name}</span>
-            </div>
-          ) : null;
-        })()}
-        <div style={{ marginBottom:18 }}>
-          <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:6 }}>Vehicle</div>
-          <div style={{ fontSize:18, fontWeight:800, color:TEXT }}>{[ro.year,ro.make,ro.model].filter(Boolean).join(" ")||"No vehicle"}</div>
-          {(ro.color||ro.plate||ro.vin) && (
-            <div style={{ fontSize:13, color:SUB, marginTop:4, display:"flex", gap:12, flexWrap:"wrap" }}>
-              {ro.color && <span>🎨 {ro.color}</span>}
-              {ro.plate && <span>🪪 {ro.plate}</span>}
-              {ro.vin   && <span style={{ fontSize:11 }}>VIN: {ro.vin}</span>}
-            </div>
-          )}
-          <div style={{ display:"flex", gap:6, marginTop:8 }}>
-            <div style={{ flex:1, background:BG, borderRadius:10, padding:"10px 12px" }}>
-              <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:3 }}>Miles In</div>
-              <div style={{ fontSize:15, fontWeight:700, color:TEXT }}>{ro.mileageIn ? ro.mileageIn.toLocaleString() : "—"}</div>
-            </div>
-            <div style={{ flex:1, background:BG, borderRadius:10, padding:"10px 12px" }}>
-              <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:3 }}>Miles Out</div>
-              <div style={{ fontSize:15, fontWeight:700, color:TEXT }}>{ro.mileageOut ? ro.mileageOut.toLocaleString() : "—"}</div>
-            </div>
-          </div>
-        </div>
-        <div style={{ marginBottom:18 }}>
-          <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:6 }}>Customer</div>
-          <div style={{ fontSize:16, fontWeight:700, color:TEXT, marginBottom:6 }}>{ro.customer||"No customer"}</div>
-          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-            {ro.phone && <a href={"tel:"+ro.phone} style={{ display:"flex", alignItems:"center", gap:5, color:ACCENT, fontSize:13, textDecoration:"none" }}>📞 {ro.phone}</a>}
-            {ro.email && <a href={"mailto:"+ro.email} style={{ display:"flex", alignItems:"center", gap:5, color:ACCENT, fontSize:13, textDecoration:"none" }}>✉️ {ro.email}</a>}
-          </div>
-          <div style={{ marginTop:8 }}>
-            {ro.waitStatus==="waiting" && <span style={{ background:"rgba(255,159,10,0.15)", color:WARN, fontSize:12, fontWeight:600, padding:"4px 10px", borderRadius:8 }}>⏳ Customer Waiting</span>}
-            {ro.waitStatus==="dropoff" && <span style={{ background:"rgba(255,255,255,0.08)", color:TEXT2, fontSize:12, fontWeight:500, padding:"4px 10px", borderRadius:8 }}>🚗 Drop-Off</span>}
-            {(!ro.waitStatus||ro.waitStatus==="none") && <span style={{ background:"rgba(255,255,255,0.05)", color:TEXT3, fontSize:12, fontWeight:500, padding:"4px 10px", borderRadius:8 }}>No status</span>}
-          </div>
-        </div>
-        <div style={{ marginBottom:18 }}>
-          <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:10 }}>Job Info</div>
-          <div style={{ display:"flex", gap:10, marginBottom:12 }}>
-            <div style={{ flex:1 }}>
-              <label style={labelStyle}>Priority</label>
-              <select value={ro.priority} onChange={e => onSave({...ro,priority:e.target.value})} style={{ ...inputStyle, padding:"10px 12px", appearance:"auto" }}>
-                <option value="LOW">Low</option><option value="NORMAL">Normal</option><option value="HIGH">High — Urgent</option>
-              </select>
-            </div>
-            <div style={{ flex:1 }}>
-              <label style={labelStyle}>Flat Rate Hrs</label>
-              <input type="number" min="0" step="0.5" value={String(ro.hours||"").replace(/h$/i,"")} onChange={e => onHoursChange(ro.id, e.target.value)} placeholder="0.0" style={{ ...inputStyle, padding:"10px 12px", fontWeight:700, fontSize:15 }}/>
-            </div>
-          </div>
-          {ro.jobs ? (
-            <div>
-              <label style={labelStyle}>Jobs</label>
-              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                {ro.jobs.split(",").map(j => j.trim()).filter(Boolean).map((j,i) => { const ab = abbrevJob(j); return <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:12, fontWeight:600, padding:"4px 10px", borderRadius:8 }}>{j}</span>; })}
-              </div>
-            </div>
-          ) : <div style={{ color:MUTED, fontSize:13, fontStyle:"italic" }}>No jobs added yet</div>}
-        </div>
-        {(ro.concern||ro.cause||ro.correction) && (
-          <div style={{ marginBottom:18 }}>
-            <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:8 }}>3 C's</div>
-            {[["Concern",ro.concern],["Cause",ro.cause],["Correction",ro.correction]].map(([lbl,val]) => val ? (
-              <div key={lbl} style={{ marginBottom:8 }}>
-                <div style={{ fontSize:10, fontWeight:700, color:MUTED, textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:3 }}>{lbl}</div>
-                <div style={{ fontSize:13, color:TEXT, lineHeight:1.5, background:BG, borderRadius:8, padding:"8px 10px" }}>{val}</div>
-              </div>
-            ) : null)}
-          </div>
-        )}
-        {ro.notes && (
-          <div style={{ background:"rgba(245,158,11,0.12)", borderRadius:10, padding:"10px 14px", marginBottom:16 }}>
-            <div style={{ fontSize:9, fontWeight:700, color:"rgba(245,158,11,0.7)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:4 }}>Notes</div>
-            <div style={{ fontSize:13, color:"rgba(253,230,138,0.9)" }}>{ro.notes}</div>
-          </div>
-        )}
-        {ro.promiseTime && (() => {
-          const now2 = Date.now(), promise = new Date(ro.promiseTime).getTime(), diff = promise - now2;
-          const overdue = diff < 0, soon = diff > 0 && diff < 3600000;
-          const timeStr = new Date(ro.promiseTime).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
-          const mins = Math.abs(Math.floor(diff/60000)), hrs2 = Math.floor(mins/60), rem = mins%60;
-          const countdown = overdue ? (hrs2>0?hrs2+"h "+rem+"m overdue":rem+"m overdue") : (hrs2>0?hrs2+"h "+rem+"m left":rem+"m left");
-          return (
-            <div style={{ marginBottom:16 }}>
-              <div style={{ background:overdue?"rgba(255,69,58,0.1)":soon?"rgba(255,159,10,0.1)":"rgba(255,255,255,0.05)", borderRadius:12, padding:"12px 14px" }}>
-                <div style={{ fontSize:9, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:4 }}>Promise Time</div>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                  <div style={{ fontSize:14, fontWeight:600, color:TEXT2 }}>🕐 {timeStr}</div>
-                  <div style={{ fontSize:12, fontWeight:600, color:overdue?DANGER:soon?WARN:SUCCESS }}>{countdown}</div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-        <NoteThread ro={ro} currentUser2={currentUser2} onAddNote={onAddNote} />
-        <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-          <div>
-            <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:4 }}>Timer</div>
-            <div style={{ fontSize:24, fontWeight:800, color:timer&&timer.running?WARN:TEXT }}>{fmtTime(elapsed)}</div>
-            {timer && timer.running && <div style={{ fontSize:10, color:WARN, fontWeight:600 }}>● Running</div>}
-          </div>
-          <button onClick={() => onTimer(ro.id)} style={{ background:timer&&timer.running?"#FEF3C7":"linear-gradient(135deg,#22C55E,#16A34A)", color:timer&&timer.running?"#D97706":"#fff", border:"none", borderRadius:12, padding:"10px 20px", fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
-            {timer&&timer.running ? <><PauseIcon/> Pause</> : <><PlayIcon/> Start</>}
-          </button>
-        </div>
-        {isTech && (
-          <button onClick={() => setTechEditing(true)} style={{ width:"100%", padding:13, background:ACCENT, color:"#fff", border:"none", borderRadius:12, fontWeight:700, cursor:"pointer", marginBottom:10, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
-            <EditIcon/> Update RO
-          </button>
-        )}
-        {isAdmin && (
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            <button onClick={() => setEditing(true)} style={{ display:"flex", alignItems:"center", gap:8, padding:13, background:"rgba(255,255,255,0.06)", color:TEXT2, border:"none", borderRadius:12, fontWeight:600, cursor:"pointer" }}><EditIcon/> Edit RO Details</button>
-            {colId === "delivered" && <button onClick={() => onArchive(ro.id)} style={{ display:"flex", alignItems:"center", gap:8, padding:13, background:"rgba(255,255,255,0.06)", color:TEXT2, border:"none", borderRadius:12, fontWeight:600, cursor:"pointer" }}><ArchiveIcon/> Archive Ticket</button>}
-            <button onClick={() => { if(window.confirm("Delete this RO?")) onDelete(ro.id); }} style={{ display:"flex", alignItems:"center", gap:8, padding:13, background:"rgba(255,69,58,0.1)", color:DANGER, border:"none", borderRadius:12, fontWeight:600, cursor:"pointer" }}><TrashIcon/> Delete RO</button>
-          </div>
-        )}
-      </div>
-    </Sheet>
-  );
-}
-
-function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes, jobPresets }) {
-  const defaultRoNum = "RO-" + String(nextNum).padStart(4,"0");
-  const [f, setF] = useState({ roNum:defaultRoNum, serviceType:"st-main", year:"", make:"", model:"", color:"", plate:"", vin:"", mileageIn:"", customer:"", phone:"", email:"", waitStatus:"none", priority:"NORMAL", hours:"", jobs:"", promiseTime:"", concern:"", notes:"", dest:"queue", assignQueue:"q-main", assignTech:"", assignCol:"ondeck" });
-  const [showJobPicker, setShowJobPicker] = useState(false);
-  function handleAdd() { onAdd({ ...f }); }
-  return (
-    <Sheet title="New Repair Order" subtitle="Fill in the details below" onClose={onClose} wide={wide}>
-      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-        <div><label style={labelStyle}>RO Number</label><input value={f.roNum} onChange={e => setF(p=>({...p,roNum:e.target.value.toUpperCase()}))} placeholder="e.g. RO-1006" style={{ ...inputStyle, fontWeight:800, fontSize:16 }}/></div>
-        <div>
-          <label style={labelStyle}>Service Type</label>
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            {serviceTypes && serviceTypes.map(st => (
-              <button key={st.id} onClick={() => setF(p=>({...p,serviceType:st.id}))} style={{ flex:"1 1 auto", padding:"10px 8px", borderRadius:12, border:"2px solid "+(f.serviceType===st.id?st.color:BORDER), background:f.serviceType===st.id?st.bg:"transparent", color:f.serviceType===st.id?st.color:TEXT2, fontWeight:600, cursor:"pointer", display:"flex", alignItems:"center", gap:6, justifyContent:"center" }}>
-                <span style={{ width:8, height:8, borderRadius:"50%", background:st.color, display:"inline-block" }}/>{st.name}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div style={{ fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.35)", textTransform:"uppercase", letterSpacing:"0.8px" }}>Vehicle</div>
-        <div style={{ display:"grid", gridTemplateColumns:"72px 1fr 1fr", gap:8 }}>
-          <input placeholder="Year" value={f.year} onChange={e => setF(p=>({...p,year:e.target.value}))} style={inputStyle}/>
-          <input placeholder="Make" value={f.make} onChange={e => setF(p=>({...p,make:e.target.value}))} style={inputStyle}/>
-          <input placeholder="Model" value={f.model} onChange={e => setF(p=>({...p,model:e.target.value}))} style={inputStyle}/>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-          <div><label style={labelStyle}>Color</label><input placeholder="e.g. White" value={f.color} onChange={e => setF(p=>({...p,color:e.target.value}))} style={inputStyle}/></div>
-          <div><label style={labelStyle}>Plate #</label><input placeholder="ABC1234" value={f.plate} onChange={e => setF(p=>({...p,plate:e.target.value}))} style={inputStyle}/></div>
-        </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-          <div><label style={labelStyle}>Mileage In</label><input type="number" placeholder="e.g. 45000" value={f.mileageIn} onChange={e => setF(p=>({...p,mileageIn:e.target.value}))} style={inputStyle}/></div>
-          <div><label style={labelStyle}>VIN (optional)</label><input placeholder="17 characters" value={f.vin} onChange={e => setF(p=>({...p,vin:e.target.value}))} style={inputStyle}/></div>
-        </div>
-        <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"0.8px" }}>Customer</div>
-        <div><label style={labelStyle}>Customer Name / Stock #</label><input placeholder="Full name or stock number" value={f.customer} onChange={e => setF(p=>({...p,customer:e.target.value}))} style={inputStyle}/></div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-          <div><label style={labelStyle}>Phone</label><input type="tel" placeholder="555-0000" value={f.phone} onChange={e => setF(p=>({...p,phone:e.target.value}))} style={inputStyle}/></div>
-          <div><label style={labelStyle}>Email</label><input type="email" placeholder="email@email.com" value={f.email} onChange={e => setF(p=>({...p,email:e.target.value}))} style={inputStyle}/></div>
-        </div>
-        <div>
-          <label style={labelStyle}>Customer Status</label>
-          <div style={{ display:"flex", gap:8 }}>
-            {[["none","— None"],["dropoff","🚗 Drop-Off"],["waiting","⏳ Waiting"]].map(([v,l]) => (
-              <button key={v} onClick={() => setF(p=>({...p,waitStatus:v}))} style={{ flex:1, padding:"10px 0", borderRadius:12, border:"2px solid "+(f.waitStatus===v?ACCENT:BORDER), background:f.waitStatus===v?ACCENT2:"transparent", color:f.waitStatus===v?ACCENT:TEXT2, fontWeight:600, cursor:"pointer" }}>{l}</button>
-            ))}
-          </div>
-        </div>
-        <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"0.8px" }}>Job Info</div>
-        <div>
-          <label style={labelStyle}>Priority</label>
-          <div style={{ display:"flex", gap:8 }}>
-            {["LOW","NORMAL","HIGH"].map(p => (
-              <button key={p} onClick={() => setF(prev=>({...prev,priority:p}))} style={{ flex:1, padding:"10px 0", borderRadius:12, border:"2px solid "+(f.priority===p?ACCENT:BORDER), background:f.priority===p?ACCENT2:"transparent", color:f.priority===p?ACCENT:TEXT2, fontWeight:600, cursor:"pointer" }}>{p}</button>
-            ))}
-          </div>
-        </div>
-        <div><label style={labelStyle}>Flat Rate Hours</label><input type="number" placeholder="e.g. 2.5" value={f.hours} onChange={e => setF(p=>({...p,hours:e.target.value}))} style={inputStyle}/></div>
-        <JobFieldTrigger value={f.jobs} onOpen={() => setShowJobPicker(true)} />
-        {showJobPicker && <JobPicker value={f.jobs} onChange={v => setF(p=>({...p,jobs:v}))} presets={jobPresets||DEFAULT_JOB_PRESETS} onClose={() => setShowJobPicker(false)} />}
-        <div><label style={labelStyle}>Promise Time (optional)</label><input type="datetime-local" value={f.promiseTime||""} onChange={e => setF(p=>({...p,promiseTime:e.target.value}))} style={{ ...inputStyle, colorScheme:"dark" }}/></div>
-        <div><label style={labelStyle}>Customer Concern</label><textarea placeholder="What the customer says…" value={f.concern} onChange={e => setF(p=>({...p,concern:e.target.value}))} style={{ ...inputStyle, minHeight:60, resize:"vertical" }}/></div>
-        <div><label style={labelStyle}>Notes</label><textarea placeholder="Any extra info…" value={f.notes} onChange={e => setF(p=>({...p,notes:e.target.value}))} style={{ ...inputStyle, minHeight:50, resize:"vertical" }}/></div>
-        <div>
-          <label style={labelStyle}>Place In</label>
-          <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-            {[["queue","Staging Queue"],["tech","Technician"]].map(([v,l]) => (
-              <button key={v} onClick={() => setF(p=>({...p,dest:v}))} style={{ flex:1, padding:11, borderRadius:12, border:"2px solid "+(f.dest===v?ACCENT:BORDER), background:f.dest===v?ACCENT2:"transparent", color:f.dest===v?ACCENT:TEXT2, fontWeight:600, cursor:"pointer" }}>{l}</button>
-            ))}
-          </div>
-          {f.dest === "queue" ? (
-            <select value={f.assignQueue} onChange={e => setF(p=>({...p,assignQueue:e.target.value}))} style={{ ...inputStyle, appearance:"auto" }}>
-              {queues.map(q => <option key={q.id} value={q.id}>{q.name}</option>)}
-            </select>
-          ) : (
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              <select value={f.assignTech} onChange={e => setF(p=>({...p,assignTech:e.target.value}))} style={{ ...inputStyle, appearance:"auto" }}>
-                <option value="">— Tech —</option>
-                {techs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-              <select value={f.assignCol} onChange={e => setF(p=>({...p,assignCol:e.target.value}))} style={{ ...inputStyle, appearance:"auto" }}>
-                {COLS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
-            </div>
-          )}
-        </div>
-        <button onClick={handleAdd} style={{ padding:15, background:ACCENT, color:"#fff", border:"none", borderRadius:14, fontWeight:700, fontSize:16, cursor:"pointer" }}>+ Create RO</button>
-      </div>
-    </Sheet>
-  );
-}
-
-function ArchiveModal({ archived, onClose, onRestore, wide }) {
-  return (
-    <Sheet title="Archived Tickets" subtitle={archived.length + " total"} onClose={onClose} wide={wide}>
-      {archived.length === 0 ? (
-        <div style={{ textAlign:"center", color:MUTED, padding:"48px 0", fontSize:15 }}>No archived tickets</div>
-      ) : (
-        archived.map(entry => {
-          const ro = entry.ro;
-          return (
-            <div key={ro.id+entry.archivedAt} style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px", marginBottom:10 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                <div>
-                  <div style={{ fontWeight:800, fontSize:15, color:"#E2E8F0" }}>{ro.roNum}</div>
-                  <div style={{ fontSize:13, color:"rgba(255,255,255,0.4)", marginTop:2 }}>{[ro.year,ro.make,ro.model].filter(Boolean).join(" ")||"No vehicle"}</div>
-                  <div style={{ fontSize:12, color:MUTED, marginTop:1 }}>{ro.customer}</div>
-                  <div style={{ fontSize:11, color:MUTED, marginTop:4 }}>{"Archived " + new Date(entry.archivedAt).toLocaleDateString()}</div>
-                </div>
-                <button onClick={() => onRestore(entry)} style={{ background:ACCENT2, color:ACCENT, border:"none", borderRadius:10, padding:"8px 14px", fontWeight:600, cursor:"pointer" }}>Restore</button>
-              </div>
-            </div>
-          );
-        })
-      )}
-    </Sheet>
-  );
-}
-
-const PRESET_COLORS = ["#1D6BF3","#9333EA","#16A34A","#EF4444","#D97706","#0891B2","#DB2777","#65A30D","#7C3AED","#EA580C"];
-const COLOR_BG = { "#1D6BF3":"#EEF4FF","#9333EA":"#FAF5FF","#16A34A":"#F0FDF4","#EF4444":"#FEF2F2","#D97706":"#FFFBEB","#0891B2":"#ECFEFF","#DB2777":"#FDF2F8","#65A30D":"#F7FEE7","#7C3AED":"#F5F3FF","#EA580C":"#FFF7ED" };
-
-function JobPresetsEditor({ presets, onSave }) {
-  const [list, setList] = useState([...presets]);
-  const [newJob, setNewJob] = useState("");
-  function addJob() { const j = newJob.trim(); if (!j || list.includes(j)) return; setList(l=>[...l,j]); setNewJob(""); }
-  function removeJob(j) { setList(l=>l.filter(x=>x!==j)); }
-  return (
-    <div>
-      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:14 }}>
-        {list.map(j => { const ab = abbrevJob(j); return (
-          <span key={j} style={{ background:ab.bg, color:ab.color, fontSize:12, fontWeight:600, padding:"4px 10px", borderRadius:8, display:"flex", alignItems:"center", gap:4 }}>
-            {j}<button onClick={() => removeJob(j)} style={{ background:"none", border:"none", cursor:"pointer", color:ab.color, padding:0 }}>×</button>
-          </span>
-        ); })}
-      </div>
-      <div style={{ display:"flex", gap:8, marginBottom:12 }}>
-        <input placeholder="Add new job type…" value={newJob} onChange={e => setNewJob(e.target.value)} onKeyDown={e => e.key==="Enter" && addJob()} style={{ ...inputStyle, flex:1, padding:"10px 12px" }}/>
-        <button onClick={addJob} style={{ background:ACCENT, color:"#fff", border:"none", borderRadius:10, padding:"0 16px", fontWeight:600, cursor:"pointer" }}>Add</button>
-      </div>
-      <button onClick={() => onSave(list)} style={{ width:"100%", padding:13, background:"linear-gradient(135deg,#0A84FF,#5E5CE6)", color:"#fff", border:"none", borderRadius:12, fontWeight:700, cursor:"pointer" }}>Save Job Presets</button>
-    </div>
-  );
-}
-
-function ServiceTypeSettings({ serviceTypes, jobPresets, onClose, onSave, onSaveJobs, wide }) {
-  const [types, setTypes] = useState(serviceTypes.map(s=>({...s})));
-  const [newName, setNewName] = useState("");
-  const [newColor, setNewColor] = useState("#1D6BF3");
-  function addType() { if (!newName.trim()) return; const id="st-"+Date.now(); setTypes(t=>[...t,{id,name:newName.trim(),color:newColor,bg:COLOR_BG[newColor]||"#F8FAFC"}]); setNewName(""); setNewColor("#1D6BF3"); }
-  function removeType(id) { setTypes(t=>t.filter(x=>x.id!==id)); }
-  function updateName(id,name) { setTypes(t=>t.map(x=>x.id===id?{...x,name}:x)); }
-  function updateColor(id,color) { setTypes(t=>t.map(x=>x.id===id?{...x,color,bg:COLOR_BG[color]||"#F8FAFC"}:x)); }
-  return (
-    <Sheet title="Service Types" subtitle="Manage RO categories" onClose={onClose} wide={wide}>
-      <div>
-        {types.map(st => (
-          <div key={st.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 0", borderBottom:"0.5px solid "+BORDER }}>
-            <span style={{ width:12, height:12, borderRadius:"50%", background:st.color, flexShrink:0 }}/>
-            <input value={st.name} onChange={e => updateName(st.id,e.target.value)} style={{ ...inputStyle, flex:1, padding:"8px 10px", fontSize:13 }}/>
-            <div style={{ display:"flex", gap:4, flexWrap:"wrap", width:140 }}>
-              {PRESET_COLORS.map(c => <button key={c} onClick={() => updateColor(st.id,c)} style={{ width:18, height:18, borderRadius:"50%", background:c, border:"2px solid "+(st.color===c?"#fff":"transparent"), cursor:"pointer" }}/>)}
-            </div>
-            <button onClick={() => removeType(st.id)} style={{ background:"#FEF2F2", color:"#EF4444", border:"1px solid #FECACA", borderRadius:8, padding:"4px 10px", fontWeight:600, cursor:"pointer", fontSize:12 }}>Remove</button>
-          </div>
+    <div style={{ marginBottom: 14 }}>
+      {label && <Label>{label}</Label>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width: '100%', background: C.surface2, border: `1px solid ${C.sep}`,
+        borderRadius: 10, color: C.text, fontSize: 15, padding: '10px 12px', outline: 'none',
+      }}>
+        {options.map(o => (
+          <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>
         ))}
-        <div style={{ marginTop:16, paddingTop:16, borderTop:"1px solid "+BORDER }}>
-          <div style={{ fontSize:11, fontWeight:700, color:MUTED, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:8 }}>Add New Category</div>
-          <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-            <input placeholder="Category name…" value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key==="Enter" && addType()} style={{ ...inputStyle, flex:1, padding:"10px" }}/>
-            <button onClick={addType} style={{ background:ACCENT, color:"#fff", border:"none", borderRadius:10, padding:"0 16px", fontWeight:600, cursor:"pointer" }}>Add</button>
-          </div>
-          <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:16 }}>
-            {PRESET_COLORS.map(c => <button key={c} onClick={() => setNewColor(c)} style={{ width:28, height:28, borderRadius:"50%", background:c, border:"3px solid "+(newColor===c?"#fff":"transparent"), cursor:"pointer" }}/>)}
-          </div>
-        </div>
-        <button onClick={() => onSave(types)} style={{ marginTop:16, width:"100%", padding:14, background:ACCENT, color:"#fff", border:"none", borderRadius:12, fontWeight:700, cursor:"pointer" }}>Save Service Types</button>
-        <div style={{ marginTop:28, paddingTop:20, borderTop:"2px solid "+BORDER }}>
-          <div style={{ fontWeight:800, fontSize:16, color:TEXT, marginBottom:4 }}>Job Presets</div>
-          <div style={{ fontSize:12, color:MUTED, marginBottom:14 }}>Edit the list of common jobs</div>
-          <JobPresetsEditor presets={jobPresets} onSave={onSaveJobs} />
-        </div>
-      </div>
-    </Sheet>
-  );
-}
-
-function ChangePinModal({ user, onClose, onSave }) {
-  const [current, setCurrent] = useState("");
-  const [newPin, setNewPin] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [err, setErr] = useState("");
-  function handleSave() {
-    if (current !== user.pin) { setErr("Current PIN is incorrect"); return; }
-    if (newPin.length < 4) { setErr("New PIN must be at least 4 digits"); return; }
-    if (newPin !== confirm) { setErr("PINs do not match"); return; }
-    if (!/^[0-9]+$/.test(newPin)) { setErr("PIN must be numbers only"); return; }
-    onSave(newPin); onClose();
-  }
-  const inp = (val, set, placeholder) => (
-    <input type="password" placeholder={placeholder} value={val} onChange={e => { set(e.target.value.replace(/\D/g,"")); setErr(""); }} onKeyDown={e => e.key==="Enter" && handleSave()} style={{ ...inputStyle, textAlign:"center", fontSize:20, letterSpacing:"0.4em", marginBottom:12 }}/>
-  );
-  return (
-    <div onClick={e => { if(e.target===e.currentTarget)onClose(); }} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <div style={{ background:SHEET_BG, borderRadius:20, padding:"24px 20px", width:"100%", maxWidth:320 }}>
-        <div style={{ fontWeight:800, fontSize:18, color:TEXT, marginBottom:4 }}>Change PIN</div>
-        <div style={{ fontSize:12, color:TEXT3, marginBottom:20 }}>{user.name}</div>
-        {inp(current, setCurrent, "Current PIN")}
-        {inp(newPin, setNewPin, "New PIN")}
-        {inp(confirm, setConfirm, "Confirm New PIN")}
-        {err && <div style={{ color:DANGER, fontSize:12, textAlign:"center", marginBottom:10, fontWeight:500 }}>{err}</div>}
-        <button onClick={handleSave} style={{ width:"100%", padding:14, background:ACCENT, color:"#fff", border:"none", borderRadius:12, fontWeight:700, cursor:"pointer", marginBottom:8 }}>Save New PIN</button>
-        <button onClick={onClose} style={{ width:"100%", padding:12, background:"rgba(255,255,255,0.06)", color:TEXT2, border:"none", borderRadius:12, fontWeight:600, cursor:"pointer" }}>Cancel</button>
-      </div>
+      </select>
     </div>
-  );
+  )
 }
 
-function LoginScreen({ onLogin }) {
-  const [selectedId, setSelectedId] = useState("");
-  const [pin, setPin] = useState("");
-  const [err, setErr] = useState("");
-  const [shake, setShake] = useState(false);
-  const [step, setStep] = useState("name");
-  const [dots, setDots] = useState([false,false,false,false,false,false]);
-  const selectedUser = USERS.find(u => u.id === selectedId);
-  const PIN_LEN = selectedUser?.pin?.length || 4;
-
-  function handlePadPress(val) {
-    if (shake) return;
-    if (val === "del") {
-      const np = pin.slice(0,-1);
-      setPin(np);
-      setDots(d => { const n=[...d]; n[np.length]=false; return n; });
-      setErr("");
-    } else {
-      if (pin.length >= PIN_LEN) return;
-      const np = pin + val;
-      setPin(np);
-      setDots(d => { const n=[...d]; n[np.length-1]=true; return n; });
-      if (np.length === PIN_LEN) {
-        setTimeout(() => {
-          const saved = JSON.parse(localStorage.getItem("sft-pins")||"{}");
-          const activePin = saved[selectedUser.id] || selectedUser.pin;
-          if (activePin === np) {
-            onLogin(selectedUser);
-          } else {
-            setShake(true); setErr("Try again");
-            setTimeout(() => { setShake(false); setErr(""); setPin(""); setDots([false,false,false,false,false,false]); }, 600);
-          }
-        }, 120);
-      }
-    }
-  }
-
-  const PAD = [["1","2","3"],["4","5","6"],["7","8","9"],["","0","del"]];
+function Tag({ label, color, small }) {
   return (
-    <div style={{ minHeight:"100vh", background:"#000000", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"24px 20px", position:"relative", overflow:"hidden" }}>
-      <div style={{ position:"absolute", top:"-20%", left:"50%", transform:"translateX(-50%)", width:400, height:400, background:"radial-gradient(circle, rgba(10,132,255,0.15) 0%, transparent 70%)", pointerEvents:"none" }}/>
-      <div style={{ animation:"fade-in 0.5s ease", textAlign:"center", marginBottom:32 }}>
-        <div style={{ margin:"0 auto 18px", filter:"drop-shadow(0 0 30px rgba(10,132,255,0.4))" }}><WFLogo size={84} radius={11} /></div>
-        <div style={{ color:TEXT, fontWeight:700, fontSize:36, fontFamily:"'Space Grotesk',-apple-system,sans-serif" }}>
-          <span style={{ color:TEXT }}>Worq</span><span style={{ background:"linear-gradient(90deg,#0A84FF,#BF5AF2)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>flow</span>
-        </div>
-        <div style={{ color:"rgba(255,255,255,0.28)", fontSize:13, marginTop:8 }}>
-          {step==="name" ? "Sign in to continue" : "Welcome back, "+selectedUser?.name}
-        </div>
-      </div>
-      {step === "name" && (
-        <div style={{ width:"100%", maxWidth:340, animation:"fade-in 0.3s ease" }}>
-          <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:24, padding:"24px 20px" }}>
-            <div style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Your Name</div>
-            <div style={{ position:"relative", marginBottom:20 }}>
-              <select value={selectedId} onChange={e => { setSelectedId(e.target.value); setPin(""); setErr(""); setDots([false,false,false,false,false,false]); }} style={{ width:"100%", padding:"16px 44px 16px 18px", background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.12)", borderRadius:14, color:TEXT, fontSize:16, outline:"none", appearance:"none", cursor:"pointer" }}>
-                <option value="" disabled style={{ color:"#666" }}>Select your name…</option>
-                {USERS.map(u => <option key={u.id} value={u.id} style={{ color:"#fff", background:"#1C1C1E" }}>{u.name} ({u.role})</option>)}
-              </select>
-              <div style={{ position:"absolute", right:16, top:"50%", transform:"translateY(-50%)", pointerEvents:"none", color:TEXT3 }}><ChevDownIcon/></div>
-            </div>
-            <button onClick={() => { if(selectedId) setStep("pin"); }} style={{ width:"100%", padding:"16px", background:selectedId?"linear-gradient(135deg,#0A84FF,#5E5CE6)":"rgba(255,255,255,0.06)", color:selectedId?"#fff":"rgba(255,255,255,0.3)", border:"none", borderRadius:14, fontWeight:700, fontSize:16, cursor:selectedId?"pointer":"not-allowed" }}>Continue</button>
-          </div>
-        </div>
-      )}
-      {step === "pin" && (
-        <div style={{ width:"100%", maxWidth:300, marginTop:32, animation:"fade-in 0.25s ease" }}>
-          <div style={{ display:"flex", gap:16, marginBottom:8, transform:shake?"translateX(0)":"none", animation:shake?"shake 0.4s ease":"none", justifyContent:"center" }}>
-            {Array.from({length:PIN_LEN}).map((_,i) => <div key={i} style={{ width:14, height:14, borderRadius:"50%", background:dots[i]?"#0A84FF":"rgba(255,255,255,0.15)", transition:"background 0.1s" }}/>)}
-          </div>
-          <div style={{ height:20, marginBottom:16, display:"flex", alignItems:"center", justifyContent:"center" }}>
-            {err && <span style={{ fontSize:12, color:DANGER, fontWeight:500 }}>{err}</span>}
-          </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, width:"100%", maxWidth:280, margin:"0 auto" }}>
-            {PAD.flat().map((key,i) => {
-              if (key === "") return <div key={i}/>;
-              const isDel = key === "del";
-              return (
-                <button key={i} className="pad-btn" onPointerDown={e => { e.preventDefault(); handlePadPress(key); }}
-                  style={{ height:76, borderRadius:22, border:"none", background:isDel?"rgba(255,255,255,0.05)":"rgba(255,255,255,0.09)", color:isDel?"rgba(255,255,255,0.55)":TEXT, fontSize:isDel?20:28, fontWeight:300, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:isDel?"0 1px 0 rgba(255,255,255,0.06) inset":"0 1px 0 rgba(255,255,255,0.14) inset, 0 4px 16px rgba(0,0,0,0.5)", fontFamily:"-apple-system,sans-serif", WebkitUserSelect:"none", userSelect:"none", touchAction:"manipulation" }}>
-                  {key}
-                </button>
-              );
-            })}
-          </div>
-          <button onClick={() => { setStep("name"); setPin(""); setErr(""); setDots([false,false,false,false,false,false]); }} style={{ marginTop:28, background:"none", border:"none", color:"rgba(255,255,255,0.4)", fontSize:14, cursor:"pointer", width:"100%", textAlign:"center" }}>← Switch account</button>
-        </div>
-      )}
-      <div style={{ position:"absolute", bottom:24, fontSize:11, color:"rgba(255,255,255,0.12)" }}>Worqflow · Built for service teams</div>
+    <span style={{
+      background: color + '22', color,
+      fontSize: small ? 10 : 11, fontWeight: 700,
+      padding: small ? '2px 5px' : '3px 8px', borderRadius: 6,
+      textTransform: 'uppercase', letterSpacing: 0.3,
+      flexShrink: 0,
+    }}>{label}</span>
+  )
+}
+
+function ProgressBar({ pct, color }) {
+  return (
+    <div style={{ background: C.surface3, borderRadius: 4, height: 5, overflow: 'hidden' }}>
+      <div style={{
+        background: color || C.blue, width: `${Math.min(pct, 1) * 100}%`,
+        height: '100%', borderRadius: 4, transition: 'width 0.4s',
+      }} />
     </div>
-  );
+  )
 }
 
-const ACTIVITIES = [
-  { id:"moving",    label:"Moving Cars", emoji:"🚗", color:"#FF9F0A" },
-  { id:"parts_run", label:"Parts Run",   emoji:"📦", color:"#BF5AF2" },
-];
+// ─── RO Card ──────────────────────────────────────────────────────────────────
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
-export default function ShopFlowTracker() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [state, setState] = useState(loadState);
-  const [showAdd, setShowAdd] = useState(false);
-  const [showArchive, setShowArchive] = useState(false);
-  const [showServiceTypes, setShowServiceTypes] = useState(false);
-  const [partsCollapsed, setPartsCollapsed] = useState(false);
-  const [showChangePin, setShowChangePin] = useState(false);
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showActivity, setShowActivity] = useState(false);
-  const [showTimeClock, setShowTimeClock] = useState(false);
-  const [detailRO, setDetailRO] = useState(null);
-  const [movingRO, setMovingRO] = useState(null);
-  const [collapsed, setCollapsed] = useState({});
-  const tickRef = useRef(null);
-  const isWide = useIsWide();
-  const isAdmin   = currentUser && currentUser.role === "admin";
-  const isManager = currentUser && currentUser.role === "manager";
-  const isAdvisor = currentUser && currentUser.role === "advisor";
-  const isTech    = currentUser && currentUser.role === "tech";
-  const canSeeAll = isAdmin || isManager || isAdvisor;
-  const canCreateRO = isAdmin;
-  const canSettings = isAdmin;
-  const canMove = isAdmin || isTech;
+function ROCard({ ro, onPress, onLongPress }) {
+  const timerRef = useRef(null)
+  const didLongPress = useRef(false)
+  const svcColor = SVC_META[ro.serviceType]?.color || C.muted
+  const prioColor = PRIORITY_META[ro.priority]?.color || C.muted
+  const elapsed = getLiveElapsed(ro)
+  const running = !!ro.timerStart
 
-  useSaveToFirebase(state);
-  useLoadFromFirebase(setState);
-  useEffect(() => { saveState(state); }, [state]);
-  useEffect(() => {
-    tickRef.current = setInterval(() => {
-      setState(s => { const any = Object.values(s.timers).some(t => t.running); return any ? { ...s } : s; });
-    }, 1000);
-    return () => clearInterval(tickRef.current);
-  }, []);
-
-  function upd(fn) { setState(s => fn({ ...s })); }
-  function getRO(id) { return state.ros.find(r => r.id === id); }
-  const visibleTechs = canSeeAll ? state.techs : state.techs.filter(t => currentUser && t.id === currentUser.id);
-
-  function removeFromAll(s, roId) {
-    const grid = {};
-    Object.entries(s.grid).forEach(([tid,cols]) => { grid[tid] = {}; Object.entries(cols).forEach(([cid,ids]) => { grid[tid][cid] = ids.filter(x => x !== roId); }); });
-    const qSlots = {};
-    Object.entries(s.qSlots).forEach(([qid,ids]) => { qSlots[qid] = ids.filter(x => x !== roId); });
-    return { ...s, grid, qSlots, partsSlots:(s.partsSlots||[]).filter(x => x !== roId) };
+  function startPress() {
+    didLongPress.current = false
+    timerRef.current = setTimeout(() => {
+      didLongPress.current = true
+      onLongPress()
+    }, 600)
   }
-
-  function handleMove(dest) {
-    if (!movingRO) return;
-    const roId = movingRO.id;
-    upd(s => {
-      const ns = removeFromAll(s, roId);
-      if (dest.type === "grid") {
-        const existing = ns.grid[dest.techId][dest.colId] || [];
-        const newState = { ...ns, grid: { ...ns.grid, [dest.techId]: { ...ns.grid[dest.techId], [dest.colId]: [...existing, roId] } } };
-        if (dest.colId === "completed" || dest.colId === "delivered") {
-          const key = dest.techId + "_" + roId;
-          const already = ns.completedByTech || {};
-          if (!already[key]) { const techCount = already[dest.techId] || 0; newState.completedByTech = { ...already, [key]:true, [dest.techId]: techCount + 1 }; }
-        }
-        return newState;
-      } else if (dest.type === "parts") {
-        return { ...ns, partsSlots: [...(ns.partsSlots||[]), roId] };
-      } else {
-        return { ...ns, qSlots: { ...ns.qSlots, [dest.queueId]: [...(ns.qSlots[dest.queueId]||[]), roId] } };
-      }
-    });
-    setMovingRO(null);
+  function endPress() {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+    if (!didLongPress.current) onPress()
+    didLongPress.current = false
   }
-
-  function handleTimer(roId) {
-    upd(s => {
-      const now = Date.now();
-      const t = s.timers[roId] || { running:false, elapsed:0, startedAt:null };
-      const updated = { ...s.timers };
-      if (!t.running) { Object.keys(updated).forEach(id => { if (id !== roId && updated[id] && updated[id].running) { updated[id] = { ...updated[id], running:false, elapsed:updated[id].elapsed + Math.floor((now - updated[id].startedAt)/1000) }; } }); }
-      updated[roId] = t.running ? { running:false, elapsed:t.elapsed + Math.floor((now-t.startedAt)/1000), startedAt:null } : { running:true, elapsed:t.elapsed, startedAt:now };
-      return { ...s, timers:updated };
-    });
+  function cancelPress() {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+    didLongPress.current = false
   }
-
-  function handleHoursChange(roId, val) { upd(s => ({ ...s, ros: s.ros.map(r => r.id === roId ? { ...r, hours:val } : r) })); }
-  function handleSaveRO(f) { upd(s => ({ ...s, ros: s.ros.map(r => r.id === f.id ? { ...r, ...f } : r) })); }
-  function handleDeleteRO(roId) { upd(s => { const ns = removeFromAll(s, roId); return { ...ns, ros:ns.ros.filter(r => r.id !== roId) }; }); setDetailRO(null); }
-  function handleArchive(roId) {
-    upd(s => { const ro = getRO(roId); const ns = removeFromAll(s, roId); return { ...ns, ros:ns.ros.filter(r => r.id !== roId), archived:[...(ns.archived||[]), { ro, archivedAt:Date.now() }] }; });
-    setDetailRO(null);
-  }
-  function handleRestore(entry) {
-    upd(s => ({ ...s, ros:[...s.ros,{...entry.ro}], archived:(s.archived||[]).filter(e=>e.archivedAt!==entry.archivedAt), qSlots:{ ...s.qSlots, "q-main":[...(s.qSlots["q-main"]||[]), entry.ro.id] }, timers:{ ...s.timers, [entry.ro.id]:{ running:false, elapsed:0, startedAt:null } } }));
-  }
-  function handleAddRO(f) {
-    const roId = "ro-" + Date.now();
-    const ro = { id:roId, roNum:f.roNum||"RO-"+String(state.nextNum).padStart(4,"0"), serviceType:f.serviceType||"st-main", year:f.year, make:f.make, model:f.model, color:f.color, plate:f.plate, vin:f.vin, mileageIn:f.mileageIn, customer:f.customer, phone:f.phone, email:f.email, waitStatus:f.waitStatus||"none", priority:f.priority||"NORMAL", hours:f.hours, jobs:f.jobs, promiseTime:f.promiseTime, concern:f.concern, notes:f.notes, roNotes:[] };
-    upd(s => {
-      const ns = { ...s, ros:[...s.ros, ro], nextNum:s.nextNum+1, timers:{ ...s.timers, [roId]:{ running:false, elapsed:0, startedAt:null } } };
-      if (f.dest === "tech" && f.assignTech) { const col = f.assignCol||"ondeck"; ns.grid = { ...ns.grid, [f.assignTech]:{ ...ns.grid[f.assignTech], [col]:[...(ns.grid[f.assignTech][col]||[]), roId] } }; }
-      else { const qid = f.assignQueue||"q-main"; ns.qSlots = { ...ns.qSlots, [qid]:[...(ns.qSlots[qid]||[]), roId] }; }
-      return ns;
-    });
-    setShowAdd(false);
-  }
-  function handleSaveServiceTypes(types) { upd(s => ({ ...s, serviceTypes:types })); setShowServiceTypes(false); }
-  function handleAddNote(roId, text, authorName) {
-    if (!text.trim()) return;
-    const note = { id:Date.now(), text:text.trim(), author:authorName, time:Date.now() };
-    upd(s => ({ ...s, ros: s.ros.map(r => r.id === roId ? { ...r, roNotes:[...(r.roNotes||[]),note] } : r) }));
-  }
-  function handleClockIn(userId)  { upd(s => ({ ...s, timeClockLog:[...(s.timeClockLog||[]),{userId,type:"in",clockIn:Date.now()}] })); }
-  function handleClockOut(userId) { upd(s => ({ ...s, timeClockLog:[...(s.timeClockLog||[]),{userId,type:"out",clockIn:Date.now()}] })); }
-  function isClockedIn(userId) { const log = state.timeClockLog||[]; return log.filter(e=>e.userId===userId&&e.type==="in").length > log.filter(e=>e.userId===userId&&e.type==="out").length; }
-  function handleStartActivity(activityId, userId) { upd(s => ({ ...s, activityLog:[...(s.activityLog||[]),{activityId,userId,startTime:Date.now(),endTime:null}] })); }
-  function handleStopActivity(entry) { upd(s => ({ ...s, activityLog:(s.activityLog||[]).map(e => e.userId===entry.userId&&e.activityId===entry.activityId&&!e.endTime ? {...e,endTime:Date.now()} : e) })); }
-  function handleSavePin(newPin) { if (typeof window !== "undefined") { const pins = JSON.parse(localStorage.getItem("sft-pins")||"{}"); pins[currentUser.id] = newPin; localStorage.setItem("sft-pins", JSON.stringify(pins)); setCurrentUser(u=>({...u,pin:newPin})); } }
-  function handleSaveJobPresets(presets) { upd(s => ({ ...s, jobPresets:presets })); setShowServiceTypes(false); }
-
-  function techStats(techId) {
-    const all = COLS.flatMap(c => state.grid[techId] ? (state.grid[techId][c.id]||[]) : []);
-    const hrs = all.reduce((sum,id) => { const ro = getRO(id); if(!ro||!ro.hours) return sum; return sum + (parseFloat(String(ro.hours).replace(/[^0-9.]/g,""))||0); }, 0);
-    const cumulative = (state.completedByTech||{})[techId] || 0;
-    return { count:all.length, hrs, cumulative };
-  }
-
-  function renderCard(ro, colId) {
-    return (
-      <ROCard key={ro.id} ro={ro} timer={state.timers[ro.id]} onTap={() => { if(!movingRO) setDetailRO({ro,colId}); }} onMove={() => { if(!canMove) return; setDetailRO(null); setMovingRO(movingRO&&movingRO.id===ro.id ? null : ro); }} isMoving={movingRO && movingRO.id === ro.id} serviceTypes={state.serviceTypes} canMove={canMove}/>
-    );
-  }
-
-  const flagged = totalFlaggedHours(state);
-  const progress = Math.min(flagged / GOAL_HOURS, 1);
-  const GAP = 6;
-  const TECH_W = isWide ? 150 : 100;
-  const CELL_W_MOBILE = 148;
-  const useFluid = isWide;
-
-  if (!currentUser) return <LoginScreen onLogin={setCurrentUser} />;
 
   return (
-    <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Space Grotesk',sans-serif", background:BG, minHeight:"100vh", minHeight:"100dvh", overflowX:"hidden" }}>
-      {movingRO && (
-        <div style={{ position:"fixed", top:0, left:0, right:0, zIndex:400, background:ACCENT, padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div style={{ color:"#fff", fontWeight:700, fontSize:13, display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ background:"rgba(255,255,255,0.2)", borderRadius:8, padding:"2px 8px", fontSize:12 }}>{movingRO.roNum}</span>
-            — tap any column or queue to place it
-          </div>
-          <button onClick={() => setMovingRO(null)} style={{ background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", borderRadius:8, padding:"4px 12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
+    <div
+      onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={cancelPress}
+      onTouchStart={e => { e.preventDefault(); startPress() }}
+      onTouchEnd={e => { e.preventDefault(); endPress() }}
+      onTouchCancel={cancelPress}
+      style={{
+        background: C.surface2, borderRadius: 11, padding: '9px 11px',
+        marginBottom: 7, cursor: 'pointer', userSelect: 'none',
+        borderLeft: `3px solid ${svcColor}`,
+        boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+        <span style={{ color: C.blue, fontWeight: 700, fontSize: 13 }}>{ro.roNumber}</span>
+        <Tag label={ro.priority} color={prioColor} small />
+      </div>
+      <div style={{ color: C.text, fontSize: 13, fontWeight: 600, marginBottom: 1, lineHeight: 1.3 }}>{ro.vehicle}</div>
+      <div style={{ color: C.muted, fontSize: 11, marginBottom: 5 }}>{ro.customer}</div>
+      {ro.jobs?.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 5 }}>
+          {ro.jobs.slice(0, 2).map(j => (
+            <span key={j} style={{
+              background: C.surface3, color: C.text2,
+              fontSize: 10, padding: '2px 5px', borderRadius: 4,
+            }}>{j}</span>
+          ))}
+          {ro.jobs.length > 2 && <span style={{ color: C.muted, fontSize: 10 }}>+{ro.jobs.length - 2}</span>}
         </div>
       )}
-      {/* Header */}
-      <div style={{ background:"rgba(10,14,24,0.92)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"0.5px solid rgba(255,255,255,0.06)", padding:"10px 14px", display:"flex", alignItems:"center", gap:10, position:"sticky", top:0, zIndex:300 }}>
-        <div style={{ flexShrink:0, filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))" }}><WFLogo size={34} radius={7} /></div>
-        <div style={{ flex:isWide?0:1 }}>
-          <div style={{ color:TEXT, fontWeight:700, fontSize:isWide?15:14, letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',sans-serif" }}>Worqflow</div>
-          <div style={{ color:TEXT3, fontSize:10, marginTop:1 }}>{currentUser.name} · {currentUser.role}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ color: running ? C.green : C.muted, fontSize: 11, fontFamily: 'monospace' }}>
+          {running ? '▶ ' : '⏸ '}{fmtElapsed(elapsed)}
+        </span>
+        <span style={{ color: C.muted, fontSize: 11 }}>🕐 {ro.promiseTime}</span>
+      </div>
+      {ro.tech && (
+        <div style={{ marginTop: 3, color: C.blue, fontSize: 11, fontWeight: 600 }}>👤 {ro.tech}</div>
+      )}
+      {ro.waitingOnParts && (
+        <div style={{ marginTop: 3, color: C.orange, fontSize: 10, fontWeight: 700 }}>⚠ WAITING ON PARTS</div>
+      )}
+    </div>
+  )
+}
+
+// ─── Column Drop Zone ─────────────────────────────────────────────────────────
+
+function ColumnCell({ children, highlight }) {
+  return (
+    <div style={{
+      background: highlight ? C.blue + '0A' : C.surface + 'BB',
+      borderRadius: 12, padding: 9, minHeight: 72,
+      border: `1px solid ${highlight ? C.blue + '44' : C.sep}`,
+      transition: 'border-color 0.2s',
+    }}>
+      {children}
+      {React.Children.count(children) === 0 && (
+        <div style={{ color: C.surface3, fontSize: 12, textAlign: 'center', paddingTop: 18 }}>—</div>
+      )}
+    </div>
+  )
+}
+
+// ─── New RO Modal ─────────────────────────────────────────────────────────────
+
+function NewROModal({ settings, onSave, onClose }) {
+  const [form, setForm] = useState({
+    roNumber: '', serviceType: 'Main Shop', vehicle: '', customer: '',
+    priority: 'normal', flatRateHours: '', jobs: [], promiseTime: '', concern: '', tech: '',
+  })
+  const [jobInput, setJobInput] = useState('')
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const presets = settings?.jobPresets || []
+
+  function togglePreset(j) {
+    set('jobs', form.jobs.includes(j) ? form.jobs.filter(x => x !== j) : [...form.jobs, j])
+  }
+
+  function addCustomJob() {
+    const t = jobInput.trim()
+    if (t && !form.jobs.includes(t)) set('jobs', [...form.jobs, t])
+    setJobInput('')
+  }
+
+  function submit() {
+    if (!form.vehicle.trim()) return alert('Vehicle is required')
+    onSave({
+      ...form,
+      roNumber: form.roNumber.trim() || genROId(),
+      flatRateHours: parseFloat(form.flatRateHours) || 0,
+      tech: form.tech || null,
+    })
+  }
+
+  return (
+    <Modal title="New Repair Order" onClose={onClose} wide>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+        <Field label="RO Number" value={form.roNumber} onChange={v => set('roNumber', v)} placeholder="Auto-generated" />
+        <Field label="Promise Time" value={form.promiseTime} onChange={v => set('promiseTime', v)} placeholder="3:00 PM" />
+        <Field label="Vehicle *" value={form.vehicle} onChange={v => set('vehicle', v)} placeholder="2024 Toyota Camry" />
+        <Field label="Customer" value={form.customer} onChange={v => set('customer', v)} placeholder="John Smith" />
+        <NativeSelect label="Service Type" value={form.serviceType} onChange={v => set('serviceType', v)}
+          options={settings?.serviceTypes || ['Main Shop', 'PDI', 'Used Cars']} />
+        <NativeSelect label="Priority" value={form.priority} onChange={v => set('priority', v)}
+          options={[{ value: 'normal', label: 'Normal' }, { value: 'high', label: 'High' }, { value: 'urgent', label: 'Urgent' }]} />
+        <Field label="Flat Rate Hours" value={form.flatRateHours} onChange={v => set('flatRateHours', v)} type="number" placeholder="2.5" />
+        <NativeSelect label="Assign Tech" value={form.tech} onChange={v => set('tech', v)}
+          options={[{ value: '', label: 'Unassigned' }, ...TECHS.map(t => ({ value: t, label: t }))]} />
+      </div>
+      <Field label="Customer Concern" value={form.concern} onChange={v => set('concern', v)} placeholder="Describe complaint…" rows={2} />
+      <div style={{ marginBottom: 16 }}>
+        <Label>Jobs</Label>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+          {presets.map(j => (
+            <button key={j} onClick={() => togglePreset(j)} style={{
+              background: form.jobs.includes(j) ? C.blue + '22' : C.surface2,
+              border: `1px solid ${form.jobs.includes(j) ? C.blue : C.sep}`,
+              color: form.jobs.includes(j) ? C.blue : C.text,
+              borderRadius: 8, padding: '4px 10px', fontSize: 12,
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}>{j}</button>
+          ))}
         </div>
-        <LiveClock />
-        {!isAdvisor && (
-          <div style={{ flex:1, display:"flex", justifyContent:"center" }}>
-            <div style={{ background:"rgba(14,18,30,0.9)", borderRadius:12, padding:"8px 16px", display:"flex", alignItems:"center", gap:10, minWidth:180 }}>
-              <span style={{ color:SUCCESS, display:"flex", alignItems:"center" }}><DollarIcon/></span>
-              <div style={{ flex:1 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline" }}>
-                  <span style={{ fontSize:isWide?16:14, fontWeight:800, color:"#F0F4FF" }}>
-                    <span style={{ color:SUCCESS }}>{flagged.toFixed(1)}</span>
-                    <span style={{ color:"rgba(255,255,255,0.35)", fontSize:11, fontWeight:600 }}> / {GOAL_HOURS}h</span>
-                  </span>
-                  <span style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontWeight:600 }}>flagged hrs</span>
-                </div>
-                <div style={{ height:5, background:"rgba(255,255,255,0.1)", borderRadius:3, overflow:"hidden", marginTop:4 }}>
-                  <div style={{ width:(progress*100)+"%", height:"100%", background:"linear-gradient(90deg,#30D158,#0A84FF)", borderRadius:3, transition:"width 0.4s" }}/>
-                </div>
-              </div>
-            </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input value={jobInput} onChange={e => setJobInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addCustomJob()}
+            placeholder="Custom job…"
+            style={{ flex: 1, background: C.surface2, border: `1px solid ${C.sep}`, borderRadius: 10, color: C.text, fontSize: 14, padding: '8px 12px', outline: 'none' }} />
+          <Btn onClick={addCustomJob} small>Add</Btn>
+        </div>
+        {form.jobs.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {form.jobs.map((j, i) => (
+              <span key={i} style={{
+                background: C.blue + '1A', border: `1px solid ${C.blue}44`,
+                color: C.blue, borderRadius: 8, padding: '3px 8px', fontSize: 12,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                {j}
+                <button onClick={() => set('jobs', form.jobs.filter((_, idx) => idx !== i))}
+                  style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
+              </span>
+            ))}
           </div>
         )}
-        {isAdvisor && <div style={{ flex:1 }}/>}
-        <div style={{ display:"flex", gap:8 }}>
-          {canSeeAll && <button onClick={() => setShowArchive(true)} style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.07)", border:"0.5px solid rgba(255,255,255,0.1)", color:TEXT2, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><BoxIcon /></button>}
-          {canSettings && <button onClick={() => setShowServiceTypes(true)} style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.07)", border:"0.5px solid rgba(255,255,255,0.1)", color:TEXT2, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><SettingsIcon /></button>}
-          {canCreateRO && <button onClick={() => setShowAdd(true)} style={{ height:34, padding:"0 16px", background:ACCENT, color:"#fff", border:"none", borderRadius:10, fontWeight:600, fontSize:13, cursor:"pointer", display:"flex", alignItems:"center", gap:4 }}><PlusIcon /> New RO</button>}
-          <button onClick={() => setShowChangePin(true)} style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.07)", border:"0.5px solid rgba(255,255,255,0.1)", color:TEXT2, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>🔑</button>
-          <button onClick={() => setCurrentUser(null)} style={{ width:36, height:36, borderRadius:10, background:"rgba(255,255,255,0.07)", border:"0.5px solid rgba(255,255,255,0.1)", color:TEXT2, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><LogoutIcon /></button>
-        </div>
       </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <Btn variant="secondary" onClick={onClose} full>Cancel</Btn>
+        <Btn onClick={submit} full>Create RO</Btn>
+      </div>
+    </Modal>
+  )
+}
 
-      <div style={{ padding:"10px 0 60px", marginTop:movingRO?44:0 }}>
-        <div style={{ padding:"0 14px", marginBottom:6 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
-            <span style={{ fontSize:10, fontWeight:600, color:TEXT3, letterSpacing:"0.8px", textTransform:"uppercase" }}>{isAdmin ? "Technicians" : currentUser.name}</span>
-            <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
-          </div>
+// ─── Three C's Tab ────────────────────────────────────────────────────────────
+
+function ThreeCsTab({ ro, onUpdate }) {
+  const [form, setForm] = useState({ concern: ro.concern || '', cause: ro.cause || '', correction: ro.correction || '' })
+  const [saved, setSaved] = useState(false)
+  const save = () => { onUpdate(form); setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  return (
+    <div>
+      {['concern', 'cause', 'correction'].map(f => (
+        <Field key={f} label={f} value={form[f]} onChange={v => setForm(p => ({ ...p, [f]: v }))}
+          placeholder={`Enter ${f}…`} rows={3} />
+      ))}
+      <Btn onClick={save} full>{saved ? '✓ Saved' : "Save 3 C's"}</Btn>
+    </div>
+  )
+}
+
+// ─── Edit RO inline form ──────────────────────────────────────────────────────
+
+function EditROForm({ form, setForm, onSave, onCancel }) {
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  return (
+    <div>
+      <Field label="Vehicle" value={form.vehicle} onChange={v => set('vehicle', v)} />
+      <Field label="Customer" value={form.customer} onChange={v => set('customer', v)} />
+      <Field label="Promise Time" value={form.promiseTime} onChange={v => set('promiseTime', v)} />
+      <Field label="Flat Rate Hours" value={String(form.flatRateHours)} onChange={v => set('flatRateHours', v)} type="number" />
+      <NativeSelect label="Priority" value={form.priority} onChange={v => set('priority', v)}
+        options={[{ value: 'normal', label: 'Normal' }, { value: 'high', label: 'High' }, { value: 'urgent', label: 'Urgent' }]} />
+      <NativeSelect label="Service Type" value={form.serviceType} onChange={v => set('serviceType', v)}
+        options={['Main Shop', 'PDI', 'Used Cars']} />
+      <NativeSelect label="Assign Tech" value={form.tech || ''} onChange={v => set('tech', v || null)}
+        options={[{ value: '', label: 'Unassigned' }, ...TECHS.map(t => ({ value: t, label: t }))]} />
+      <div style={{ display: 'flex', gap: 10 }}>
+        <Btn variant="secondary" onClick={onCancel} full>Cancel</Btn>
+        <Btn onClick={onSave} full>Save Changes</Btn>
+      </div>
+    </div>
+  )
+}
+
+// ─── RO Detail Sheet ──────────────────────────────────────────────────────────
+
+function RODetailSheet({ ro, currentUser, onClose, onUpdate, onDelete, onArchive, onToggleTimer, onAddNote }) {
+  const [tab, setTab] = useState('details')
+  const [noteText, setNoteText] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState({ ...ro })
+
+  useEffect(() => { setEditForm({ ...ro }) }, [ro.id])
+
+  const elapsed = getLiveElapsed(ro)
+  const running = !!ro.timerStart
+  const svcColor = SVC_META[ro.serviceType]?.color || C.muted
+  const canAdmin = currentUser?.role === 'admin' || currentUser?.role === 'manager'
+
+  function submitNote() {
+    if (!noteText.trim()) return
+    onAddNote(noteText.trim())
+    setNoteText('')
+  }
+
+  function saveEdit() {
+    onUpdate({ ...editForm, flatRateHours: parseFloat(editForm.flatRateHours) || 0 })
+    setEditing(false)
+  }
+
+  const colLabel = COLUMNS.find(c => c.id === ro.column)?.label || ro.column
+
+  return (
+    <Overlay onClick={onClose} sheet>
+      <div style={{
+        background: C.surface, borderRadius: '20px 20px 0 0',
+        width: '100%', maxWidth: 580, maxHeight: '90vh',
+        display: 'flex', flexDirection: 'column',
+        boxShadow: '0 -12px 48px rgba(0,0,0,0.85)',
+      }}>
+        {/* Handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: C.surface3 }} />
         </div>
 
-        <div style={{ overflowX: useFluid ? "hidden" : "auto", WebkitOverflowScrolling:"touch", padding:"0 14px" }}>
-          <div style={{ display:"inline-flex", flexDirection:"column", width: useFluid ? "100%" : "auto", minWidth: useFluid ? "100%" : "auto" }}>
-            {/* Column headers */}
-            <div style={{ display:"flex", gap:GAP, marginBottom:6 }}>
-              <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0 }} />
-              {COLS.map(col => (
-                <div key={col.id} style={{ flex: useFluid ? 1 : "none", width: useFluid ? "auto" : CELL_W_MOBILE, minWidth: useFluid ? 0 : CELL_W_MOBILE }}>
-                  <div style={{ background:"rgba(255,255,255,0.04)", color:col.color, padding:"5px 8px", borderRadius:8, fontSize:10, fontWeight:700, textAlign:"center", letterSpacing:"0.4px", textTransform:"uppercase" }}>{col.label}</div>
-                </div>
-              ))}
+        {/* Header */}
+        <div style={{ padding: '4px 20px 14px', borderBottom: `1px solid ${C.sep}`, flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                <span style={{ color: C.blue, fontWeight: 700, fontSize: 22 }}>{ro.roNumber}</span>
+                <Tag label={ro.serviceType} color={svcColor} />
+                <Tag label={ro.priority} color={PRIORITY_META[ro.priority]?.color || C.muted} />
+                <Tag label={colLabel} color={C.muted} />
+              </div>
+              <div style={{ color: C.text, fontWeight: 600, fontSize: 17, marginBottom: 2 }}>{ro.vehicle}</div>
+              <div style={{ color: C.muted, fontSize: 13 }}>{ro.customer}</div>
             </div>
-            {/* Tech rows */}
-            {visibleTechs.map(tech => {
-              const { count, hrs, cumulative } = techStats(tech.id);
-              return (
-                <div key={tech.id} style={{ display:"flex", gap:GAP, marginBottom:GAP, alignItems:"flex-start" }}>
-                  <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0, background:TECH_BG, borderRadius:12, padding:"10px 8px", boxSizing:"border-box" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                      <div style={{ width:30, height:30, borderRadius:"50%", background:"linear-gradient(135deg,#0A84FF,#5E5CE6)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, color:"#fff", flexShrink:0 }}>{initials(tech.name)}</div>
-                      <div style={{ minWidth:0 }}>
-                        <div style={{ fontWeight:500, fontSize:11, color:TEXT2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{tech.name}</div>
-                        <div style={{ fontSize:10, color:TEXT3, marginTop:2, display:"flex", gap:4, alignItems:"center" }}>
-                          {!isAdvisor && <span style={{ color:SUCCESS, fontWeight:500 }}>{hrs.toFixed(1)}h</span>}
-                          <span style={{ color:TEXT3 }}>{cumulative}✓</span>
-                          {isAdmin && isClockedIn(tech.id) && <span style={{ width:5, height:5, borderRadius:"50%", background:SUCCESS, display:"inline-block" }}/>}
-                        </div>
-                      </div>
-                    </div>
-                    {isAdmin && (
-                      <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:4 }}>
-                        <div style={{ display:"flex", gap:4 }}>
-                          {(() => {
-                            const active = (state.activityLog||[]).find(e => e.userId===tech.id && !e.endTime);
-                            if (active) {
-                              const act = ACTIVITIES.find(a => a.id === active.activityId);
-                              return <button onClick={() => handleStopActivity(active)} style={{ flex:1, background:act?.color+"22", color:act?.color, border:"none", borderRadius:6, padding:"4px 0", fontSize:9, fontWeight:600, cursor:"pointer" }}>{act?.emoji} Stop</button>;
-                            }
-                            return ACTIVITIES.map(act => <button key={act.id} onClick={() => handleStartActivity(act.id, tech.id)} style={{ flex:1, background:"rgba(255,255,255,0.04)", color:TEXT3, border:"none", borderRadius:6, padding:"4px 0", fontSize:10, cursor:"pointer" }}>{act.emoji}</button>);
-                          })()}
-                        </div>
-                        {isClockedIn(tech.id) ? (
-                          <button onClick={() => handleClockOut(tech.id)} style={{ width:"100%", background:"rgba(255,69,58,0.12)", color:DANGER, border:"none", borderRadius:6, padding:"4px 0", fontSize:9, fontWeight:600, cursor:"pointer" }}>🕐 Clock Out</button>
-                        ) : (
-                          <button onClick={() => handleClockIn(tech.id)} style={{ width:"100%", background:"rgba(48,209,88,0.12)", color:SUCCESS, border:"none", borderRadius:6, padding:"4px 0", fontSize:9, fontWeight:600, cursor:"pointer" }}>🟢 Clock In</button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {COLS.map(col => {
-                    const ids = state.grid[tech.id] ? (state.grid[tech.id][col.id]||[]) : [];
-                    const isTarget = movingRO && !ids.includes(movingRO.id);
-                    return (
-                      <div key={col.id} onClick={() => { if(isTarget) handleMove({ type:"grid", techId:tech.id, colId:col.id }); }}
-                        style={{ flex: useFluid ? 1 : "none", width: useFluid ? "auto" : CELL_W_MOBILE, minWidth: useFluid ? 0 : CELL_W_MOBILE, flexShrink: useFluid ? 1 : 0, background: isTarget ? "rgba(10,132,255,0.10)" : CELL_BG, border: "0.5px solid "+(isTarget?"#0A84FF":col.border), borderRadius:12, padding: ids.length ? "7px 7px 2px" : 0, display:"flex", flexDirection:"column", alignItems: ids.length ? "stretch" : "center", justifyContent: ids.length ? "flex-start" : "center", minHeight:82, boxSizing:"border-box", cursor: isTarget ? "pointer" : "default", boxShadow: isTarget ? "0 0 0 1.5px #0A84FF, "+CELL_SHADOW : CELL_SHADOW, backdropFilter:"blur(4px)", WebkitBackdropFilter:"blur(4px)" }}>
-                        {ids.length === 0 ? (
-                          isTarget ? (
-                            <span style={{ color:ACCENT, fontSize:9, fontWeight:500, textAlign:"center", padding:8 }}>Tap to place here</span>
-                          ) : (
-                            <div style={{ padding:"6px 8px", width:"100%", boxSizing:"border-box" }}><SkeletonCard /></div>
-                          )
-                        ) : (
-                          ids.map(roId => { const ro = getRO(roId); if (!ro) return null; return renderCard(ro, col.id); })
-                        )}
-                        {ids.length > 0 && isTarget && (
-                          <div style={{ margin:"4px 0 6px", padding:"7px", background:"rgba(10,132,255,0.12)", borderRadius:8, textAlign:"center", fontSize:9, color:ACCENT, fontWeight:600, cursor:"pointer" }}>+ Place here</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+            <button onClick={onClose} style={xBtnStyle}>✕</button>
           </div>
         </div>
 
-        {/* Waiting on Parts */}
-        {(() => {
-          const partIds = state.partsSlots || [];
-          const isPartsTarget = movingRO && !partIds.includes(movingRO.id);
-          return (
-            <div style={{ padding:"10px 14px 0" }}>
-              <div style={{ background:"rgba(14,18,30,0.97)", borderRadius:16, overflow:"hidden" }}>
-                <div style={{ background:"linear-gradient(135deg,rgba(191,90,242,0.3),rgba(191,90,242,0.1))", padding:"10px 14px", display:"flex", alignItems:"center", gap:10 }}>
-                  <div style={{ width:28, height:28, background:"rgba(191,90,242,0.25)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>📦</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ color:TEXT, fontWeight:700, fontSize:14 }}>Waiting on Parts</div>
-                    <div style={{ color:"rgba(255,255,255,0.45)", fontSize:10, marginTop:1 }}>Hold until parts arrive</div>
+        {/* Timer strip */}
+        <div style={{
+          padding: '10px 20px', borderBottom: `1px solid ${C.sep}`,
+          display: 'flex', alignItems: 'center', gap: 12,
+          background: '#050505', flexShrink: 0, flexWrap: 'wrap',
+        }}>
+          <button onClick={onToggleTimer} style={{
+            background: running ? C.red + '22' : C.green + '22',
+            border: `1px solid ${running ? C.red : C.green}`,
+            color: running ? C.red : C.green,
+            borderRadius: 10, padding: '8px 16px',
+            fontWeight: 700, cursor: 'pointer', fontSize: 14,
+          }}>{running ? '⏸ Pause' : '▶ Start'}</button>
+          <span style={{
+            color: running ? C.green : C.muted,
+            fontFamily: 'monospace', fontSize: 26, fontWeight: 700, letterSpacing: 2,
+          }}>{fmtElapsed(elapsed)}</span>
+          <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+            <div style={{ color: C.muted, fontSize: 11 }}>Promise</div>
+            <div style={{ color: C.text, fontWeight: 600 }}>{ro.promiseTime || '—'}</div>
+          </div>
+          {ro.tech && (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ color: C.muted, fontSize: 11 }}>Tech</div>
+              <div style={{ color: C.blue, fontWeight: 600 }}>{ro.tech}</div>
+            </div>
+          )}
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ color: C.muted, fontSize: 11 }}>Flat Rate</div>
+            <div style={{ color: C.text, fontWeight: 600 }}>{ro.flatRateHours}h</div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: `1px solid ${C.sep}`, padding: '0 20px', flexShrink: 0 }}>
+          {['details', 'notes', '3cs'].map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              background: 'none', border: 'none',
+              color: tab === t ? C.blue : C.muted,
+              padding: '10px 14px', cursor: 'pointer',
+              fontSize: 14, fontWeight: tab === t ? 700 : 400,
+              borderBottom: `2px solid ${tab === t ? C.blue : 'transparent'}`,
+              marginBottom: -1,
+            }}>{t === '3cs' ? "3 C's" : t.charAt(0).toUpperCase() + t.slice(1)}</button>
+          ))}
+        </div>
+
+        {/* Tab body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+          {tab === 'details' && !editing && (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                {[
+                  ['Service Type', ro.serviceType],
+                  ['Priority', ro.priority],
+                  ['Column', colLabel],
+                  ['Flat Rate', `${ro.flatRateHours}h`],
+                  ['Promise', ro.promiseTime || '—'],
+                  ['Tech', ro.tech || 'Unassigned'],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ background: C.surface2, borderRadius: 10, padding: '9px 12px' }}>
+                    <div style={{ color: C.muted, fontSize: 11, marginBottom: 2 }}>{k}</div>
+                    <div style={{ color: C.text, fontWeight: 600, fontSize: 14 }}>{v}</div>
                   </div>
-                  <div style={{ background:"rgba(191,90,242,0.3)", color:"#E5B8FF", borderRadius:8, padding:"3px 10px", fontSize:12, fontWeight:700 }}>{partIds.length}</div>
-                  <button onClick={() => setPartsCollapsed(c=>!c)} style={{ background:"none", border:"none", color:TEXT3, cursor:"pointer", padding:4 }}>{partsCollapsed ? <ChevDownIcon/> : <ChevUpIcon/>}</button>
+                ))}
+              </div>
+              {ro.concern && (
+                <div style={{ background: C.surface2, borderRadius: 10, padding: 12, marginBottom: 12 }}>
+                  <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>Customer Concern</div>
+                  <div style={{ color: C.text, fontSize: 14, lineHeight: 1.5 }}>{ro.concern}</div>
                 </div>
-                {!partsCollapsed && (
-                  <div style={{ padding:"10px 10px 8px" }}>
-                    {partIds.length === 0 && !isPartsTarget ? (
-                      <div style={{ border:"1px dashed rgba(191,90,242,0.2)", borderRadius:12, padding:"20px 16px", textAlign:"center" }}>
-                        <div style={{ fontSize:24, marginBottom:8 }}>🔩</div>
-                        <div style={{ fontSize:13, color:"rgba(255,255,255,0.3)", fontWeight:500 }}>No vehicles waiting on parts</div>
-                        <div style={{ fontSize:11, color:"rgba(255,255,255,0.18)", marginTop:4 }}>Long-press an RO card to move it here</div>
-                      </div>
-                    ) : (
-                      <div style={{ maxHeight: partIds.length > 3 ? 270 : "none", overflowY: partIds.length > 3 ? "auto" : "visible" }}>
-                        {partIds.map(roId => { const ro = getRO(roId); if (!ro) return null; return renderCard(ro, "parts"); })}
-                      </div>
-                    )}
-                    {isPartsTarget && <button onClick={() => handleMove({type:"parts"})} style={{ width:"100%", padding:12, background:"rgba(191,90,242,0.12)", color:"#E5B8FF", border:"1px solid rgba(191,90,242,0.2)", borderRadius:10, fontWeight:600, cursor:"pointer", marginTop:8 }}>📦 Move to Waiting on Parts</button>}
+              )}
+              {ro.jobs?.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <Label>Jobs</Label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {ro.jobs.map((j, i) => (
+                      <span key={i} style={{ background: C.surface3, color: C.text2, fontSize: 12, padding: '4px 10px', borderRadius: 8 }}>{j}</span>
+                    ))}
                   </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                <Btn variant="secondary" onClick={() => setEditing(true)} small>Edit</Btn>
+                <Btn variant="orange" onClick={() => onUpdate({ waitingOnParts: !ro.waitingOnParts })} small>
+                  {ro.waitingOnParts ? '✓ Parts Arrived' : '⏳ Waiting on Parts'}
+                </Btn>
+                <Btn variant="secondary" onClick={onArchive} small>Archive</Btn>
+                {canAdmin && (
+                  <Btn variant="danger" small onClick={() => { if (window.confirm('Delete this RO?')) onDelete() }}>Delete</Btn>
                 )}
               </div>
             </div>
-          );
-        })()}
+          )}
 
-        {/* Staging Queues */}
-        <div style={{ padding:"10px 14px 0" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
-            <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
-            <span style={{ fontSize:10, fontWeight:600, color:TEXT3, letterSpacing:"0.8px", textTransform:"uppercase" }}>Staging Queues</span>
-            <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
-          </div>
-          <div style={{ padding:"0 0 0", display:isWide?"flex":"block", gap:8, alignItems:"flex-start" }}>
-            {(isWide ? [...state.queues].sort((a,b) => { const order={"q-main":0,"q-used":1,"q-pdi":2}; return (order[a.id]??99)-(order[b.id]??99); }) : state.queues).map(queue => {
-              const ids = state.qSlots[queue.id] || [];
-              const isCollapsed = collapsed[queue.id];
-              const isTarget = movingRO && !ids.includes(movingRO.id);
-              return (
-                <div key={queue.id} style={{ flex:1, marginBottom:isWide?0:12, background:"rgba(14,18,30,0.97)", borderRadius:16, overflow:"hidden" }}>
-                  <div style={{ background:"linear-gradient(135deg,"+queue.color+","+queue.color+"99)", padding:"10px 14px", display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ width:28, height:28, background:"rgba(255,255,255,0.2)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>{queue.icon}</div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ color:"#fff", fontWeight:800, fontSize:14, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{queue.name}</div>
-                      <div style={{ color:"rgba(255,255,255,0.7)", fontSize:10, marginTop:1 }}>{queue.subtitle}</div>
-                    </div>
-                    <div style={{ background:"rgba(255,255,255,0.25)", color:"#fff", borderRadius:8, padding:"3px 10px", fontSize:12, fontWeight:700 }}>{ids.length}</div>
-                    {isAdmin && <button onClick={() => setShowAdd(true)} style={{ width:26, height:26, borderRadius:6, background:"rgba(255,255,255,0.2)", border:"none", color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}><PlusIcon /></button>}
-                    <button onClick={() => setCollapsed(c=>({...c,[queue.id]:!c[queue.id]}))} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.7)", cursor:"pointer", padding:4 }}>{isCollapsed ? <ChevDownIcon/> : <ChevUpIcon/>}</button>
+          {tab === 'details' && editing && (
+            <EditROForm form={editForm} setForm={setEditForm} onSave={saveEdit} onCancel={() => setEditing(false)} />
+          )}
+
+          {tab === 'notes' && (
+            <div>
+              {!ro.notes?.length && (
+                <div style={{ color: C.muted, textAlign: 'center', padding: '24px 0', fontSize: 14 }}>No notes yet</div>
+              )}
+              {ro.notes?.map(n => (
+                <div key={n.id} style={{ background: C.surface2, borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ color: C.blue, fontSize: 12, fontWeight: 700 }}>{n.author}</span>
+                    <span style={{ color: C.muted, fontSize: 11 }}>
+                      {new Date(n.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
-                  {!isCollapsed && (
-                    <div style={{ padding:"10px 10px 8px" }}>
-                      <div style={{ maxHeight:ids.length>3?270:"none", overflowY:ids.length>3?"auto":"visible" }}>
-                        {ids.map(roId => { const ro = getRO(roId); if(!ro) return null; return renderCard(ro, "queue"); })}
-                      </div>
-                      {ids.length > 3 && <div style={{ textAlign:"center", fontSize:10, color:MUTED, padding:"2px 0 4px" }}>Scroll to see all {ids.length}</div>}
-                      {isTarget && <button onClick={() => handleMove({type:"queue",queueId:queue.id})} style={{ width:"100%", padding:10, background:"rgba(255,255,255,0.08)", color:"#fff", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer", marginTop:6 }}>{queue.icon} Move to {queue.name}</button>}
-                      {ids.length === 0 && !isTarget && <div style={{ border:"2px dashed "+BORDER, borderRadius:12, padding:18, textAlign:"center", color:MUTED, fontSize:12 }}>{isAdmin ? "Use + to add tickets" : "No tickets here"}</div>}
-                    </div>
-                  )}
+                  <div style={{ color: C.text, fontSize: 14, lineHeight: 1.5 }}>{n.text}</div>
                 </div>
-              );
-            })}
+              ))}
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <input value={noteText} onChange={e => setNoteText(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitNote()}
+                  placeholder="Add a note…"
+                  style={{ flex: 1, background: C.surface2, border: `1px solid ${C.sep}`, borderRadius: 10, color: C.text, fontSize: 14, padding: '10px 12px', outline: 'none' }} />
+                <Btn onClick={submitNote} disabled={!noteText.trim()}>Send</Btn>
+              </div>
+            </div>
+          )}
+
+          {tab === '3cs' && <ThreeCsTab ro={ro} onUpdate={onUpdate} />}
+        </div>
+      </div>
+    </Overlay>
+  )
+}
+
+// ─── Move RO Modal ────────────────────────────────────────────────────────────
+
+function MoveROModal({ ro, onMove, onClose }) {
+  const [col, setCol] = useState(ro?.column || 'onDeck')
+  const [tech, setTech] = useState(ro?.tech || '')
+  if (!ro) return null
+
+  function ChoiceBtn({ active, onClick, children }) {
+    return (
+      <button onClick={onClick} style={{
+        background: active ? C.blue + '22' : C.surface2,
+        border: `1px solid ${active ? C.blue : C.sep}`,
+        color: active ? C.blue : C.text,
+        borderRadius: 10, padding: '11px 14px', textAlign: 'left',
+        cursor: 'pointer', fontSize: 14, fontWeight: active ? 700 : 400,
+        width: '100%', marginBottom: 6,
+      }}>{children}</button>
+    )
+  }
+
+  return (
+    <Modal title={`Move ${ro.roNumber}`} onClose={onClose}>
+      <Label>Destination Column</Label>
+      <div style={{ marginBottom: 18 }}>
+        {COLUMNS.map(c => (
+          <ChoiceBtn key={c.id} active={col === c.id} onClick={() => setCol(c.id)}>{c.label}</ChoiceBtn>
+        ))}
+      </div>
+      <Label>Assign Tech</Label>
+      <div style={{ marginBottom: 20 }}>
+        <ChoiceBtn active={!tech} onClick={() => setTech('')}>Unassigned</ChoiceBtn>
+        {TECHS.map(t => (
+          <ChoiceBtn key={t} active={tech === t} onClick={() => setTech(t)}>{t}</ChoiceBtn>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <Btn variant="secondary" onClick={onClose} full>Cancel</Btn>
+        <Btn onClick={() => onMove(col, tech || null)} full>Move RO</Btn>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Clock Modal ──────────────────────────────────────────────────────────────
+
+function ClockModal({ techClocks, getTechHours, onToggle, onClose }) {
+  return (
+    <Modal title="Tech Clock In / Out" onClose={onClose}>
+      {TECHS.map(tech => {
+        const tc = techClocks[tech] || { in: false, total: 0 }
+        const hours = getTechHours(tech)
+        const pct = hours / 40
+        return (
+          <div key={tech} style={{ background: C.surface2, borderRadius: 13, padding: '14px 16px', marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 2 }}>{tech}</div>
+                <div style={{ color: C.muted, fontSize: 12 }}>{hours.toFixed(2)}h / 40h goal</div>
+              </div>
+              <button onClick={() => onToggle(tech)} style={{
+                background: tc.in ? C.red + '22' : C.green + '22',
+                border: `1px solid ${tc.in ? C.red : C.green}`,
+                color: tc.in ? C.red : C.green,
+                borderRadius: 10, padding: '8px 18px', fontWeight: 700, cursor: 'pointer',
+              }}>{tc.in ? 'Clock Out' : 'Clock In'}</button>
+            </div>
+            <ProgressBar pct={pct} color={pct >= 1 ? C.green : C.blue} />
           </div>
+        )
+      })}
+      <Btn onClick={onClose} full style={{ marginTop: 6 }}>Done</Btn>
+    </Modal>
+  )
+}
+
+// ─── Settings Modal ───────────────────────────────────────────────────────────
+
+function SettingsModal({ settings, pins, currentUser, isAdmin, archive, onUpdateSettings, onUpdatePins, onClose }) {
+  const [tab, setTab] = useState('jobs')
+  const [localSettings, setLocalSettings] = useState({ ...settings })
+  const [newPreset, setNewPreset] = useState('')
+  const [pinTarget, setPinTarget] = useState(null)
+  const [newPIN, setNewPIN] = useState('')
+  const [confirmPIN, setConfirmPIN] = useState('')
+  const [pinErr, setPinErr] = useState('')
+  const [pinSuccess, setPinSuccess] = useState('')
+
+  const addPreset = () => {
+    const t = newPreset.trim()
+    if (!t) return
+    setLocalSettings(s => ({ ...s, jobPresets: [...(s.jobPresets || []), t] }))
+    setNewPreset('')
+  }
+
+  const removePreset = i => {
+    setLocalSettings(s => ({ ...s, jobPresets: s.jobPresets.filter((_, idx) => idx !== i) }))
+  }
+
+  function saveSettings() { onUpdateSettings(localSettings); onClose() }
+
+  function changePin() {
+    if (newPIN.length < 4) { setPinErr('At least 4 digits required'); return }
+    if (newPIN !== confirmPIN) { setPinErr('PINs do not match'); return }
+    onUpdatePins({ ...pins, [pinTarget]: newPIN })
+    setPinErr('')
+    setPinSuccess(`PIN updated for ${pinTarget}`)
+    setPinTarget(null); setNewPIN(''); setConfirmPIN('')
+    setTimeout(() => setPinSuccess(''), 3000)
+  }
+
+  const tabs = ['jobs', 'pins', 'archive']
+
+  return (
+    <Modal title="Settings" onClose={onClose} wide>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 18, borderBottom: `1px solid ${C.sep}`, paddingBottom: 0 }}>
+        {tabs.map(t => (
+          <button key={t} onClick={() => setTab(t)} style={{
+            background: 'none', border: 'none', color: tab === t ? C.blue : C.muted,
+            padding: '8px 14px', cursor: 'pointer', fontSize: 14,
+            fontWeight: tab === t ? 700 : 400,
+            borderBottom: `2px solid ${tab === t ? C.blue : 'transparent'}`,
+            marginBottom: -1,
+          }}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
+        ))}
+      </div>
+
+      {tab === 'jobs' && (
+        <div>
+          <Label>Job Presets</Label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+            {(localSettings.jobPresets || []).map((j, i) => (
+              <span key={i} style={{
+                background: C.surface2, border: `1px solid ${C.sep}`,
+                color: C.text, borderRadius: 8, padding: '4px 10px', fontSize: 13,
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                {j}
+                <button onClick={() => removePreset(i)} style={{ background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: 0 }}>×</button>
+              </span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            <input value={newPreset} onChange={e => setNewPreset(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addPreset()}
+              placeholder="Add preset…"
+              style={{ flex: 1, background: C.surface2, border: `1px solid ${C.sep}`, borderRadius: 10, color: C.text, fontSize: 14, padding: '8px 12px', outline: 'none' }} />
+            <Btn onClick={addPreset} small>Add</Btn>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Btn variant="secondary" onClick={onClose} full>Cancel</Btn>
+            <Btn onClick={saveSettings} full>Save</Btn>
+          </div>
+        </div>
+      )}
+
+      {tab === 'pins' && (
+        <div>
+          {pinSuccess && (
+            <div style={{ background: C.green + '22', border: `1px solid ${C.green}`, color: C.green, borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 14 }}>
+              {pinSuccess}
+            </div>
+          )}
+          {pinTarget ? (
+            <div>
+              <div style={{ color: C.text, fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Change PIN — {pinTarget}</div>
+              <Field label="New PIN (digits only)">
+                <input type="password" value={newPIN} onChange={e => setNewPIN(e.target.value.replace(/\D/g, ''))}
+                  placeholder="New PIN"
+                  style={{ width: '100%', background: C.surface2, border: `1px solid ${C.sep}`, borderRadius: 10, color: C.text, fontSize: 15, padding: '10px 12px', outline: 'none' }} />
+              </Field>
+              <Field label="Confirm PIN">
+                <input type="password" value={confirmPIN} onChange={e => setConfirmPIN(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Confirm PIN"
+                  style={{ width: '100%', background: C.surface2, border: `1px solid ${C.sep}`, borderRadius: 10, color: C.text, fontSize: 15, padding: '10px 12px', outline: 'none' }} />
+              </Field>
+              {pinErr && <div style={{ color: C.red, fontSize: 13, marginBottom: 10 }}>{pinErr}</div>}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Btn variant="secondary" onClick={() => { setPinTarget(null); setNewPIN(''); setConfirmPIN(''); setPinErr('') }} full>Cancel</Btn>
+                <Btn onClick={changePin} full>Change PIN</Btn>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>
+                {isAdmin ? 'Tap any user to change their PIN.' : 'You can only change your own PIN.'}
+              </div>
+              {Object.entries(pins).map(([name, pin]) => {
+                const canEdit = isAdmin || name === currentUser?.name
+                return (
+                  <div key={name} style={{
+                    background: C.surface2, borderRadius: 10, padding: '12px 16px', marginBottom: 8,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15 }}>{name}</div>
+                      <div style={{ color: C.muted, fontSize: 12 }}>
+                        PIN: {isAdmin ? pin : '•'.repeat(pin.length)}
+                      </div>
+                    </div>
+                    {canEdit && <Btn variant="secondary" onClick={() => setPinTarget(name)} small>Change</Btn>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'archive' && (
+        <div>
+          {!archive?.length && (
+            <div style={{ color: C.muted, textAlign: 'center', padding: '24px 0', fontSize: 14 }}>No archived ROs</div>
+          )}
+          {archive?.map(ro => (
+            <div key={ro.id} style={{ background: C.surface2, borderRadius: 10, padding: '12px 16px', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ color: C.blue, fontWeight: 700, fontSize: 14 }}>{ro.roNumber}</span>
+                <span style={{ color: C.muted, fontSize: 11 }}>{new Date(ro.archivedAt).toLocaleDateString()}</span>
+              </div>
+              <div style={{ color: C.text, fontSize: 14, marginBottom: 2 }}>{ro.vehicle}</div>
+              <div style={{ color: C.muted, fontSize: 12 }}>{ro.customer} · {ro.serviceType}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+// ─── Login Screen ─────────────────────────────────────────────────────────────
+
+function LoginScreen({ onLogin, initPins }) {
+  const [pin, setPin] = useState('')
+  const [err, setErr] = useState('')
+  const shakeRef = useRef(null)
+
+  function tryLogin(full) {
+    // Check dynamic pins first
+    const dynMatch = Object.entries(initPins || {}).find(([, p]) => p === full)
+    if (dynMatch) {
+      const role = getDefaultRole(dynMatch[0])
+      onLogin({ name: dynMatch[0], role })
+      setPin('')
+      return
+    }
+    // Fall back to static map
+    const staticUser = PIN_MAP[full]
+    if (staticUser) {
+      onLogin(staticUser)
+      setPin('')
+      return
+    }
+    // Wrong
+    if (full.length >= 6) {
+      setErr('Wrong PIN')
+      setTimeout(() => { setPin(''); setErr('') }, 900)
+    }
+  }
+
+  function press(d) {
+    if (err) return
+    const next = pin + d
+    setPin(next)
+    tryLogin(next)
+  }
+
+  function backspace() { setPin(p => p.slice(0, -1)); setErr('') }
+
+  const PAD = ['1','2','3','4','5','6','7','8','9','','0','⌫']
+
+  return (
+    <div style={{
+      background: C.bg, minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'Space Grotesk, sans-serif', color: C.text,
+    }}>
+      <style>{GLOBAL_STYLE}</style>
+
+      {/* Logo */}
+      <div style={{ textAlign: 'center', marginBottom: 44 }}>
+        <div style={{ fontSize: 52, marginBottom: 10 }}>🔧</div>
+        <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: -0.5, marginBottom: 4 }}>ShopFlow</div>
+        <div style={{ color: C.muted, fontSize: 14 }}>Service Department Tracker</div>
+      </div>
+
+      {/* PIN dots */}
+      <div style={{ display: 'flex', gap: 14, marginBottom: 10 }} ref={shakeRef}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} style={{
+            width: 14, height: 14, borderRadius: 7,
+            background: i < pin.length ? (err ? C.red : C.blue) : C.surface2,
+            border: `2px solid ${i < pin.length ? (err ? C.red : C.blue) : C.surface3}`,
+            transition: 'background 0.15s, border-color 0.15s',
+          }} />
+        ))}
+      </div>
+
+      {/* Error */}
+      <div style={{ height: 22, display: 'flex', alignItems: 'center', marginBottom: 20 }}>
+        {err && <span style={{ color: C.red, fontSize: 14, fontWeight: 600 }}>{err}</span>}
+      </div>
+
+      {/* Numpad */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 76px)', gap: 12 }}>
+        {PAD.map((d, i) => {
+          if (d === '') return <div key={i} />
+          return (
+            <button key={d + i} onClick={() => d === '⌫' ? backspace() : press(d)}
+              style={{
+                background: C.surface, border: 'none', borderRadius: 38,
+                width: 76, height: 76, color: C.text,
+                fontSize: d === '⌫' ? 22 : 26, fontWeight: 600,
+                cursor: 'pointer', boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+                transition: 'transform 0.1s',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+              onMouseDown={e => e.currentTarget.style.transform = 'scale(0.93)'}
+              onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >{d}</button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main ShopFlowTracker ─────────────────────────────────────────────────────
+
+export default function ShopFlowTracker() {
+  const [currentUser, setCurrentUser] = useState(null)
+
+  const [appState, setAppState] = useState(() => {
+    try {
+      const raw = localStorage.getItem('shopstate_v2')
+      if (raw) return JSON.parse(raw)
+    } catch {}
+    return DEFAULT_STATE
+  })
+
+  const [selectedROId, setSelectedROId] = useState(null)
+  const [showNewRO, setShowNewRO] = useState(false)
+  const [moveROId, setMoveROId] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showClock, setShowClock] = useState(false)
+  const [, setTick] = useState(0)
+
+  const isRemote = useRef(false)
+  const saveTimer = useRef(null)
+
+  // ── Firebase listener ──
+  useEffect(() => {
+    const ref = doc(db, 'shopstate', 'main')
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        isRemote.current = true
+        setAppState(snap.data())
+        setTimeout(() => { isRemote.current = false }, 300)
+      }
+    }, err => console.error('[ShopFlow] snapshot error', err))
+    return unsub
+  }, [])
+
+  // ── Debounced save ──
+  const scheduleSave = useCallback((state) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      try { localStorage.setItem('shopstate_v2', JSON.stringify(state)) } catch {}
+      if (!isRemote.current) {
+        try { await setDoc(doc(db, 'shopstate', 'main'), state) }
+        catch (e) { console.error('[ShopFlow] save failed', e) }
+      }
+    }, 800)
+  }, [])
+
+  useEffect(() => { scheduleSave(appState) }, [appState, scheduleSave])
+
+  // ── 1-second tick for live timers ──
+  useEffect(() => {
+    const iv = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(iv)
+  }, [])
+
+  // ── State helpers ──
+  const update = useCallback(updater => setAppState(prev => updater(prev)), [])
+
+  const updateRO = useCallback((id, changes) => {
+    update(s => ({ ...s, ros: s.ros.map(r => r.id === id ? { ...r, ...changes } : r) }))
+  }, [update])
+
+  const addRO = useCallback(data => {
+    const ro = {
+      ...data, id: data.roNumber || genROId(),
+      column: 'onDeck', timerStart: null, timerElapsed: 0,
+      notes: [], cause: data.cause || '', correction: data.correction || '',
+      waitingOnParts: false, createdAt: Date.now(),
+    }
+    update(s => ({ ...s, ros: [...s.ros, ro] }))
+  }, [update])
+
+  const deleteRO = useCallback(id => {
+    update(s => ({ ...s, ros: s.ros.filter(r => r.id !== id) }))
+  }, [update])
+
+  const archiveRO = useCallback(id => {
+    update(s => {
+      const ro = s.ros.find(r => r.id === id)
+      if (!ro) return s
+      return { ...s, ros: s.ros.filter(r => r.id !== id), archive: [...s.archive, { ...ro, archivedAt: Date.now() }] }
+    })
+  }, [update])
+
+  const moveRO = useCallback((id, column, tech) => {
+    update(s => ({
+      ...s,
+      ros: s.ros.map(r => {
+        if (r.id !== id) return r
+        const wasRunning = !!r.timerStart
+        const newElapsed = wasRunning && column !== 'inProgress'
+          ? r.timerElapsed + (Date.now() - r.timerStart) : r.timerElapsed
+        return {
+          ...r, column,
+          tech: tech !== undefined ? tech : r.tech,
+          timerStart: column === 'inProgress' && !r.timerStart ? Date.now()
+            : column !== 'inProgress' ? null : r.timerStart,
+          timerElapsed: newElapsed,
+        }
+      }),
+    }))
+  }, [update])
+
+  const toggleTimer = useCallback(id => {
+    update(s => ({
+      ...s,
+      ros: s.ros.map(r => {
+        if (r.id !== id) return r
+        if (r.timerStart) {
+          return { ...r, timerStart: null, timerElapsed: r.timerElapsed + (Date.now() - r.timerStart) }
+        }
+        return { ...r, timerStart: Date.now() }
+      }),
+    }))
+  }, [update])
+
+  const addNote = useCallback((id, text) => {
+    const note = { id: Date.now(), text, author: currentUser?.name || 'Unknown', time: Date.now() }
+    update(s => ({ ...s, ros: s.ros.map(r => r.id === id ? { ...r, notes: [...(r.notes || []), note] } : r) }))
+  }, [update, currentUser])
+
+  const toggleClock = useCallback(tech => {
+    update(s => {
+      const tc = s.techClocks[tech] || { in: false, start: null, total: 0 }
+      if (tc.in) {
+        return { ...s, techClocks: { ...s.techClocks, [tech]: { in: false, start: null, total: tc.total + (tc.start ? Date.now() - tc.start : 0) } } }
+      }
+      return { ...s, techClocks: { ...s.techClocks, [tech]: { in: true, start: Date.now(), total: tc.total } } }
+    })
+  }, [update])
+
+  const getTechHours = useCallback(tech => {
+    const tc = appState.techClocks[tech]
+    if (!tc) return 0
+    return ((tc.total || 0) + (tc.in && tc.start ? Date.now() - tc.start : 0)) / 3600000
+  }, [appState.techClocks])
+
+  const toggleActivity = useCallback(type => {
+    update(s => {
+      const active = s.activity[type]
+      return { ...s, activity: { ...s.activity, [type]: !active, [`${type}Start`]: !active ? Date.now() : null } }
+    })
+  }, [update])
+
+  const isAdmin = currentUser?.role === 'admin'
+  const isManager = currentUser?.role === 'admin' || currentUser?.role === 'manager'
+  const { ros, techClocks, activity, settings, archive, pins } = appState
+
+  const selectedRO = ros.find(r => r.id === selectedROId) || null
+  const moveRO_ro = ros.find(r => r.id === moveROId) || null
+
+  // ── Login gate ──
+  if (!currentUser) {
+    return <LoginScreen onLogin={setCurrentUser} initPins={pins} />
+  }
+
+  // ── Render board ──
+  return (
+    <div style={{ background: C.bg, minHeight: '100vh', color: C.text, fontFamily: 'Space Grotesk, sans-serif' }}>
+      <style>{GLOBAL_STYLE}</style>
+
+      {/* ── Header ── */}
+      <div style={{
+        background: C.surface, borderBottom: `1px solid ${C.sep}`,
+        padding: '10px 16px', display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 200,
+        gap: 8, flexWrap: 'wrap',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 22 }}>🔧</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: -0.3, lineHeight: 1.1 }}>ShopFlow</div>
+            <div style={{ color: C.muted, fontSize: 10 }}>Service Tracker</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Activity toggles */}
+          {[
+            { key: 'movingCars', label: '🚗 Moving Cars', active: activity.movingCars, color: C.orange },
+            { key: 'partsRun',   label: '📦 Parts Run',   active: activity.partsRun,   color: C.blue  },
+          ].map(({ key, label, active, color }) => (
+            <button key={key} onClick={() => toggleActivity(key)} style={{
+              background: active ? color + '22' : C.surface2,
+              border: `1px solid ${active ? color : C.sep}`,
+              color: active ? color : C.muted,
+              borderRadius: 8, padding: '6px 11px', fontSize: 12,
+              fontWeight: 700, cursor: 'pointer',
+            }}>{label}</button>
+          ))}
+
+          {isAdmin && (
+            <button onClick={() => setShowClock(true)} style={{
+              background: C.surface2, border: `1px solid ${C.sep}`,
+              color: C.text, borderRadius: 8, padding: '6px 11px', fontSize: 12, cursor: 'pointer',
+            }}>⏰ Clock</button>
+          )}
+
+          <button onClick={() => setShowNewRO(true)} style={{
+            background: C.blue, border: 'none', color: '#fff',
+            borderRadius: 9, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+          }}>+ New RO</button>
+
+          <button onClick={() => setShowSettings(true)} style={{
+            background: C.surface2, border: 'none', color: C.muted,
+            width: 34, height: 34, borderRadius: 8, cursor: 'pointer', fontSize: 17,
+          }}>⚙️</button>
+
+          <button onClick={() => setCurrentUser(null)} style={{
+            background: C.surface2, border: `1px solid ${C.sep}`,
+            color: C.muted, borderRadius: 8, padding: '6px 11px',
+            fontSize: 12, cursor: 'pointer',
+          }}>{currentUser.name} ↩</button>
         </div>
       </div>
 
-      {/* Modals */}
-      {showChangePin && currentUser && <ChangePinModal user={currentUser} onClose={() => setShowChangePin(false)} onSave={handleSavePin} />}
-      {showAdd && <NewROModal onAdd={handleAddRO} onClose={() => setShowAdd(false)} nextNum={state.nextNum} techs={state.techs} queues={state.queues} wide={isWide} serviceTypes={state.serviceTypes||DEFAULT_SERVICE_TYPES} jobPresets={state.jobPresets||DEFAULT_JOB_PRESETS} />}
-      {showArchive && <ArchiveModal archived={state.archived||[]} onClose={() => setShowArchive(false)} onRestore={handleRestore} wide={isWide} />}
-      {showServiceTypes && <ServiceTypeSettings serviceTypes={state.serviceTypes||DEFAULT_SERVICE_TYPES} jobPresets={state.jobPresets||DEFAULT_JOB_PRESETS} onClose={() => setShowServiceTypes(false)} onSave={handleSaveServiceTypes} onSaveJobs={handleSaveJobPresets} wide={isWide} />}
-      {detailRO && !movingRO && (
-        <RODetail ro={detailRO.ro} colId={detailRO.colId} timer={state.timers[detailRO.ro.id]} onClose={() => setDetailRO(null)} onSave={f => { handleSaveRO(f); setDetailRO(d=>({...d,ro:{...d.ro,...f}})); }} onDelete={handleDeleteRO} onArchive={handleArchive} onTimer={handleTimer} onHoursChange={(id,val) => { handleHoursChange(id,val); setDetailRO(d=>({...d,ro:{...d.ro,hours:val}})); }} wide={isWide} isAdmin={isAdmin} isTech={isTech} serviceTypes={state.serviceTypes} jobPresets={state.jobPresets} currentUser2={currentUser} onAddNote={(roId,text,author) => { handleAddNote(roId,text,author); setDetailRO(d => d ? {...d,ro:{...d.ro,roNotes:[...(d.ro.roNotes||[]),{id:Date.now(),text,author,time:Date.now()}]}} : d); }} />
+      {/* ── Tech Status Bar ── */}
+      <div style={{
+        background: C.surface, borderBottom: `1px solid ${C.sep}`,
+        padding: '8px 16px', display: 'flex', gap: 10, overflowX: 'auto',
+      }}>
+        {TECHS.map(tech => {
+          const tc = techClocks[tech] || { in: false }
+          const hours = getTechHours(tech)
+          const pct = hours / 40
+          return (
+            <div key={tech} style={{
+              background: C.surface2, borderRadius: 11,
+              padding: '8px 13px', minWidth: 130, flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                <span style={{ fontWeight: 700, fontSize: 13 }}>{tech}</span>
+                <span style={{
+                  background: tc.in ? C.green + '22' : C.surface3,
+                  color: tc.in ? C.green : C.muted,
+                  fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase',
+                }}>{tc.in ? 'Clocked In' : 'Out'}</span>
+              </div>
+              <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>{hours.toFixed(1)}h / 40h</div>
+              <ProgressBar pct={pct} color={pct >= 1 ? C.green : C.blue} />
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Board ── */}
+      <div style={{ padding: '14px 12px', overflowX: 'auto' }}>
+
+        {/* Column header row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(210px, 1fr))', gap: 10, marginBottom: 12 }}>
+          {COLUMNS.map(col => {
+            const count = ros.filter(r => r.column === col.id).length
+            return (
+              <div key={col.id} style={{
+                background: C.surface, borderRadius: 12, padding: '10px 14px',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <span style={{ fontWeight: 700, fontSize: 14 }}>{col.label}</span>
+                <span style={{
+                  background: C.surface2, color: C.muted,
+                  fontSize: 12, padding: '2px 9px', borderRadius: 10, fontWeight: 600,
+                }}>{count}</span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Service-type queue rows */}
+        {Object.entries(SVC_META).map(([svc, meta]) => {
+          const svcROs = ros.filter(r => r.serviceType === svc)
+          return (
+            <div key={svc} style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, paddingLeft: 2 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 5, background: meta.color, flexShrink: 0 }} />
+                <span style={{ color: meta.color, fontWeight: 700, fontSize: 12, letterSpacing: 0.5 }}>
+                  {svc.toUpperCase()}
+                </span>
+                <span style={{ color: C.muted, fontSize: 12 }}>({svcROs.length})</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(210px, 1fr))', gap: 10 }}>
+                {COLUMNS.map(col => {
+                  const cells = svcROs.filter(r => r.column === col.id)
+                  return (
+                    <ColumnCell key={col.id}>
+                      {cells.map(ro => (
+                        <ROCard key={ro.id} ro={ro}
+                          onPress={() => setSelectedROId(ro.id)}
+                          onLongPress={() => setMoveROId(ro.id)} />
+                      ))}
+                    </ColumnCell>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Waiting on Parts */}
+        {(() => {
+          const wop = ros.filter(r => r.waitingOnParts)
+          return (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, paddingLeft: 2 }}>
+                <div style={{ width: 10, height: 10, borderRadius: 5, background: C.orange, flexShrink: 0 }} />
+                <span style={{ color: C.orange, fontWeight: 700, fontSize: 12, letterSpacing: 0.5 }}>WAITING ON PARTS</span>
+                <span style={{ color: C.muted, fontSize: 12 }}>({wop.length})</span>
+              </div>
+              <div style={{
+                background: C.surface + 'BB', borderRadius: 12, padding: 10,
+                border: `1px dashed ${C.orange}55`, minHeight: 62,
+                display: 'flex', flexWrap: 'wrap', gap: 8,
+              }}>
+                {wop.map(ro => (
+                  <div key={ro.id} style={{ width: 210 }}>
+                    <ROCard ro={ro}
+                      onPress={() => setSelectedROId(ro.id)}
+                      onLongPress={() => setMoveROId(ro.id)} />
+                  </div>
+                ))}
+                {!wop.length && (
+                  <div style={{ color: C.surface3, fontSize: 12, margin: 'auto' }}>No vehicles waiting on parts</div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Tech rows */}
+        <div style={{ paddingLeft: 2, marginBottom: 8 }}>
+          <span style={{ color: C.muted, fontWeight: 700, fontSize: 12, letterSpacing: 0.5 }}>TECHNICIANS</span>
+        </div>
+        {TECHS.map(tech => {
+          const tc = techClocks[tech] || { in: false }
+          const techAllROs = ros.filter(r => r.tech === tech)
+          return (
+            <div key={tech} style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7, paddingLeft: 2 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 4, background: tc.in ? C.green : C.muted, flexShrink: 0 }} />
+                <span style={{ color: C.text, fontWeight: 700, fontSize: 13 }}>{tech}</span>
+                <span style={{ color: C.muted, fontSize: 12 }}>
+                  {techAllROs.length} RO{techAllROs.length !== 1 ? 's' : ''} · {getTechHours(tech).toFixed(1)}h
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(210px, 1fr))', gap: 10 }}>
+                {COLUMNS.map(col => {
+                  const cells = ros.filter(r => r.tech === tech && r.column === col.id)
+                  return (
+                    <ColumnCell key={col.id} highlight={col.id === 'inProgress' && tc.in && cells.length > 0}>
+                      {cells.map(ro => (
+                        <ROCard key={ro.id} ro={ro}
+                          onPress={() => setSelectedROId(ro.id)}
+                          onLongPress={() => setMoveROId(ro.id)} />
+                      ))}
+                    </ColumnCell>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Modals ── */}
+
+      {showNewRO && (
+        <NewROModal
+          settings={settings}
+          onSave={data => { addRO(data); setShowNewRO(false) }}
+          onClose={() => setShowNewRO(false)}
+        />
+      )}
+
+      {selectedRO && (
+        <RODetailSheet
+          ro={selectedRO}
+          currentUser={currentUser}
+          onClose={() => setSelectedROId(null)}
+          onUpdate={changes => updateRO(selectedROId, changes)}
+          onDelete={() => { deleteRO(selectedROId); setSelectedROId(null) }}
+          onArchive={() => { archiveRO(selectedROId); setSelectedROId(null) }}
+          onToggleTimer={() => toggleTimer(selectedROId)}
+          onAddNote={text => addNote(selectedROId, text)}
+        />
+      )}
+
+      {moveRO_ro && (
+        <MoveROModal
+          ro={moveRO_ro}
+          onMove={(col, tech) => { moveRO(moveROId, col, tech); setMoveROId(null) }}
+          onClose={() => setMoveROId(null)}
+        />
+      )}
+
+      {showSettings && (
+        <SettingsModal
+          settings={settings}
+          pins={pins}
+          currentUser={currentUser}
+          isAdmin={isAdmin}
+          archive={archive}
+          onUpdateSettings={s => update(st => ({ ...st, settings: s }))}
+          onUpdatePins={p => update(st => ({ ...st, pins: p }))}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+
+      {showClock && (
+        <ClockModal
+          techClocks={techClocks}
+          getTechHours={getTechHours}
+          onToggle={toggleClock}
+          onClose={() => setShowClock(false)}
+        />
       )}
     </div>
-  );
+  )
 }
