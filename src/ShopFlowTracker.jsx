@@ -402,8 +402,8 @@ function JobFieldTrigger({ value, onOpen }) {
   return (
     <div>
       <label style={labelStyle}>Job Types</label>
-      <button onClick={onOpen}
-        style={{ width:"100%", padding:"12px 14px", border:"1.5px solid "+BORDER, borderRadius:12, background:"#FAFAFA", textAlign:"left", cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, minHeight:48 }}>
+      <button type="button" onClick={onOpen}
+        style={{ width:"100%", padding:"12px 14px", border:"1.5px solid "+BORDER, borderRadius:12, background:"rgba(255,255,255,0.07)", textAlign:"left", cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, minHeight:48, touchAction:"manipulation" }}>
         {jobs.length === 0 ? (
           <span style={{ color:MUTED, fontSize:14 }}>Tap to select job types…</span>
         ) : (
@@ -478,7 +478,7 @@ function JobPicker({ value, onChange, presets, onClose }) {
         <div style={{ overflowY:"auto", flex:1, padding:"10px 18px", WebkitOverflowScrolling:"touch" }}>
           <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.35)", textTransform:"uppercase", letterSpacing:"0.7px", marginBottom:10 }}>Common Services</div>
           <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-            {presets.map(j => {
+            {(presets||[]).map(j => {
               const isSelected = selected.includes(j);
               const ab = abbrevJob(j);
               return (
@@ -492,18 +492,26 @@ function JobPicker({ value, onChange, presets, onClose }) {
           </div>
         </div>
         {/* Custom job input */}
-        <div style={{ padding:"10px 18px 36px", borderTop:"1px solid "+BORDER, flexShrink:0 }}>
+        <div style={{ padding:"10px 18px 12px", borderTop:"1px solid "+BORDER, flexShrink:0 }}>
           <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.35)", textTransform:"uppercase", letterSpacing:"0.7px", marginBottom:8 }}>Add Custom Job</div>
           <div style={{ display:"flex", gap:8 }}>
             <input
-              placeholder="e.g. Control Arms, Strut Mounts…"value={custom}
+              placeholder="e.g. Control Arms, Strut Mounts…" value={custom}
               onChange={e => setCustom(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addCustom()}              style={{ ...inputStyle, flex:1, padding:"11px 14px", fontSize:14 }}
+              onKeyDown={e => e.key === "Enter" && addCustom()}
+              style={{ ...inputStyle, flex:1, padding:"11px 14px", fontSize:14 }}
             />
-            <button onClick={addCustom} style={{ background:ACCENT, color:"#fff", border:"none", borderRadius:12, padding:"0 18px", cursor:"pointer", fontWeight:700, fontSize:14, fontFamily:"inherit", whiteSpace:"nowrap" }}>
+            <button type="button" onClick={addCustom} style={{ background:ACCENT, color:"#fff", border:"none", borderRadius:12, padding:"0 18px", cursor:"pointer", fontWeight:700, fontSize:14, fontFamily:"inherit", whiteSpace:"nowrap" }}>
               Add
             </button>
           </div>
+        </div>
+        {/* Done button */}
+        <div style={{ padding:"10px 18px 36px", flexShrink:0 }}>
+          <button type="button" onClick={onClose}
+            style={{ width:"100%", padding:14, background:ACCENT, color:"#fff", border:"none", borderRadius:14, fontFamily:"'Barlow',sans-serif", fontWeight:800, fontSize:16, cursor:"pointer", touchAction:"manipulation" }}>
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -1376,7 +1384,7 @@ function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes
       </div>
     </Sheet>
     {showJobPicker && (
-      <JobPicker value={f.jobs} onChange={v => setF(p => ({...p, jobs:v}))} presets={jobPresets} onClose={() => setShowJobPicker(false)} />
+      <JobPicker value={f.jobs} onChange={v => setF(p => ({...p, jobs:v}))} presets={jobPresets||DEFAULT_JOB_PRESETS} onClose={() => setShowJobPicker(false)} />
     )}
     </>
   );
