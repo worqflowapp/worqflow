@@ -422,7 +422,7 @@ function JobFieldTrigger({ value, onOpen }) {
 }
 // ─── JobPicker ───────────────────────────────────────────────────────────────
 function JobPicker({ value, onChange, presets, onClose }) {
-  // value is a comma-separated string like "Oil Change, Brakes"const selected = value ? value.split(",").map(j => j.trim()).filter(Boolean) : [];
+  const selected = value ? value.split(",").map(j => j.trim()).filter(Boolean) : [];
   const [custom, setCustom] = useState("");
   function toggle(job) {
     const exists = selected.includes(job);
