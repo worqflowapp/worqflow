@@ -564,6 +564,7 @@ function HoursPicker({ ro, onHoursChange, onClose }) {
 }
 // ─── Job abbreviations ───────────────────────────────────────────────────────
 function abbrevJob(j) {
+  if (!j || typeof j !== "string") return { label:"", bg:"rgba(100,116,139,0.18)", color:"#94A3B8" };
   const v = j.toLowerCase().trim();
   if (v.includes("oil"))         return { label:"Oil",    bg:"rgba(234,88,12,0.18)",   color:"#FB923C" };
   if (v.includes("brake"))       return { label:"Brks",   bg:"rgba(190,18,60,0.18)",   color:"#F87171" };
@@ -672,8 +673,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
         </span>
         {ro.roNotes && ro.roNotes.length > 0 && (
           <span style={{ background:"rgba(10,132,255,0.2)", color:ACCENT, fontSize:8, fontWeight:600, padding:"1px 5px", borderRadius:4, flexShrink:0 }}>
-            
-{ro.roNotes.length}
+            💬 {ro.roNotes.length}
           </span>
         )}
         <div style={{ display:"flex", alignItems:"center", gap:3, flexShrink:0 }}>
@@ -695,8 +695,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
         return (
           <div style={{ display:"flex", alignItems:"center", gap:3, marginBottom:3 }}>
             <span style={{ background:overdue?"rgba(255,69,58,0.15)":soon?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", color:overdue?DANGER:soon?WARN:TEXT3, fontSize:8, fontWeight:600, padding:"2px 7px", borderRadius:5, display:"flex", alignItems:"center", gap:3 }}>
-              
- {overdue?"OVERDUE — ":soon?"Due soon — ":""}{timeStr}
+              ⏰ {overdue?"OVERDUE — ":soon?"Due soon — ":""}{timeStr}
             </span>
           </div>
         );
@@ -973,6 +972,7 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
       <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"1px", marginBottom:10, marginTop:6, paddingBottom:6, borderBottom:"1px solid "+BORDER }}>{title}</div>
     );
     return (
+      <>
       <Sheet title="Edit RO" subtitle={ro.roNum} onClose={onClose} wide={wide}>
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
           {sec("Service Type")}
@@ -1035,11 +1035,8 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
             <label style={labelStyle}>Flat Rate Hours</label>
             <input type="number" min="0" step="0.5" placeholder="e.g. 2.5" value={f.hours||""} onChange={e => setF(p => ({...p, hours:e.target.value}))} style={{ ...inputStyle, fontWeight:700 }} />
           </div>
-          {/* Jobs — full width with picker */}
+          {/* Jobs — full width with picker (JobPicker renders outside Sheet below) */}
           <JobFieldTrigger value={f.jobs} onOpen={() => setShowJobPickerEdit(true)} />
-          {showJobPickerEdit && (
-            <JobPicker value={f.jobs} onChange={v => setF(p => ({...p, jobs:v}))} presets={jobPresetsForEdit} onClose={() => setShowJobPickerEdit(false)} />
-          )}
                     {sec("3 C's — Technician Notes")}
           <div><label style={labelStyle}>Concern (Customer complaint)</label><textarea placeholder="What the customer says is wrong…" value={f.concern||""} onChange={e => setF(p => ({...p, concern:e.target.value}))} rows={2} style={{...inputStyle,resize:"vertical"}}/></div>
           <div><label style={labelStyle}>Cause (What tech found)</label><textarea placeholder="Root cause identified by technician…" value={f.cause||""} onChange={e => setF(p => ({...p, cause:e.target.value}))} rows={2} style={{...inputStyle,resize:"vertical"}}/></div>
@@ -1055,6 +1052,10 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
           </div>
         </div>
       </Sheet>
+      {showJobPickerEdit && (
+        <JobPicker value={f.jobs} onChange={v => setF(p => ({...p, jobs:v}))} presets={jobPresetsForEdit} onClose={() => setShowJobPickerEdit(false)} />
+      )}
+      </>
     );
   }
   return (
@@ -1226,6 +1227,11 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
             {timer && timer.running ? <><PauseIcon /> Pause</> : <><PlayIcon /> Start</>}
           </button>
         </div>
+        {isTech && !isAdmin && (
+          <button onClick={() => setTechEditing(true)} style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:14, background:"rgba(10,132,255,0.1)", color:ACCENT, border:"0.5px solid rgba(10,132,255,0.3)", borderRadius:14, fontFamily:"inherit", fontWeight:600, fontSize:15, cursor:"pointer", width:"100%" }}>
+            <EditIcon /> Update RO
+          </button>
+        )}
         {isAdmin && (
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
             {isAdmin && (
@@ -1256,6 +1262,7 @@ function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes
     onAdd({ ...f, roId });
   }
   return (
+    <>
     <Sheet title="New Repair Order" subtitle="Fill in the details below" onClose={onClose} wide={wide}>
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
         {/* RO Number — editable */}
@@ -1331,9 +1338,6 @@ function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes
           <input type="number" placeholder="e.g. 2.5" value={f.hours} onChange={e => setF(p => ({...p, hours:e.target.value}))} style={inputStyle}/>
         </div>
         <JobFieldTrigger value={f.jobs} onOpen={() => setShowJobPicker(true)} />
-        {showJobPicker && (
-          <JobPicker value={f.jobs} onChange={v => setF(p => ({...p, jobs:v}))} presets={jobPresets} onClose={() => setShowJobPicker(false)} />
-        )}
         <div>          <label style={labelStyle}>Promise Time (optional)</label>
           <input type="datetime-local" value={f.promiseTime||""} onChange={e => setF(p=>({...p, promiseTime:e.target.value}))} style={inputStyle}/>
         </div>
@@ -1371,6 +1375,10 @@ function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes
         </button>
       </div>
     </Sheet>
+    {showJobPicker && (
+      <JobPicker value={f.jobs} onChange={v => setF(p => ({...p, jobs:v}))} presets={jobPresets} onClose={() => setShowJobPicker(false)} />
+    )}
+    </>
   );
 }
 // ─── Archive Modal ────────────────────────────────────────────────────────────
@@ -3363,14 +3371,12 @@ export default function ShopFlowTracker() {
                       {isClockedIn(tech.id) ? (
                         <button onClick={() => handleClockOut(tech.id)}
                           style={{ width:"100%", background:"rgba(255,69,58,0.12)", color:DANGER, border:"0.5px solid rgba(255,69,58,0.3)", borderRadius:8, padding:"5px 4px", fontSize:9, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:3 }}>
-                          
- Clock Out
+                          🔴 Clock Out
                         </button>
                       ) : (
                         <button onClick={() => handleClockIn(tech.id)}
                           style={{ width:"100%", background:"rgba(48,209,88,0.12)", color:SUCCESS, border:"0.5px solid rgba(48,209,88,0.3)", borderRadius:8, padding:"5px 4px", fontSize:9, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:3 }}>
-                          
- Clock In
+                          🟢 Clock In
                         </button>
                       )}
                     </div>
@@ -3443,7 +3449,7 @@ export default function ShopFlowTracker() {
                 {/* Header */}
                 <div style={{ background:"linear-gradient(135deg,rgba(191,90,242,0.3),rgba(191,90,242,0.15))", padding:"12px 14px", display:"flex", alignItems:"center", gap:10 }}>
                   <div style={{ width:28, height:28, background:"rgba(191,90,242,0.25)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, flexShrink:0 }}>
-</div>
+🔩</div>
                   <div style={{ flex:1 }}>
                     <div style={{ color:TEXT, fontWeight:700, fontSize:14, letterSpacing:"-0.2px" }}>Waiting on Parts</div>
                     <div style={{ color:"rgba(255,255,255,0.45)", fontSize:10, marginTop:1 }}>Parts ordered — waiting for arrival</div>
@@ -3459,7 +3465,7 @@ export default function ShopFlowTracker() {
                     {partIds.length === 0 && !isPartsTarget ? (
                       <div style={{ border:"1px dashed rgba(191,90,242,0.2)", borderRadius:12, padding:"20px 16px", textAlign:"center" }}>
                         <div style={{ fontSize:24, marginBottom:8 }}>
-</div>
+🔩</div>
                         <div style={{ fontSize:13, color:"rgba(255,255,255,0.3)", fontWeight:500 }}>No tickets waiting on parts</div>
                         <div style={{ fontSize:11, color:"rgba(255,255,255,0.18)", marginTop:4 }}>Long press a card to move it here</div>
                       </div>
