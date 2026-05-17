@@ -81,6 +81,55 @@ Replaced `onTouchStart/Move/End` + `onMouseDown/Up/Leave` (with `e.preventDefaul
 
 ---
 
+## Session 5 — Display Mode + Hours Tracker
+**Commits:** `fb7227a` → `a1beb7d` → `99a2e71` → `77e8827` → `698dfee` → `99fac4e` → `378dec8` → `903f237` → `acdb64f` → `b4e286c` → `b03869e` → `e780b16`
+
+### Display Mode (PIN 9999)
+Added a read-only TV/wall board mode. `isDisplay = currentUser?.role === "display"` triggers an early return rendering a completely separate 5-zone fixed layout (100vh, no scroll):
+
+| Zone | Height | Content |
+|------|--------|---------|
+| 1 | 7vh | Header with logo, hours tracker, live clock |
+| 2 | 4vh | Column headers |
+| 3 | 52vh | Kanban grid |
+| 4 | 16vh | Waiting on Parts |
+| 5 | 21vh | Staging queues |
+
+### Hours Goal Tracker
+Center of Zone 1 header shows:
+- Total flagged hours vs `GOAL_HOURS` target with a progress bar
+- Revenue estimate (`flagged hours × labor rate`)
+- Per-tech chips showing individual hours with color coding (green ≥8h, orange ≥4h, red <4h)
+
+### DisplayCard — final working design
+After multiple iterations, the correct approach is:
+
+**DO NOT pass a `cardHeight` prop. DO NOT set `height/minHeight/maxHeight` in pixels on the card.**
+
+The working pattern:
+- Card shell: `height:'100%'` — fills whatever wrapper it's in
+- Each card in a cell is wrapped in `<div style={{ flex:1, minHeight:0, overflow:'hidden' }}>`
+- Cell container: `display:flex, flexDirection:column, gap:4`
+- 1 card → wrapper `flex:1` = 100% of cell → card fills it
+- 2 cards → each wrapper `flex:1` = 50% each → no math needed
+- N cards → equal split automatically
+
+3 rows always rendered (never conditional):
+- Row 1: RO number + service type
+- Row 2: Vehicle (bold) + Customer — `flex:1, justifyContent:'center'`
+- Row 3: Job pills + timer + hours
+
+`justifyContent:'space-between'` on 3 rows (not 5) distributes cleanly without overlap.
+
+### What went wrong in earlier attempts
+1. **5-row layout with `space-between`** — when 5 rows totaled more px than the card height, flexbox created negative gaps and rows literally overlapped each other, covering the vehicle text.
+2. **Fixed `cardHeight` prop via pixel math** — `calcCardHeight()` and `cellHeightPx` state computed card heights from `window.innerHeight`, but the computed values didn't match actual CSS-rendered heights (zone padding/gap discrepancies). Cards were either too tall or too short.
+3. **`flex:1` on card with no `height:100%` on shell** — card shell grew but content didn't fill it correctly.
+
+The root fix: let CSS do the work. Wrapper `flex:1` + card `height:100%` is the only reliable approach.
+
+---
+
 ## Firestore Management
 To delete `shopstate/main` (forces fresh seed on next page load):
 ```bash

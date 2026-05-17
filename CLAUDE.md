@@ -14,7 +14,7 @@ Auto dealership service department kanban board. Built for real shop use — tec
 - React + Vite (no TypeScript)
 - Firebase Firestore — real-time sync across devices
 - Vercel — auto-deploys on every push to `main`
-- Single-file component: `src/ShopFlowTracker.jsx` (~2700 lines)
+- Single-file component: `src/ShopFlowTracker.jsx` (~4000 lines)
 - Font: Space Grotesk
 - Theme: Apple iOS dark / OLED black
 
@@ -30,6 +30,7 @@ Auto dealership service department kanban board. Built for real shop use — tec
 | LA | tech | 2222 |
 | Darcheezy | tech | 3333 |
 | Jason | tech | 4444 |
+| Display | display | 9999 |
 
 ---
 
@@ -48,7 +49,7 @@ All app state lives in one object (`state`/`setState`). Shape defined by `freshS
 ```
 
 ### Firebase Sync (critical — do not break)
-Located around line 2375–2430 in ShopFlowTracker.jsx.
+Located around line 3050–3100 in ShopFlowTracker.jsx.
 
 - `isRemote` ref: prevents write-back loops when a remote snapshot arrives
 - `stateRef` ref: mirrors state so the onSnapshot seed write has current data
@@ -81,7 +82,8 @@ worqflow/
 | Component | Purpose |
 |-----------|---------|
 | `LoginScreen` | PIN login with numpad |
-| `ROCard` | Kanban card — memo-wrapped, Pointer Events for hold-to-move |
+| `DisplayCard` | Read-only kanban card for TV display mode — `height:100%`, no cardHeight prop |
+| `ROCard` | Interactive kanban card — memo-wrapped, Pointer Events for hold-to-move |
 | `RODetail` | Full RO edit sheet (3 C's, notes, timer, hours) |
 | `NewROModal` | Create new RO form |
 | `ArchiveModal` | View/restore archived ROs |
@@ -94,11 +96,47 @@ worqflow/
 
 ---
 
+## Display Mode (PIN 9999, role: "display")
+
+`isDisplay = currentUser?.role === "display"` triggers an early return that renders a completely separate 5-zone TV layout. Nothing from the normal board renders.
+
+### 5-Zone Layout (100vh, no scroll)
+| Zone | Height | Content |
+|------|--------|---------|
+| 1 | 7vh | Header: logo, hours goal tracker, live clock |
+| 2 | 4vh | Column headers (On Deck / In Progress / QC / Delivered) |
+| 3 | 52vh | Kanban grid: tech rows × 4 columns |
+| 4 | 16vh | Waiting on Parts queue |
+| 5 | 21vh | Staging queues (Main Shop, PDI, Used Cars) |
+
+### DisplayCard
+- **No `cardHeight` prop** — the container controls height, not the card
+- Card shell: `height:'100%'` fills its wrapper
+- 3 rows always rendered (never conditional):
+  - Row 1: RO number + service type dot
+  - Row 2: Vehicle (bold) + Customer — `flex:1, justifyContent:'center'`
+  - Row 3: Job pills + timer badge + hours badge
+- `justifyContent:'space-between'` distributes 3 rows cleanly
+
+### Cell height mechanism (Zone 3)
+Each kanban cell is `display:flex, flexDirection:column, gap:4, overflow:hidden`.  
+Each card is wrapped in `<div style={{ flex:1, minHeight:0, overflow:'hidden' }}>`.  
+- 1 card → wrapper is 100% of cell → card `height:100%` fills it
+- 2 cards → each wrapper is 50% → each card fills its half
+- N cards → equal split, pure CSS, no pixel math needed
+
+### Hours Goal Tracker (Zone 1 header center)
+Shows shop-wide flagged hours vs goal, revenue estimate, per-tech chips.  
+`GOAL_HOURS` constant controls the target. Uses `techStats()` to sum flagged hours.
+
+---
+
 ## Known Issues / Watch Out For
 1. **PDF extraction artifacts** — the original source was extracted from a PDF. Multiple rounds of broken multi-line strings and merged `const` declarations were fixed. If something looks syntactically weird, check nearby lines for merged code.
 2. **Firestore schema** — the Firestore document may have data from old app versions. The onSnapshot merge handles this but always keep the explicit field fallbacks.
 3. **Storage key** — if users see stale/broken data, bump `STORAGE_KEY` and re-delete the Firestore document.
-4. **Deleting Firestore doc** — can be done with this one-liner from inside `/Users/adnanqamar/worqflow/`:
+4. **DisplayCard height** — DO NOT add a `cardHeight` prop back to DisplayCard. The `height:100%` + wrapper `flex:1` approach is intentional. Previous attempts to pass pixel heights caused row overlap bugs.
+5. **Deleting Firestore doc** — can be done with this one-liner from inside `/Users/adnanqamar/worqflow/`:
    ```
    node -e "const {initializeApp}=require('firebase/app'),{getFirestore,doc,deleteDoc}=require('firebase/firestore'),app=initializeApp({apiKey:'AIzaSyDhh-lq9b8AtN7BEu8cDDXoGI_FlrKvRxg',projectId:'worqflow-67bff'}),db=getFirestore(app);deleteDoc(doc(db,'shopstate','main')).then(()=>{console.log('done');process.exit()})"
    ```
@@ -109,9 +147,10 @@ worqflow/
 - [ ] Laptop performance still feels slower than mobile (memo helps but more optimization possible)
 - [ ] Analytics screen — verify all tabs (Overview, Tech, Efficiency) show real data
 - [ ] Clock in/out admin area needs testing with real users
-- [ ] Long press to move cards — recently switched to Pointer Events API, needs real-world testing
+- [ ] Long press to move cards — Pointer Events API, needs real-world testing
 - [ ] HoursPicker and other modals use light-theme colors (need dark theme audit)
 - [ ] No offline support — app breaks without internet
 - [ ] No push notifications for RO updates
 - [ ] Admin: ability to add/remove techs
 - [ ] Better promise time handling (currently stores raw datetime string)
+- [ ] Display mode Zones 4/5 — cards fill zone height via flex stretch, test with real parts/staging tickets
