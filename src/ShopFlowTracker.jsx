@@ -2887,181 +2887,6 @@ function LoginScreen({ onLogin, users }) {
     </div>
   );
 }
-// ─── DisplayROCard — read-only card for TV display ──────────────────────────
-function DisplayROCard({ ro, serviceTypes }) {
-  const st = (serviceTypes || DEFAULT_SERVICE_TYPES).find(s => s.id === ro.serviceType);
-  const borderColor = st ? st.color : "rgba(255,255,255,0.2)";
-  const jobs = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
-  const vehicle = [ro.year, ro.make, ro.model].filter(Boolean).join(" ");
-  const now = Date.now();
-  const due = ro.promiseTime ? new Date(ro.promiseTime).getTime() : null;
-  const diff = due ? due - now : null;
-  const isOverdue = diff !== null && diff <= 0;
-  const isSoon    = diff !== null && diff > 0 && diff <= 30 * 60 * 1000;
-  const promiseFmt = due && !isNaN(due) ? new Date(due).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }) : null;
-  return (
-    <div style={{
-      background: "rgba(22,26,42,0.95)",
-      borderRadius: 8,
-      borderLeft: "3px solid " + borderColor,
-      padding: "7px 9px",
-      marginBottom: 5,
-      flexShrink: 0,
-      animation: isOverdue ? "urgent-glow 1.5s ease-in-out infinite" : "none",
-    }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:4 }}>
-        <span style={{ fontSize:"clamp(13px,1.2vw,18px)", fontWeight:800, color:"#FFFFFF", letterSpacing:"-0.3px", lineHeight:1.1 }}>{ro.roNum}</span>
-        {ro.hours && <span style={{ fontSize:"clamp(9px,0.75vw,11px)", fontWeight:700, color:SUCCESS, background:"rgba(48,209,88,0.15)", padding:"2px 6px", borderRadius:5, flexShrink:0, whiteSpace:"nowrap" }}>{ro.hours}h</span>}
-      </div>
-      {vehicle && <div style={{ fontSize:"clamp(11px,1vw,15px)", color:"rgba(255,255,255,0.7)", marginTop:2, lineHeight:1.2 }}>{vehicle}</div>}
-      {ro.customer && <div style={{ fontSize:"clamp(10px,0.9vw,13px)", color:"rgba(255,255,255,0.4)", marginTop:1, lineHeight:1.2 }}>{ro.customer}</div>}
-      {jobs.length > 0 && (
-        <div style={{ display:"flex", gap:3, flexWrap:"wrap", marginTop:4 }}>
-          {jobs.slice(0,3).map((j,i) => {
-            const ab = abbrevJob(j);
-            return <span key={i} style={{ fontSize:"clamp(8px,0.65vw,10px)", fontWeight:700, background:ab.bg, color:ab.color, padding:"2px 6px", borderRadius:20 }}>{j}</span>;
-          })}
-          {jobs.length > 3 && <span style={{ fontSize:"clamp(8px,0.65vw,10px)", color:"rgba(255,255,255,0.3)" }}>+{jobs.length-3}</span>}
-        </div>
-      )}
-      {promiseFmt && (
-        <div style={{ marginTop:3, fontSize:"clamp(8px,0.65vw,10px)", fontWeight:700, color:isOverdue?DANGER:isSoon?WARN:"rgba(255,255,255,0.35)" }}>
-          ⏰ {promiseFmt}{isOverdue?" — OVERDUE":isSoon?" — SOON":""}
-        </div>
-      )}
-    </div>
-  );
-}
-// ─── DisplayScreen — full-screen TV/wall board ───────────────────────────────
-function DisplayScreen({ state, onLogout, connected }) {
-  const techs = state.techs || DEFAULT_TECHS;
-  const numTechs = Math.max(techs.length, 1);
-  const colRefs = useRef([]);
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Auto-scroll tech columns with >4 cards every 10 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      colRefs.current.forEach(ref => {
-        if (!ref || ref.scrollHeight <= ref.clientHeight + 10) return;
-        const atBottom = ref.scrollTop + ref.clientHeight >= ref.scrollHeight - 20;
-        ref.scrollTo({ top: atBottom ? 0 : ref.scrollHeight, behavior:"smooth" });
-      });
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  function getRO(id) { return (state.ros || []).find(r => r.id === id); }
-
-  function getTechAllROs(techId) {
-    const cols = state.grid[techId] || {};
-    return COLS.flatMap(c => (cols[c.id] || []).map(id => ({ id, col: c })));
-  }
-
-  const timeStr = now.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" });
-  const dateStr = now.toLocaleDateString([], { weekday:"long", month:"long", day:"numeric" });
-  const queues = state.queues || DEFAULT_QUEUES;
-  const partsIds = state.partsSlots || [];
-  const svcTypes = state.serviceTypes || DEFAULT_SERVICE_TYPES;
-
-  return (
-    <div style={{ position:"fixed", inset:0, background:"#000000", display:"flex", flexDirection:"column", overflow:"hidden", fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Space Grotesk',sans-serif" }}>
-      {/* ── Top bar — tap anywhere to logout ── */}
-      <div
-        onClick={onLogout}
-        style={{ height:"5vh", minHeight:44, maxHeight:56, display:"flex", alignItems:"center", padding:"0 14px", borderBottom:"1px solid rgba(255,255,255,0.08)", background:"rgba(8,10,18,0.97)", cursor:"pointer", flexShrink:0, gap:10, userSelect:"none" }}
-      >
-        <WFLogo size={26} radius={6} />
-        <span style={{ fontSize:"clamp(11px,1vw,15px)", fontWeight:700, color:"rgba(255,255,255,0.7)", flex:1, letterSpacing:"-0.2px" }}>Service Department</span>
-        <div style={{ textAlign:"right", marginRight:8 }}>
-          <div style={{ fontSize:"clamp(13px,1.2vw,17px)", fontWeight:700, color:"#FFFFFF", fontVariantNumeric:"tabular-nums", letterSpacing:"-0.3px" }}>{timeStr}</div>
-          <div style={{ fontSize:"clamp(8px,0.65vw,10px)", color:"rgba(255,255,255,0.3)", marginTop:1 }}>{dateStr}</div>
-        </div>
-        <div title={connected?"Live":"Disconnected"} style={{ width:9, height:9, borderRadius:"50%", background:connected?SUCCESS:DANGER, flexShrink:0, boxShadow:connected?"0 0 6px "+SUCCESS:"none" }} />
-      </div>
-
-      {/* ── Main board — top ~60vh ── */}
-      <div style={{ height:"60vh", display:"flex", gap:"clamp(4px,0.5vw,8px)", padding:"clamp(4px,0.5vw,8px) clamp(6px,0.8vw,10px) clamp(3px,0.4vw,5px)", overflow:"hidden" }}>
-        {techs.map((tech, i) => {
-          const roEntries = getTechAllROs(tech.id);
-          const totalHrs = roEntries.reduce((s, { id }) => {
-            const r = getRO(id);
-            return s + (parseFloat(String(r?.hours||"0").replace(/[^0-9.]/g,""))||0);
-          }, 0);
-          return (
-            <div key={tech.id} style={{ width:`calc((100vw - clamp(12px,1.6vw,20px)) / ${numTechs})`, flexShrink:0, display:"flex", flexDirection:"column", minWidth:0 }}>
-              {/* Tech header */}
-              <div style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 8px", background:"rgba(255,255,255,0.04)", borderRadius:"8px 8px 0 0", border:"1px solid rgba(255,255,255,0.08)", borderBottom:"none", flexShrink:0 }}>
-                <div style={{ width:"clamp(26px,2.2vw,34px)", height:"clamp(26px,2.2vw,34px)", borderRadius:8, background:"rgba(10,132,255,0.18)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"clamp(9px,0.8vw,13px)", fontWeight:800, color:ACCENT, flexShrink:0 }}>
-                  {tech.name.slice(0,2).toUpperCase()}
-                </div>
-                <span style={{ flex:1, fontSize:"clamp(11px,1vw,15px)", fontWeight:700, color:"#FFFFFF", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{tech.name}</span>
-                {totalHrs > 0 && (
-                  <span style={{ background:"rgba(48,209,88,0.15)", color:SUCCESS, fontSize:"clamp(8px,0.65vw,10px)", fontWeight:800, padding:"2px 7px", borderRadius:20, flexShrink:0, whiteSpace:"nowrap" }}>{totalHrs % 1 === 0 ? totalHrs : totalHrs.toFixed(1)}h</span>
-                )}
-              </div>
-              {/* Scrollable card list */}
-              <div
-                ref={el => { colRefs.current[i] = el; }}
-                style={{ flex:1, overflowY:"auto", padding:"6px 6px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:"0 0 8px 8px", WebkitOverflowScrolling:"touch" }}
-              >
-                {roEntries.length === 0 ? (
-                  <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.18)", fontSize:"clamp(10px,0.85vw,13px)" }}>—</div>
-                ) : roEntries.map(({ id, col }) => {
-                  const ro = getRO(id);
-                  if (!ro) return null;
-                  return (
-                    <div key={id} style={{ marginBottom:6 }}>
-                      <div style={{ fontSize:"clamp(7px,0.6vw,9px)", fontWeight:700, color:col.color, textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:2 }}>{col.label}</div>
-                      <DisplayROCard ro={ro} serviceTypes={svcTypes} />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* ── Bottom queues — remaining ~35vh ── */}
-      <div style={{ flex:1, display:"flex", gap:"clamp(4px,0.5vw,8px)", padding:"clamp(3px,0.4vw,5px) clamp(6px,0.8vw,10px) clamp(6px,0.8vw,10px)", overflow:"hidden", minHeight:0 }}>
-        {queues.map(queue => {
-          const ids = (state.qSlots || {})[queue.id] || [];
-          return (
-            <div key={queue.id} style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0 }}>
-              <div style={{ padding:"5px 8px", background:queue.color+"20", borderRadius:"7px 7px 0 0", border:"1px solid "+queue.color+"40", borderBottom:"none", flexShrink:0 }}>
-                <div style={{ fontSize:"clamp(10px,0.9vw,13px)", fontWeight:800, color:queue.color }}>{queue.icon} {queue.name}</div>
-                <div style={{ fontSize:"clamp(8px,0.6vw,10px)", color:"rgba(255,255,255,0.3)", marginTop:1 }}>{ids.length} ticket{ids.length!==1?"s":""}</div>
-              </div>
-              <div style={{ flex:1, overflowY:"auto", padding:"5px 6px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderTop:"1px solid "+queue.color+"30", borderRadius:"0 0 7px 7px", WebkitOverflowScrolling:"touch" }}>
-                {ids.length === 0
-                  ? <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.15)", fontSize:"clamp(10px,0.85vw,12px)" }}>—</div>
-                  : ids.map(id => { const ro = getRO(id); return ro ? <DisplayROCard key={id} ro={ro} serviceTypes={svcTypes} /> : null; })}
-              </div>
-            </div>
-          );
-        })}
-        {/* Waiting on Parts */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0 }}>
-          <div style={{ padding:"5px 8px", background:"rgba(191,90,242,0.14)", borderRadius:"7px 7px 0 0", border:"1px solid rgba(191,90,242,0.3)", borderBottom:"none", flexShrink:0 }}>
-            <div style={{ fontSize:"clamp(10px,0.9vw,13px)", fontWeight:800, color:"#BF5AF2" }}>⚙️ Waiting on Parts</div>
-            <div style={{ fontSize:"clamp(8px,0.6vw,10px)", color:"rgba(255,255,255,0.3)", marginTop:1 }}>{partsIds.length} ticket{partsIds.length!==1?"s":""}</div>
-          </div>
-          <div style={{ flex:1, overflowY:"auto", padding:"5px 6px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderTop:"1px solid rgba(191,90,242,0.2)", borderRadius:"0 0 7px 7px", WebkitOverflowScrolling:"touch" }}>
-            {partsIds.length === 0
-              ? <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.15)", fontSize:"clamp(10px,0.85vw,12px)" }}>—</div>
-              : partsIds.map(id => { const ro = getRO(id); return ro ? <DisplayROCard key={id} ro={ro} serviceTypes={svcTypes} /> : null; })}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function ShopFlowTracker() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -3082,6 +2907,7 @@ export default function ShopFlowTracker() {
   const [, setTick] = useState(0);
   const tickRef = useRef(null);
   const isWide  = useIsWide();
+  const isDisplay  = currentUser?.role === "display";
   const isAdmin   = currentUser && currentUser.role === "admin";
   const isManager = currentUser && currentUser.role === "manager";
   const isAdvisor = currentUser && currentUser.role === "advisor";
@@ -3091,6 +2917,7 @@ export default function ShopFlowTracker() {
   const canSettings = isAdmin;
   const canDelete   = isAdmin;
   const canMove     = isAdmin || isTech;
+  const displayScrollRef = useRef(null);
   const isRemote = useRef(false);
   const saveTimer = useRef(null);
   const stateRef = useRef(state);
@@ -3201,9 +3028,20 @@ export default function ShopFlowTracker() {
     }, 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+  // ── Display mode auto-scroll ──
+  useEffect(() => {
+    if (!isDisplay) return;
+    const interval = setInterval(() => {
+      const el = displayScrollRef.current;
+      if (!el) return;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
+      el.scrollTo({ top: atBottom ? 0 : el.scrollHeight, behavior:"smooth" });
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [isDisplay]);
   function upd(fn) { setState(s => fn({ ...s })); }
   function getRO(id) { return state.ros.find(r => r.id === id); }
-  const visibleTechs = canSeeAll
+  const visibleTechs = (canSeeAll || isDisplay)
     ? state.techs
     : state.techs.filter(t => currentUser && t.id === currentUser.id);
   function removeFromAll(s, roId) {
@@ -3393,11 +3231,12 @@ export default function ShopFlowTracker() {
         key={ro.id}
         ro={ro}
         timer={state.timers[ro.id]}
-        onTap={() => { if (!movingRO) setDetailRO({ ro, colId }); }}
-        onMove={() => { if (!canMove) return; setDetailRO(null); setMovingRO(movingRO && movingRO.id === ro.id ? null : ro); }}
-        isMoving={movingRO && movingRO.id === ro.id}
+        onTap={isDisplay ? () => {} : () => { if (!movingRO) setDetailRO({ ro, colId }); }}
+        onMove={isDisplay ? () => {} : () => { if (!canMove) return; setDetailRO(null); setMovingRO(movingRO && movingRO.id === ro.id ? null : ro); }}
+        isMoving={isDisplay ? false : (movingRO && movingRO.id === ro.id)}
         serviceTypes={state.serviceTypes}
-        canMove={canMove}      />
+        canMove={isDisplay ? false : canMove}
+      />
     );
   }
   const flagged  = totalFlaggedHours(state);
@@ -3418,13 +3257,13 @@ export default function ShopFlowTracker() {
     const loginUsers = [...nonTechUsers, ...dynamicTechs, displayUser];
     return <LoginScreen onLogin={setCurrentUser} users={loginUsers} />;
   }
-  if (currentUser.role === "display") {
-    return <DisplayScreen state={state} onLogout={() => setCurrentUser(null)} connected={connected} />;
-  }
   return (
-    <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Barlow',sans-serif", background:"radial-gradient(ellipse at 50% 0%, #0A0F1F 0%, #000000 55%)", minHeight:"100vh", maxWidth:"100vw", overflow:"hidden", color:TEXT }}>
-      {/* Moving banner */}
-      {movingRO && (
+    <div
+      ref={isDisplay ? displayScrollRef : null}
+      style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Barlow',sans-serif", background:"radial-gradient(ellipse at 50% 0%, #0A0F1F 0%, #000000 55%)", minHeight:"100vh", maxWidth:"100vw", overflow: isDisplay ? "auto" : "hidden", color:TEXT, ...(isDisplay ? { position:"fixed", inset:0 } : {}) }}
+    >
+      {/* Moving banner — hidden in display mode */}
+      {!isDisplay && movingRO && (
         <div style={{ position:"fixed", top:0, left:0, right:0, zIndex:400, background:ACCENT, padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ color:"#fff", fontWeight:700, fontSize:13, display:"flex", alignItems:"center", gap:8 }}>
             <span style={{ background:"rgba(255,255,255,0.2)", borderRadius:8, padding:"2px 8px", fontSize:11 }}>MOVING</span>
@@ -3436,91 +3275,111 @@ export default function ShopFlowTracker() {
         </div>
       )}
       {/* Header */}
-      <div style={{ background:"rgba(10,14,24,0.92)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"0.5px solid rgba(255,255,255,0.08)", borderTop:"0.5px solid rgba(255,255,255,0.06)", padding:isWide?"10px 24px":"9px 14px", display:"flex", alignItems:"center", gap:12, position:"sticky", top:movingRO?44:0, zIndex:300, boxShadow:"0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05) inset" }}>
-        <div style={{ flexShrink:0, filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))" }}>
-          <WFLogo size={34} radius={7} />
-        </div>
-        <div style={{ flex:isWide?0:1 }}>
-          <div style={{ color:TEXT, fontWeight:700, fontSize:isWide?15:14, letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif" }}><span style={{color:TEXT}}>Worq</span><span style={{background:"linear-gradient(135deg,#60B3FF,#0A84FF)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>flow</span></div>
-          <div style={{ color:TEXT3, fontSize:10, marginTop:1, letterSpacing:"0.1px" }}>{currentUser.name}</div>
-        </div>
-        <LiveClock />        {/* Hours bar — hidden for advisor */}
-        {!isAdvisor && (
-          <div style={{ flex:1, display:"flex", justifyContent:"center" }}>
-            <div style={{ background:"rgba(14,18,30,0.9)", borderRadius:12, padding:"8px 16px", display:"flex", alignItems:"center", gap:12, minWidth:isWide?260:180, border:"0.5px solid rgba(255,255,255,0.08)", boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 2px 8px rgba(0,0,0,0.4)", borderTop:"0.5px solid rgba(255,255,255,0.12)" }}>
-              <span style={{ color:SUCCESS, display:"flex", alignItems:"center" }}><DollarIcon /></span>
-              <div style={{ flex:1 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:4 }}>
-                  <span style={{ fontSize:isWide?16:14, fontWeight:800, color:"#F0F4FF", fontFamily:"'Barlow',sans-serif" }}>
-                    <span style={{ color:SUCCESS }}>{flagged.toFixed(1)}</span>
-                    <span style={{ color:"rgba(255,255,255,0.35)", fontSize:11, fontWeight:600 }}> / {GOAL_HOURS}h</span>
-                  </span>
-                  <span style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontWeight:600 }}>Flagged</span>
-                </div>
-                <div style={{ height:5, background:"rgba(255,255,255,0.1)", borderRadius:3, overflow:"hidden" }}>
-                  <div style={{ width:(progress*100)+"%", height:"100%", background:"linear-gradient(90deg,#0A84FF,#30D158)", borderRadius:3 }} />
+      <div style={{ background:"rgba(10,14,24,0.92)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"0.5px solid rgba(255,255,255,0.08)", borderTop:"0.5px solid rgba(255,255,255,0.06)", padding:isWide?"10px 24px":"9px 14px", display:"flex", alignItems:"center", gap:12, position:"sticky", top: isDisplay ? 0 : movingRO ? 44 : 0, zIndex:300, boxShadow:"0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05) inset" }}>
+        {isDisplay ? (
+          // ── Display mode header: logo (tap = logout) + title + clock + dot ──
+          <>
+            <div onClick={() => setCurrentUser(null)} style={{ flexShrink:0, filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))", cursor:"pointer" }} title="Tap to logout">
+              <WFLogo size={34} radius={7} />
+            </div>
+            <div onClick={() => setCurrentUser(null)} style={{ flex:1, cursor:"pointer" }}>
+              <div style={{ color:TEXT, fontWeight:700, fontSize:15, letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif" }}>
+                <span style={{color:TEXT}}>Service </span><span style={{color:TEXT2}}>Department</span>
+              </div>
+              <div style={{ color:TEXT3, fontSize:10, marginTop:1 }}>Display Board — tap to logout</div>
+            </div>
+            <LiveClock />
+            <div title={connected?"Live":"Disconnected"} style={{ width:9, height:9, borderRadius:"50%", background:connected?SUCCESS:DANGER, flexShrink:0, boxShadow:connected?"0 0 6px "+SUCCESS:"none", animation:"pulse 2s ease-in-out infinite" }} />
+          </>
+        ) : (
+          // ── Normal header ──
+          <>
+            <div style={{ flexShrink:0, filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))" }}>
+              <WFLogo size={34} radius={7} />
+            </div>
+            <div style={{ flex:isWide?0:1 }}>
+              <div style={{ color:TEXT, fontWeight:700, fontSize:isWide?15:14, letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif" }}><span style={{color:TEXT}}>Worq</span><span style={{background:"linear-gradient(135deg,#60B3FF,#0A84FF)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>flow</span></div>
+              <div style={{ color:TEXT3, fontSize:10, marginTop:1, letterSpacing:"0.1px" }}>{currentUser.name}</div>
+            </div>
+            <LiveClock />
+            {!isAdvisor && (
+              <div style={{ flex:1, display:"flex", justifyContent:"center" }}>
+                <div style={{ background:"rgba(14,18,30,0.9)", borderRadius:12, padding:"8px 16px", display:"flex", alignItems:"center", gap:12, minWidth:isWide?260:180, border:"0.5px solid rgba(255,255,255,0.08)", boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 2px 8px rgba(0,0,0,0.4)", borderTop:"0.5px solid rgba(255,255,255,0.12)" }}>
+                  <span style={{ color:SUCCESS, display:"flex", alignItems:"center" }}><DollarIcon /></span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:4 }}>
+                      <span style={{ fontSize:isWide?16:14, fontWeight:800, color:"#F0F4FF", fontFamily:"'Barlow',sans-serif" }}>
+                        <span style={{ color:SUCCESS }}>{flagged.toFixed(1)}</span>
+                        <span style={{ color:"rgba(255,255,255,0.35)", fontSize:11, fontWeight:600 }}> / {GOAL_HOURS}h</span>
+                      </span>
+                      <span style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontWeight:600 }}>Flagged</span>
+                    </div>
+                    <div style={{ height:5, background:"rgba(255,255,255,0.1)", borderRadius:3, overflow:"hidden" }}>
+                      <div style={{ width:(progress*100)+"%", height:"100%", background:"linear-gradient(90deg,#0A84FF,#30D158)", borderRadius:3 }} />
+                    </div>
+                  </div>
                 </div>
               </div>
+            )}
+            {isAdvisor && <div style={{ flex:1 }}/>}
+            <div style={{ display:"flex", gap:8 }}>
+              {canSeeAll && (
+                <button onClick={() => setShowAnalytics(true)} title="Analytics" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <AnalyticsIcon />
+                </button>
+              )}
+              {(isAdmin || isManager) && (
+                <button onClick={() => setShowReport(true)} title="Generate Report" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <ReportIcon />
+                </button>
+              )}
+              {canSeeAll && (
+                <button onClick={() => setShowHistory(true)} title="RO History" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <HistoryIcon />
+                </button>
+              )}
+              {canSeeAll && (
+                <button onClick={() => setShowArchive(true)} style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <BoxIcon />
+                </button>
+              )}
+              {canSettings && (
+                <button onClick={() => setShowServiceTypes(true)} title="Settings" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <SettingsIcon />
+                </button>
+              )}
+              {canCreateRO && (
+                <button onClick={() => setShowAdd(true)} style={{ height:34, padding:"0 16px", borderRadius:20, border:"none", background:ACCENT, color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif", fontWeight:600, fontSize:13, letterSpacing:"-0.1px", boxShadow:"0 4px 16px rgba(10,132,255,0.45)" }}>
+                  <PlusIcon /> New RO
+                </button>
+              )}
+              {isTech && (
+                <button onClick={() => setShowActivity(true)} title="Activity Tracker" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <ActivityIcon />
+                </button>
+              )}
+              {isAdmin && (
+                <button onClick={() => setShowTimeClock(true)} title="Time Clock" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <TimeClockIcon />
+                </button>
+              )}
+              <button onClick={() => setShowChangePin(true)} title="Change PIN" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <KeyIcon />
+              </button>
+              <button onClick={() => setCurrentUser(null)} style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <LogoutIcon />
+              </button>
             </div>
-          </div>
+          </>
         )}
-        {isAdvisor && <div style={{ flex:1 }}/>}
-        <div style={{ display:"flex", gap:8 }}>
-          {canSeeAll && (
-            <button onClick={() => setShowAnalytics(true)} title="Analytics" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <AnalyticsIcon />
-            </button>
-          )}
-          {(isAdmin || isManager) && (
-            <button onClick={() => setShowReport(true)} title="Generate Report" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <ReportIcon />
-            </button>
-          )}
-          {canSeeAll && (
-            <button onClick={() => setShowHistory(true)} title="RO History" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <HistoryIcon />
-            </button>
-          )}
-          {canSeeAll && (
-            <button onClick={() => setShowArchive(true)} style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <BoxIcon />
-            </button>
-          )}
-          {canSettings && (
-            <button onClick={() => setShowServiceTypes(true)} title="Settings" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <SettingsIcon />
-            </button>
-          )}
-          {canCreateRO && (
-            <button onClick={() => setShowAdd(true)} style={{ height:34, padding:"0 16px", borderRadius:20, border:"none", background:ACCENT, color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif", fontWeight:600, fontSize:13, letterSpacing:"-0.1px", boxShadow:"0 4px 16px rgba(10,132,255,0.45)" }}>
-              <PlusIcon /> New RO
-            </button>
-          )}
-          {isTech && (
-            <button onClick={() => setShowActivity(true)} title="Activity Tracker" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <ActivityIcon />
-            </button>
-          )}
-          {isAdmin && (
-            <button onClick={() => setShowTimeClock(true)} title="Time Clock" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <TimeClockIcon />
-            </button>
-          )}
-          <button onClick={() => setShowChangePin(true)} title="Change PIN" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <KeyIcon />
-          </button>
-          <button onClick={() => setCurrentUser(null)} style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-            <LogoutIcon />
-          </button>
-        </div>
       </div>
-      <div style={{ padding:"10px 0 60px", marginTop:movingRO?44:0 }}>
+      <div style={{ padding:"10px 0 60px", marginTop: isDisplay ? 0 : movingRO ? 44 : 0 }}>
         {/* Technicians label */}
         <div style={{ padding:"0 14px", marginBottom:6 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
             <span style={{ fontSize:10, fontWeight:600, color:TEXT3, letterSpacing:"0.8px", textTransform:"uppercase", fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif" }}>
-              {isAdmin ? "Technicians" : currentUser.name}
+              {(isAdmin || isDisplay) ? "Technicians" : currentUser.name}
             </span>
             <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
           </div>
@@ -3572,8 +3431,8 @@ export default function ShopFlowTracker() {
                       </div>
                     </div>
                   </div>
-                  {/* Admin activity controls */}
-                  {isAdmin && (
+                  {/* Admin activity controls — hidden in display mode */}
+                  {isAdmin && !isDisplay && (
                     <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                       {/* Activity buttons */}
                       <div style={{ display:"flex", gap:4 }}>
@@ -3615,7 +3474,7 @@ export default function ShopFlowTracker() {
                   {/* Kanban cells — flex:1 on wide to fill screen */}
                   {COLS.map(col => {
                     const ids = state.grid[tech.id] ? (state.grid[tech.id][col.id]||[]) : [];
-                    const isTarget = movingRO && !ids.includes(movingRO.id);
+                    const isTarget = !isDisplay && movingRO && !ids.includes(movingRO.id);
                     return (
                       <div
                         key={col.id}
@@ -3673,7 +3532,7 @@ export default function ShopFlowTracker() {
         {/* ── WAITING ON PARTS QUEUE ── */}
         {(() => {
           const partIds = state.partsSlots || [];
-          const isPartsTarget = movingRO && !partIds.includes(movingRO.id);
+          const isPartsTarget = !isDisplay && movingRO && !partIds.includes(movingRO.id);
           return (
             <div style={{ padding:"10px 14px 0" }}>              <div style={{ background:"rgba(14,18,30,0.97)", borderRadius:16, overflow:"hidden", border:"0.5px solid "+(isPartsTarget?"#BF5AF2":"rgba(255,255,255,0.07)"), borderTop:"0.5px solid "+(isPartsTarget?"rgba(191,90,242,0.5)":"rgba(255,255,255,0.12)"), backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", boxShadow:"0 1px 0 rgba(255,255,255,0.09) inset, 0 8px 32px rgba(0,0,0,0.6)" }}>
                 {/* Header */}
@@ -3685,12 +3544,12 @@ export default function ShopFlowTracker() {
                     <div style={{ color:"rgba(255,255,255,0.45)", fontSize:10, marginTop:1 }}>Parts ordered — waiting for arrival</div>
                   </div>
                   <div style={{ background:"rgba(191,90,242,0.3)", color:"#E5B8FF", borderRadius:20, padding:"2px 10px", fontSize:12, fontWeight:700, flexShrink:0 }}>{partIds.length}</div>
-                  <button onClick={()=>setPartsCollapsed(c=>!c)} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.5)", cursor:"pointer", display:"flex", alignItems:"center", flexShrink:0, padding:4 }}>
+                  {!isDisplay && <button onClick={()=>setPartsCollapsed(c=>!c)} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.5)", cursor:"pointer", display:"flex", alignItems:"center", flexShrink:0, padding:4 }}>
                     {partsCollapsed ? <ChevDownIcon/> : <ChevUpIcon/>}
-                  </button>
+                  </button>}
                 </div>
                 {/* Body */}
-                {!partsCollapsed && (
+                {(!partsCollapsed || isDisplay) && (
                   <div style={{ padding:"10px 10px 8px" }}>
                     {partIds.length === 0 && !isPartsTarget ? (
                       <div style={{ border:"1px dashed rgba(191,90,242,0.2)", borderRadius:12, padding:"20px 16px", textAlign:"center" }}>
@@ -3733,8 +3592,8 @@ export default function ShopFlowTracker() {
             : state.queues
           ).map(queue => {
             const ids = state.qSlots[queue.id] || [];
-            const isCollapsed = collapsed[queue.id];
-            const isTarget = movingRO && !ids.includes(movingRO.id);
+            const isCollapsed = !isDisplay && collapsed[queue.id];
+            const isTarget = !isDisplay && movingRO && !ids.includes(movingRO.id);
             return (
               <div key={queue.id} style={{ flex:1, marginBottom:isWide?0:12, background:"rgba(14,18,30,0.97)", borderRadius:16, overflow:"hidden", boxShadow:"0 1px 0 rgba(255,255,255,0.09) inset, 0 -1px 0 rgba(0,0,0,0.5) inset, 0 8px 32px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.4)", border:"0.5px solid "+(isTarget?queue.color:"rgba(255,255,255,0.07)"), borderTop:"0.5px solid rgba(255,255,255,0.12)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)" }}>
                 <div style={{ background:"linear-gradient(135deg,"+queue.color+","+queue.color+"CC)", padding:"12px 14px", display:"flex", alignItems:"center", gap:10 }}>
@@ -3748,14 +3607,14 @@ export default function ShopFlowTracker() {
                   <div style={{ background:"rgba(255,255,255,0.25)", color:"#fff", borderRadius:20, padding:"2px 10px", fontSize:12, fontWeight:800, flexShrink:0 }}>
                     {ids.length}
                   </div>
-                  {isAdmin && (
+                  {isAdmin && !isDisplay && (
                     <button onClick={() => setShowAdd(true)} style={{ width:26, height:26, borderRadius:"50%", background:"rgba(255,255,255,0.25)", border:"none", color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                       <PlusIcon />
                     </button>
                   )}
-                  <button onClick={() => setCollapsed(c => ({ ...c, [queue.id]:!c[queue.id] }))} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.8)", cursor:"pointer", display:"flex", alignItems:"center", flexShrink:0 }}>
+                  {!isDisplay && <button onClick={() => setCollapsed(c => ({ ...c, [queue.id]:!c[queue.id] }))} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.8)", cursor:"pointer", display:"flex", alignItems:"center", flexShrink:0 }}>
                     {isCollapsed ? <ChevDownIcon /> : <ChevUpIcon />}
-                  </button>
+                  </button>}
                 </div>
                 {!isCollapsed && (
                   <div style={{ padding:"10px 10px 8px" }}>
@@ -3768,7 +3627,7 @@ export default function ShopFlowTracker() {
                     </div>
                     {ids.length > 3 && (
                       <div style={{ textAlign:"center", fontSize:10, color:MUTED, padding:"2px 0 4px", fontWeight:600 }}>
-                        Scroll to see all {ids.length}                      </div>
+                        Scroll to see all {ids.length}</div>
                     )}
                     {isTarget && (
                       <button onClick={() => handleMove({ type:"queue", queueId:queue.id })} style={{ width:"100%", padding:12, background:queue.color+"14", color:queue.color, border:"2px dashed "+queue.color, borderRadius:12, fontWeight:800, fontSize:13, cursor:"pointer", fontFamily:"'Barlow',sans-serif", marginTop:6, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
@@ -3777,7 +3636,7 @@ export default function ShopFlowTracker() {
                     )}
                     {ids.length === 0 && !isTarget && (
                       <div style={{ border:"2px dashed "+BORDER, borderRadius:12, padding:18, textAlign:"center", color:MUTED, fontSize:12 }}>
-                        {isAdmin ? "Use + to add tickets" : "No tickets here"}
+                        No tickets here
                       </div>
                     )}
                   </div>
