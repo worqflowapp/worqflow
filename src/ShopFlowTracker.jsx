@@ -600,6 +600,34 @@ function abbrevJob(j) {
   if (v.includes("tie"))         return { label:"Tie",    bg:"rgba(153,27,27,0.18)",   color:"#FCA5A5" };
   return { label: j.slice(0,4),            bg:"rgba(100,116,139,0.18)", color:"#94A3B8" };
 }
+// ─── Display Card — compact, read-only, TV board only ────────────────────────
+const DisplayCard = memo(function DisplayCard({ ro, timer, serviceTypes }) {
+  const vehicle = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
+  const svcType = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
+  const leftColor = svcType ? svcType.color : priorityBorder(ro.priority);
+  const timerRunning = timer && timer.running;
+  const elapsed = timer ? (timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000) : timer.elapsed) : 0;
+  const allJobs = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
+  const visJobs = allJobs.slice(0, 2);
+  const extraJobs = allJobs.length - visJobs.length;
+  const isOverdue = ro.promiseTime && (new Date(ro.promiseTime).getTime() - Date.now()) < 0;
+  return (
+    <div style={{ background:CARD_BG, borderRadius:8, padding:"5px 7px", marginBottom:4, border:"0.5px solid "+CARD_BORDER, borderLeft:"3px solid "+leftColor, animation:isOverdue?"urgent-glow 2s ease-in-out infinite":"none", userSelect:"none", width:"100%", boxSizing:"border-box", flexShrink:0 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:4, marginBottom:2 }}>
+        <span style={{ fontWeight:800, fontSize:"clamp(10px,1vw,13px)", color:TEXT, fontFamily:"'Barlow',sans-serif", letterSpacing:"-0.3px", flexShrink:0 }}>{ro.roNum}</span>
+        {ro.hours && <span style={{ background:"rgba(48,209,88,0.15)", color:SUCCESS, fontSize:"clamp(7px,0.65vw,9px)", fontWeight:600, padding:"1px 4px", borderRadius:4, flexShrink:0 }}>{String(ro.hours).replace(/h$/i,"")}h</span>}
+        {ro.priority === "HIGH" && <span style={{ background:"rgba(255,69,58,0.15)", color:DANGER, fontSize:"clamp(7px,0.65vw,9px)", fontWeight:700, padding:"1px 4px", borderRadius:4, flexShrink:0 }}>!</span>}
+        <span style={{ background:timerRunning?"rgba(255,159,10,0.12)":"rgba(255,255,255,0.05)", color:timerRunning?WARN:TEXT3, fontSize:"clamp(7px,0.65vw,9px)", fontWeight:500, padding:"1px 4px", borderRadius:4, marginLeft:"auto", flexShrink:0 }}>{fmtTime(elapsed)}</span>
+      </div>
+      <div style={{ fontSize:"clamp(9px,0.85vw,11px)", color:"rgba(255,255,255,0.55)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom:2, lineHeight:1.2 }}>{vehicle}</div>
+      <div style={{ display:"flex", alignItems:"center", gap:3 }}>
+        <span style={{ fontSize:"clamp(8px,0.75vw,10px)", color:"rgba(255,255,255,0.35)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1, lineHeight:1.2 }}>{ro.customer || "No customer"}</span>
+        {visJobs.map((j, i) => { const jj = abbrevJob(j); return <span key={i} style={{ fontSize:"clamp(7px,0.65vw,9px)", background:jj.bg, color:jj.color, padding:"1px 4px", borderRadius:4, flexShrink:0, whiteSpace:"nowrap" }}>{jj.label}</span>; })}
+        {extraJobs > 0 && <span style={{ fontSize:"clamp(7px,0.65vw,9px)", color:TEXT3, flexShrink:0 }}>+{extraJobs}</span>}
+      </div>
+    </div>
+  );
+});
 // ─── RO Card — long press to move, tap to open ───────────────────────────────
 const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
   const holdRef    = useRef(null);
@@ -3039,6 +3067,11 @@ export default function ShopFlowTracker() {
     }, 15000);
     return () => clearInterval(interval);
   }, [isDisplay]);
+  useEffect(() => {
+    if (!isDisplay) return;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, [isDisplay]);
   function upd(fn) { setState(s => fn({ ...s })); }
   function getRO(id) { return state.ros.find(r => r.id === id); }
   const visibleTechs = (canSeeAll || isDisplay)
@@ -3257,6 +3290,163 @@ export default function ShopFlowTracker() {
     const loginUsers = [...nonTechUsers, ...dynamicTechs, displayUser];
     return <LoginScreen onLogin={setCurrentUser} users={loginUsers} />;
   }
+
+  // ── Display Mode — 5-zone TV layout, 100vh no scroll ──────────────────────
+  if (isDisplay) {
+    const nTechs = visibleTechs.length || 1;
+    const laborRate = parseFloat(localStorage.getItem("sft-labor-rate")||"125");
+    const cellH = window.innerHeight * 0.52 / nTechs;
+    const maxCardsPerCell = Math.max(1, Math.floor((cellH - 8) / 54));
+    const maxPartCards = Math.max(1, Math.floor((window.innerWidth - 32) / 168));
+    const maxQueueCards = Math.max(1, Math.floor((window.innerWidth / (state.queues.length||1) - 24) / 168));
+    return (
+      <div style={{ height:"100vh", width:"100vw", overflow:"hidden", display:"flex", flexDirection:"column", background:BG, position:"fixed", inset:0 }}>
+
+        {/* Zone 1 — Header: 7vh */}
+        <div style={{ height:"7vh", flexShrink:0, background:"rgba(10,14,24,0.95)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"0.5px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", gap:12, padding:"0 clamp(12px,1.5vw,24px)", overflow:"hidden" }}>
+          <div onClick={() => setCurrentUser(null)} style={{ flexShrink:0, display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} title="Tap to logout">
+            <div style={{ filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))" }}><WFLogo size={32} radius={7} /></div>
+            <div>
+              <div style={{ color:TEXT, fontWeight:700, fontSize:"clamp(11px,1.3vw,17px)", letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif", whiteSpace:"nowrap" }}>
+                <span style={{color:TEXT}}>Service </span><span style={{color:TEXT2}}>Department</span>
+              </div>
+              <div style={{ color:TEXT3, fontSize:"clamp(8px,0.8vw,11px)", marginTop:1 }}>tap to logout</div>
+            </div>
+          </div>
+          <div style={{ flex:1, display:"flex", justifyContent:"center", alignItems:"center", overflow:"hidden", padding:"0 8px" }}>
+            <div style={{ width:"clamp(260px,38vw,600px)", background:"rgba(14,18,30,0.9)", borderRadius:10, padding:"clamp(3px,0.4vh,6px) clamp(10px,1.2vw,16px)", border:"0.5px solid rgba(255,255,255,0.08)", overflow:"hidden" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"clamp(2px,0.3vh,4px)" }}>
+                <div style={{ display:"flex", alignItems:"baseline", gap:4 }}>
+                  <span style={{ fontSize:"clamp(14px,1.6vw,22px)", fontWeight:800, color:SUCCESS, fontFamily:"'Barlow',sans-serif", lineHeight:1 }}>{flagged.toFixed(1)}</span>
+                  <span style={{ fontSize:"clamp(10px,1vw,15px)", fontWeight:600, color:"rgba(255,255,255,0.35)", fontFamily:"'Barlow',sans-serif" }}>/ {GOAL_HOURS}h</span>
+                </div>
+                <span style={{ fontSize:"clamp(9px,0.85vw,13px)", fontWeight:700, color:SUCCESS, fontFamily:"'Barlow',sans-serif" }}>${(flagged*laborRate).toLocaleString("en-US",{maximumFractionDigits:0})}</span>
+              </div>
+              <div style={{ height:"clamp(3px,0.4vh,5px)", background:"rgba(255,255,255,0.1)", borderRadius:3, overflow:"hidden", marginBottom:"clamp(2px,0.3vh,4px)" }}>
+                <div style={{ width:(progress*100)+"%", height:"100%", background:"linear-gradient(90deg,#30D158,#0A84FF)", borderRadius:3 }} />
+              </div>
+              <div style={{ display:"flex", gap:"clamp(3px,0.4vw,6px)", overflow:"hidden" }}>
+                {state.techs.map(t => {
+                  const hrs = techStats(t.id).hrs;
+                  const cc = hrs >= 8 ? SUCCESS : hrs >= 4 ? "#FF9F0A" : DANGER;
+                  return (
+                    <div key={t.id} style={{ display:"flex", alignItems:"center", gap:2, background:"rgba(255,255,255,0.06)", borderRadius:5, padding:"1px 5px", border:"0.5px solid rgba(255,255,255,0.08)", flexShrink:0 }}>
+                      <span style={{ fontSize:"clamp(7px,0.7vw,10px)", color:"rgba(255,255,255,0.5)", fontFamily:"'Barlow',sans-serif", fontWeight:600 }}>{t.name.split(" ")[0]}</span>
+                      <span style={{ fontSize:"clamp(7px,0.7vw,10px)", color:cc, fontFamily:"'Barlow',sans-serif", fontWeight:700 }}>{hrs.toFixed(1)}h</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <LiveClock />
+          <div title={connected?"Live":"Disconnected"} style={{ width:9, height:9, borderRadius:"50%", background:connected?SUCCESS:DANGER, flexShrink:0, boxShadow:connected?"0 0 6px "+SUCCESS:"none", animation:"pulse 2s ease-in-out infinite" }} />
+        </div>
+
+        {/* Zone 2 — Column Headers: 4vh */}
+        <div style={{ height:"4vh", flexShrink:0, display:"flex", alignItems:"center", gap:4, padding:"0 clamp(8px,1vw,16px)", background:"rgba(6,8,16,0.9)", borderBottom:"0.5px solid rgba(255,255,255,0.06)", overflow:"hidden" }}>
+          <div style={{ width:"clamp(80px,8vw,120px)", flexShrink:0 }} />
+          {COLS.map(col => (
+            <div key={col.id} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <span style={{ color:col.color, fontSize:"clamp(8px,0.85vw,12px)", fontWeight:700, letterSpacing:"0.8px", textTransform:"uppercase", borderBottom:"2px solid "+col.color, padding:"0 6px", lineHeight:1, whiteSpace:"nowrap" }}>{col.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Zone 3 — Kanban Grid: 52vh */}
+        <div style={{ height:"52vh", flexShrink:0, display:"flex", flexDirection:"column", gap:2, padding:"3px clamp(8px,1vw,16px) 0", overflow:"hidden" }}>
+          {visibleTechs.map(tech => {
+            const { hrs } = techStats(tech.id);
+            return (
+              <div key={tech.id} style={{ flex:1, minHeight:0, display:"flex", flexDirection:"row", gap:4, overflow:"hidden" }}>
+                <div style={{ width:"clamp(80px,8vw,120px)", flexShrink:0, background:TECH_BG, borderRadius:8, padding:"5px 8px", display:"flex", flexDirection:"column", justifyContent:"center", gap:3, overflow:"hidden", border:"0.5px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <div style={{ width:"clamp(20px,2vw,28px)", height:"clamp(20px,2vw,28px)", borderRadius:"50%", background:"linear-gradient(135deg,#1D6BF3,#0EA5E9)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:"clamp(7px,0.75vw,11px)", flexShrink:0 }}>
+                      {initials(tech.name)}
+                    </div>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontWeight:600, fontSize:"clamp(8px,0.85vw,11px)", color:TEXT2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{tech.name}</div>
+                      <div style={{ fontSize:"clamp(7px,0.7vw,10px)", color:SUCCESS, fontWeight:600 }}>{hrs.toFixed(1)}h</div>
+                    </div>
+                  </div>
+                </div>
+                {COLS.map(col => {
+                  const ids = state.grid[tech.id] ? (state.grid[tech.id][col.id]||[]) : [];
+                  const shown = ids.slice(0, maxCardsPerCell);
+                  const extra = ids.length - shown.length;
+                  return (
+                    <div key={col.id} style={{ flex:1, minWidth:0, background:CELL_BG, border:"0.5px solid "+col.border, borderRadius:8, padding:ids.length?"4px 4px 0":"0", display:"flex", flexDirection:"column", overflow:"hidden", boxShadow:CELL_SHADOW }}>
+                      {ids.length === 0
+                        ? <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", opacity:0.2 }}><SkeletonCard /></div>
+                        : <>
+                            {shown.map(roId => { const ro = getRO(roId); if (!ro) return null; return <DisplayCard key={ro.id} ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} />; })}
+                            {extra > 0 && <div style={{ fontSize:9, color:"rgba(255,255,255,0.3)", textAlign:"center", padding:"2px 0", flexShrink:0 }}>+{extra} more</div>}
+                          </>
+                      }
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Zone 4 — Waiting on Parts: 16vh */}
+        {(() => {
+          const partIds = state.partsSlots || [];
+          const shownParts = partIds.slice(0, maxPartCards);
+          const extraParts = partIds.length - shownParts.length;
+          return (
+            <div style={{ height:"16vh", flexShrink:0, display:"flex", flexDirection:"column", overflow:"hidden", padding:"3px clamp(8px,1vw,16px) 0" }}>
+              <div style={{ background:"linear-gradient(135deg,rgba(191,90,242,0.3),rgba(191,90,242,0.15))", padding:"0 12px", display:"flex", alignItems:"center", gap:8, flexShrink:0, height:"4vh", borderRadius:"8px 8px 0 0" }}>
+                <span style={{ fontSize:"clamp(11px,1vw,15px)" }}>🔩</span>
+                <span style={{ color:TEXT, fontWeight:700, fontSize:"clamp(10px,0.95vw,13px)" }}>Waiting on Parts</span>
+                <span style={{ background:"rgba(191,90,242,0.3)", color:"#E5B8FF", borderRadius:20, padding:"1px 8px", fontSize:"clamp(8px,0.75vw,11px)", fontWeight:700 }}>{partIds.length}</span>
+              </div>
+              <div style={{ flex:1, minHeight:0, background:"rgba(14,18,30,0.97)", borderRadius:"0 0 8px 8px", padding:"4px 6px", display:"flex", flexDirection:"row", gap:4, overflow:"hidden", alignItems:"flex-start" }}>
+                {partIds.length === 0
+                  ? <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.2)", fontSize:"clamp(9px,0.9vw,12px)" }}>No tickets waiting on parts</div>
+                  : <>
+                      {shownParts.map(roId => { const ro = getRO(roId); if (!ro) return null; return <div key={ro.id} style={{ width:160, flexShrink:0 }}><DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} /></div>; })}
+                      {extraParts > 0 && <div style={{ display:"flex", alignItems:"center", color:"rgba(255,255,255,0.3)", fontSize:"clamp(8px,0.75vw,10px)", padding:"0 8px", flexShrink:0 }}>+{extraParts} more</div>}
+                    </>
+                }
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Zone 5 — Staging Queues: 21vh */}
+        <div style={{ height:"21vh", flexShrink:0, display:"flex", flexDirection:"row", gap:4, padding:"3px clamp(8px,1vw,16px) 3px", overflow:"hidden" }}>
+          {[...state.queues].sort((a,b) => { const o={"q-main":0,"q-used":1,"q-pdi":2}; return (o[a.id]??99)-(o[b.id]??99); }).map(queue => {
+            const ids = state.qSlots[queue.id] || [];
+            const shownIds = ids.slice(0, maxQueueCards);
+            const extra = ids.length - shownIds.length;
+            return (
+              <div key={queue.id} style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", overflow:"hidden", background:"rgba(14,18,30,0.97)", borderRadius:10, border:"0.5px solid rgba(255,255,255,0.07)" }}>
+                <div style={{ background:"linear-gradient(135deg,"+queue.color+","+queue.color+"CC)", padding:"0 10px", display:"flex", alignItems:"center", gap:6, flexShrink:0, height:"5vh" }}>
+                  <span style={{ fontSize:"clamp(11px,1vw,15px)" }}>{queue.icon}</span>
+                  <span style={{ color:"#fff", fontWeight:800, fontSize:"clamp(10px,0.95vw,13px)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>{queue.name}</span>
+                  <span style={{ background:"rgba(255,255,255,0.25)", color:"#fff", borderRadius:20, padding:"1px 8px", fontSize:"clamp(8px,0.75vw,11px)", fontWeight:800, flexShrink:0 }}>{ids.length}</span>
+                </div>
+                <div style={{ flex:1, minHeight:0, padding:"4px 6px", display:"flex", flexDirection:"row", gap:4, overflow:"hidden", alignItems:"flex-start" }}>
+                  {ids.length === 0
+                    ? <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.2)", fontSize:"clamp(9px,0.8vw,11px)" }}>No tickets</div>
+                    : <>
+                        {shownIds.map(roId => { const ro = getRO(roId); if (!ro) return null; return <div key={ro.id} style={{ width:160, flexShrink:0 }}><DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} /></div>; })}
+                        {extra > 0 && <div style={{ display:"flex", alignItems:"center", color:"rgba(255,255,255,0.3)", fontSize:"clamp(8px,0.75vw,10px)", padding:"0 6px", flexShrink:0 }}>+{extra} more</div>}
+                      </>
+                  }
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+      </div>
+    );
+  }
+
   return (
     <div
       ref={isDisplay ? displayScrollRef : null}
