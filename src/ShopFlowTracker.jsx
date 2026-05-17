@@ -40,7 +40,8 @@ const BG         = "#000000";                    // pure OLED black
 const SURFACE    = "rgba(255,255,255,0.05)";     // frosted glass
 const SURFACE2   = "rgba(255,255,255,0.09)";     // elevated glass
 const BORDER     = "rgba(255,255,255,0.08)";     // barely visible border
-const BORDER2    = "rgba(255,255,255,0.14)";     // slightly brighterconst TEXT       = "#FFFFFF";                    // pure white — Apple uses this
+const BORDER2    = "rgba(255,255,255,0.14)";     // slightly brighter
+const TEXT       = "#FFFFFF";                    // pure white — Apple uses this
 const TEXT2      = "rgba(255,255,255,0.7)";      // secondary — 70% white
 const TEXT3      = "rgba(255,255,255,0.4)";      // tertiary — 40% white
 const ACCENT     = "#0A84FF";                    // Apple's exact iOS blue
