@@ -1,3 +1,4 @@
+import { useSaveToFirebase, useLoadFromFirebase } from "./useFirebaseSync";
 import { useState, useEffect, useRef } from "react";
 
 if (typeof document !== "undefined" && !document.getElementById("sft-font")) {
@@ -1122,6 +1123,8 @@ export default function ShopFlowTracker() {
   const canSettings = isAdmin;
   const canMove = isAdmin || isTech;
 
+  useSaveToFirebase(state);
+  useLoadFromFirebase(setState);
   useEffect(() => { saveState(state); }, [state]);
   useEffect(() => {
     tickRef.current = setInterval(() => {
