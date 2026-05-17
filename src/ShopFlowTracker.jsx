@@ -643,7 +643,7 @@ const DisplayCard = memo(function DisplayCard({ ro, timer, serviceTypes, cardHei
       width: "100%",
       display: "flex",
       flexDirection: "column",
-      justifyContent: "space-between",
+      gap: 3,
       overflow: "hidden",
       userSelect: "none",
       boxShadow: isSingle
@@ -688,8 +688,8 @@ const DisplayCard = memo(function DisplayCard({ ro, timer, serviceTypes, cardHei
             : <>{visJobs.map((j,i)=>{ const jj=abbrevJob(j); return <span key={i} style={{ background:jj.bg, color:jj.color, fontSize:"clamp(9px,0.85vw,12px)", fontWeight:600, padding:"2px 8px", borderRadius:5, height:18, display:"flex", alignItems:"center", flexShrink:0, whiteSpace:"nowrap" }}>{jj.label}</span>; })}{extraJobs>0&&<span style={{ fontSize:"clamp(9px,0.85vw,12px)", color:"rgba(255,255,255,0.35)", flexShrink:0 }}>+{extraJobs}</span>}</>}
         </div>
       )}
-      {/* Row 5 — Timer | Promise | Hours — always shown */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4, flexShrink:0 }}>
+      {/* Row 5 — Timer | Promise | Hours — always shown, pinned to bottom */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4, flexShrink:0, marginTop:"auto" }}>
         <span style={{ display:"flex", alignItems:"center", gap:3, background:timerRunning?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", borderRadius:4, padding:"2px 6px", minWidth:55, flexShrink:0 }}>
           {timerRunning && <span style={{ width:4, height:4, borderRadius:"50%", background:"#FF9F0A", display:"inline-block", animation:"pulse 1.8s ease-in-out infinite" }}/>}
           <span style={{ fontSize:"clamp(9px,0.85vw,12px)", fontWeight:500, color:timerRunning?"#FF9F0A":"rgba(255,255,255,0.5)" }}>{fmtTime(elapsed)}</span>
