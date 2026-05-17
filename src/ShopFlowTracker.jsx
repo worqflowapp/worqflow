@@ -357,8 +357,10 @@ function ROCard({ ro, onPress, onLongPress }) {
     <div
       onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={cancelPress}
       onTouchStart={e => { e.preventDefault(); startPress() }}
+      onTouchMove={cancelPress}
       onTouchEnd={e => { e.preventDefault(); endPress() }}
       onTouchCancel={cancelPress}
+      onContextMenu={e => e.preventDefault()}
       style={{
         background: C.surface2, borderRadius: 11, padding: '9px 11px',
         marginBottom: 7, cursor: 'pointer', userSelect: 'none',
@@ -1090,15 +1092,25 @@ export default function ShopFlowTracker() {
 
   const isRemote = useRef(false)
   const saveTimer = useRef(null)
+  // Mirrors appState so the onSnapshot seed write can read current state
+  // without a stale closure.
+  const stateRef = useRef(appState)
 
   // ── Firebase listener ──
   useEffect(() => {
     const ref = doc(db, 'shopstate', 'main')
     const unsub = onSnapshot(ref, snap => {
       if (snap.exists()) {
+        // Mark as remote BEFORE updating state. The flag is cleared inside
+        // scheduleSave after the 800ms debounce fires, guaranteeing it is
+        // still true when the save would otherwise write back to Firestore.
         isRemote.current = true
         setAppState(snap.data())
-        setTimeout(() => { isRemote.current = false }, 300)
+      } else {
+        // Document doesn't exist yet — seed Firestore with current local state
+        // so every connected device converges immediately on first load.
+        setDoc(ref, stateRef.current)
+          .catch(e => console.error('[ShopFlow] seed failed', e))
       }
     }, err => console.error('[ShopFlow] snapshot error', err))
     return unsub
@@ -1108,15 +1120,24 @@ export default function ShopFlowTracker() {
   const scheduleSave = useCallback((state) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
+      // Capture and clear atomically inside the debounce window.
+      // This is the only correct place to reset the flag: the 800ms delay
+      // guarantees the flag is still true for writes triggered by a remote
+      // snapshot, which is exactly when we must skip the Firestore write.
+      const fromRemote = isRemote.current
+      isRemote.current = false
       try { localStorage.setItem('shopstate_v2', JSON.stringify(state)) } catch {}
-      if (!isRemote.current) {
+      if (!fromRemote) {
         try { await setDoc(doc(db, 'shopstate', 'main'), state) }
         catch (e) { console.error('[ShopFlow] save failed', e) }
       }
     }, 800)
   }, [])
 
-  useEffect(() => { scheduleSave(appState) }, [appState, scheduleSave])
+  useEffect(() => {
+    stateRef.current = appState
+    scheduleSave(appState)
+  }, [appState, scheduleSave])
 
   // ── 1-second tick for live timers ──
   useEffect(() => {
