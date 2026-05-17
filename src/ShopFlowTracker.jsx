@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 // ─── Global styles injected once ─────────────────────────────────────────────
@@ -330,6 +330,34 @@ function CheckIcon() {
     </svg>
   );
 }
+function AnalyticsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+  );
+}
+function TimeClockIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  );
+}
+function ActivityIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  );
+}
+function KeyIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/>
+    </svg>
+  );
+}
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const labelStyle = {  display: "block",
   fontSize: 10,
@@ -549,9 +577,11 @@ function abbrevJob(j) {
   return { label: j.slice(0,4),            bg:"rgba(100,116,139,0.18)", color:"#94A3B8" };
 }
 // ─── RO Card — long press to move, tap to open ───────────────────────────────
-function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
-  const holdRef  = useRef(null);
-  const didHold  = useRef(false);
+const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
+  const holdRef    = useRef(null);
+  const didHold    = useRef(false);
+  const touchX     = useRef(0);
+  const touchY     = useRef(0);
   const vehicle     = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
   const svcType     = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
   const leftColor   = isMoving ? ACCENT : (svcType ? svcType.color : priorityBorder(ro.priority));
@@ -569,23 +599,33 @@ function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
     holdRef.current = setTimeout(() => {
       didHold.current = true;
       onMove();
-      if (navigator.vibrate) navigator.vibrate(40);
-    }, 600);
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 700);
   }
   function cancelHold() {
     if (holdRef.current) clearTimeout(holdRef.current);
   }
   function handleClick() {
     if (didHold.current) { didHold.current = false; return; }
-    if (isMoving) { onMove(); return; } // second tap cancels move
+    if (isMoving) { onMove(); return; }
     onTap();
-  }  return (
+  }
+  return (
     <div
       onMouseDown={startHold}
       onMouseUp={cancelHold}
       onMouseLeave={cancelHold}
-      onTouchStart={e => { e.preventDefault(); startHold(); }}
-      onTouchMove={cancelHold}
+      onTouchStart={e => {
+        e.preventDefault();
+        touchX.current = e.touches[0].clientX;
+        touchY.current = e.touches[0].clientY;
+        startHold();
+      }}
+      onTouchMove={e => {
+        const dx = Math.abs(e.touches[0].clientX - touchX.current);
+        const dy = Math.abs(e.touches[0].clientY - touchY.current);
+        if (dx > 10 || dy > 10) cancelHold();
+      }}
       onTouchEnd={e => { e.preventDefault(); cancelHold(); }}
       onTouchCancel={cancelHold}
       onContextMenu={e => e.preventDefault()}
@@ -705,7 +745,7 @@ function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
       )}
     </div>
   );
-}
+});
 // ─── Sheet (bottom modal) ─────────────────────────────────────────────────────
 function Sheet({ title, subtitle, onClose, children, wide }) {
   return (
@@ -2683,8 +2723,8 @@ export default function ShopFlowTracker() {
         {isAdvisor && <div style={{ flex:1 }}/>}
         <div style={{ display:"flex", gap:8 }}>
           {canSeeAll && (
-            <button onClick={() => setShowAnalytics(true)} title="Analytics" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
-              
+            <button onClick={() => setShowAnalytics(true)} title="Analytics" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <AnalyticsIcon />
             </button>
           )}
           {canSeeAll && (
@@ -2703,17 +2743,17 @@ export default function ShopFlowTracker() {
             </button>
           )}
           {isTech && (
-            <button onClick={() => setShowActivity(true)} title="Activity Tracker" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
-              
+            <button onClick={() => setShowActivity(true)} title="Activity Tracker" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <ActivityIcon />
             </button>
           )}
           {isAdmin && (
-            <button onClick={() => setShowTimeClock(true)} title="Time Clock" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
-              
+            <button onClick={() => setShowTimeClock(true)} title="Time Clock" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <TimeClockIcon />
             </button>
           )}
-          <button onClick={() => setShowChangePin(true)} title="Change PIN" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>
-            
+          <button onClick={() => setShowChangePin(true)} title="Change PIN" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            <KeyIcon />
           </button>
           <button onClick={() => setCurrentUser(null)} style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
             <LogoutIcon />
