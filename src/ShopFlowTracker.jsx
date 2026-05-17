@@ -2383,7 +2383,26 @@ export default function ShopFlowTracker() {
     const unsub = onSnapshot(ref, snap => {
       if (snap.exists()) {
         isRemote.current = true;
-        setState(snap.data());
+        // Merge with freshState() so missing fields from schema changes don't crash the app
+        const data = snap.data();
+        const fresh = freshState();
+        setState({
+          ...fresh,
+          ...data,
+          timers:          data.timers          || {},
+          grid:            data.grid            || fresh.grid,
+          qSlots:          data.qSlots          || fresh.qSlots,
+          partsSlots:      data.partsSlots      || [],
+          techs:           data.techs           || fresh.techs,
+          queues:          data.queues          || fresh.queues,
+          serviceTypes:    data.serviceTypes    || fresh.serviceTypes,
+          jobPresets:      data.jobPresets      || fresh.jobPresets,
+          archived:        data.archived        || [],
+          completedByTech: data.completedByTech || {},
+          activityLog:     data.activityLog     || [],
+          timeClockLog:    data.timeClockLog     || [],
+          ros:             data.ros             || fresh.ros,
+        });
       } else {
         setDoc(ref, stateRef.current)
           .catch(e => console.error('[ShopFlow] seed failed', e));
@@ -2413,7 +2432,7 @@ export default function ShopFlowTracker() {
   useEffect(() => {
     tickRef.current = setInterval(() => {
       setState(s => {
-        const any = Object.values(s.timers).some(t => t.running);
+        const any = Object.values(s.timers || {}).some(t => t.running);
         return any ? { ...s } : s;
       });
     }, 1000);
