@@ -15,23 +15,24 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
   s.id = "sft-styles";
   s.textContent = [
     "@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }",
-    "@keyframes fade-in { from{opacity:0;transform:translateY(6px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }",
-    "@keyframes slide-up { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }",
-    "@keyframes card-in { from{opacity:0;transform:translateY(10px) scale(0.96)} to{opacity:1;transform:translateY(0) scale(1)} }",
-    "@keyframes urgent-glow { 0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,0)} 50%{box-shadow:0 0 12px 2px rgba(255,69,58,0.3)} }",
+    "@keyframes fade-in { from{opacity:0;transform:translateY(8px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }",
+    "@keyframes slide-up { from{transform:translateY(48px);opacity:0} to{transform:translateY(0);opacity:1} }",
+    "@keyframes card-in { from{opacity:0;transform:translateY(12px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }",
+    "@keyframes urgent-glow { 0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,0)} 50%{box-shadow:0 0 14px 3px rgba(255,69,58,0.35)} }",
     "@keyframes shimmer { from{background-position:-200px 0} to{background-position:200px 0} }",
-    "@keyframes count-up { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }",
-    "@keyframes snap-in { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }",
-    "@keyframes tick { 0%{opacity:1} 49%{opacity:1} 50%{opacity:0.7} 100%{opacity:1} }",
-    "@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }",
-    "* { -webkit-tap-highlight-color: transparent; }",
+    "@keyframes snap-in { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:scale(1)} }",
+    "@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)} 40%{transform:translateX(9px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }",
+    "* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }",
     "input, select, textarea { color-scheme: dark; }",
     "::-webkit-scrollbar { width: 0px; }",
-    ".card-press:active { transform: scale(0.97) !important; transition: transform 0.08s ease !important; }",
+    ".card-press { transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease, background 0.15s ease; }",
+    ".card-press:active { transform: scale(0.96) !important; }",
     ".col-snap { scroll-snap-type: x mandatory; }",
     ".col-snap-item { scroll-snap-align: start; }",
-    ".pad-btn { -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }",
+    ".pad-btn { -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; transition: transform 0.1s cubic-bezier(0.34,1.56,0.64,1), background 0.1s ease; }",
     ".pad-btn:active { transform: scale(0.88) !important; background: rgba(255,255,255,0.18) !important; }",
+    ".btn-press { transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1), opacity 0.12s ease; }",
+    ".btn-press:active { transform: scale(0.94) !important; opacity: 0.8 !important; }",
   ].join(" ");
   document.head.appendChild(s);
 }
@@ -119,15 +120,16 @@ function freshState() {
     ros: SAMPLE_ROS,
     nextNum: 1006,
     grid: {
-      t1: { ondeck:[],          inprogress:[], completed:[], delivered:[] },
-      t2: { ondeck:["ro-1005"], inprogress:[], completed:[], delivered:[] },
-      t3: { ondeck:["ro-1003"], inprogress:[], completed:[], delivered:[] },
-      t4: { ondeck:["ro-1002"], inprogress:[], completed:[], delivered:[] },
+      t1: { ondeck:["ro-1001"],  inprogress:["ro-87045"], completed:[],          delivered:[]          },
+      t2: { ondeck:["ro-1005"],  inprogress:[],            completed:[],          delivered:[]          },
+      t3: { ondeck:[],           inprogress:["ro-1003"],   completed:["ro-56003"],delivered:[]          },
+      t4: { ondeck:["ro-1002"],  inprogress:[],            completed:[],          delivered:[]          },
     },
-    partsSlots: [],
-    completedByTech: {},    activityLog: [],
+    partsSlots: ["ro-55922"],
+    completedByTech: { "t3_ro-56003": true, t3: 1 },
+    activityLog: [],
     timeClockLog: [],
-    qSlots: { "q-main":["ro-87045","ro-55922","ro-56003"], "q-pdi":[], "q-used":["ro-1004","ro-1001"] },
+    qSlots: { "q-main":[], "q-pdi":[], "q-used":["ro-1004"] },
     timers: {},
     archived: [],
     serviceTypes: DEFAULT_SERVICE_TYPES,
@@ -552,7 +554,6 @@ function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
   const didHold  = useRef(false);
   const vehicle     = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
   const svcType     = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
-  const cardBg      = isMoving ? "#DBEAFE" : (svcType ? svcType.bg : SURFACE);
   const leftColor   = isMoving ? ACCENT : (svcType ? svcType.color : priorityBorder(ro.priority));
   const isWaiting   = ro.waitStatus === "waiting";
   const timerRunning = timer && timer.running;
@@ -589,23 +590,25 @@ function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
       onTouchCancel={cancelHold}
       onContextMenu={e => e.preventDefault()}
       onClick={handleClick}
-      className="card-press"style={{
-        background: isMoving ? "rgba(10,132,255,0.12)" : CARD_BG,
+      className="card-press"
+      style={{
+        background: isMoving ? "rgba(10,132,255,0.10)" : CARD_BG,
         borderRadius: 14,
         padding: "12px 13px",
         marginBottom: 7,
         boxShadow: isMoving
-          ? "0 0 0 1.5px #0A84FF, 0 8px 32px rgba(10,132,255,0.2)": "0 1px 0 "+CARD_TOP+" inset, 0 4px 20px rgba(0,0,0,0.3)",
-        animation: isMoving ? "none" : (ro.priority==="HIGH"? "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1), urgent-glow 2.4s ease-in-out 0.3s infinite": "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)"),
-        border: "1px solid " + CARD_BORDER,
-        borderLeft: "2.5px solid " + leftColor,
-        animation: "fade-in 0.18s ease",
+          ? "0 0 0 1.5px #0A84FF, 0 8px 32px rgba(10,132,255,0.25)"
+          : ro.priority === "HIGH"
+            ? "0 1px 0 "+CARD_TOP+" inset, 0 4px 20px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,69,58,0.15)"
+            : "0 1px 0 "+CARD_TOP+" inset, 0 4px 20px rgba(0,0,0,0.3)",
+        animation: isMoving ? "none" : "card-in 0.2s cubic-bezier(0.34,1.56,0.64,1)",
+        border: "0.5px solid " + (isMoving ? "rgba(10,132,255,0.4)" : CARD_BORDER),
+        borderLeft: "3px solid " + leftColor,
         cursor: "pointer",
         userSelect: "none",
         width: "100%",
         boxSizing: "border-box",
-        transform: isMoving ? "scale(1.01)" : "scale(1)",
-        transition: "box-shadow 0.2s, transform 0.2s, background 0.2s",
+        transform: isMoving ? "scale(1.02)" : "scale(1)",
         WebkitTouchCallout: "none",
         WebkitUserSelect: "none",
       }}
@@ -2362,6 +2365,7 @@ export default function ShopFlowTracker() {
   const [showTimeClock, setShowTimeClock]     = useState(false);
   const [detailRO, setDetailRO]       = useState(null);  const [movingRO, setMovingRO]       = useState(null);
   const [collapsed, setCollapsed]     = useState({});
+  const [, setTick] = useState(0);
   const tickRef = useRef(null);
   const isWide  = useIsWide();
   const isAdmin   = currentUser && currentUser.role === "admin";
@@ -2430,12 +2434,7 @@ export default function ShopFlowTracker() {
     scheduleSave(state);
   }, [state, scheduleSave]);
   useEffect(() => {
-    tickRef.current = setInterval(() => {
-      setState(s => {
-        const any = Object.values(s.timers || {}).some(t => t.running);
-        return any ? { ...s } : s;
-      });
-    }, 1000);
+    tickRef.current = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(tickRef.current);
   }, []);
   function upd(fn) { setState(s => fn({ ...s })); }
