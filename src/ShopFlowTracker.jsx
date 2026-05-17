@@ -95,7 +95,7 @@ const DEFAULT_QUEUES = [
   { id:"q-pdi",  name:"PDIs",           subtitle:"Pre-Delivery Inspections", color:"#9333EA", icon:"🚗" },
   { id:"q-used", name:"Used Cars",      subtitle:"Secondary Priority",       color:"#16A34A", icon:"🏷️" },
 ];
-const STORAGE_KEY = "sft-v20";
+const STORAGE_KEY = "sft-v21";
 const GOAL_HOURS  = 40;
 // ─── Service Types ────────────────────────────────────────────────────────────
 const DEFAULT_SERVICE_TYPES = [
@@ -523,30 +523,30 @@ function HoursPicker({ ro, onHoursChange, onClose }) {
 // ─── Job abbreviations ───────────────────────────────────────────────────────
 function abbrevJob(j) {
   const v = j.toLowerCase().trim();
-  if (v.includes("oil"))         return { label:"Oil",    bg:"#FFF7ED", color:"#C2410C" };
-  if (v.includes("brake"))       return { label:"Brks",   bg:"#FFF1F2", color:"#BE123C" };
-  if (v.includes("diag"))        return { label:"Diag",   bg:"#EEF4FF", color:"#1D4ED8" };
-  if (v.includes("trans"))       return { label:"Trans",  bg:"#FAF5FF", color:"#7E22CE" };
-  if (v.includes("tire"))        return { label:"Tires",  bg:"#F0FDF4", color:"#15803D" };
-  if (v.includes("align"))       return { label:"Algn",   bg:"#F0FDF4", color:"#15803D" };
-  if (v.includes("coolant"))     return { label:"Cool",   bg:"#ECFEFF", color:"#0E7490" };
-  if (v.includes("flush"))       return { label:"Flush",  bg:"#ECFEFF", color:"#0E7490" };
-  if (v.includes("filter"))      return { label:"Fltr",   bg:"#FFF7ED", color:"#C2410C" };
-  if (v.includes("spark"))       return { label:"Plugs",  bg:"#FFFBEB", color:"#B45309" };
-  if (v.includes("battery"))     return { label:"Batt",   bg:"#FFFBEB", color:"#B45309" };
-  if (v.includes("inspect"))     return { label:"Insp",   bg:"#F8FAFC", color:"#475569" };
-  if (v.includes("general"))     return { label:"Gen",    bg:"#F8FAFC", color:"#475569" };
-  if (v.includes("pdi"))         return { label:"PDI",    bg:"#FAF5FF", color:"#7E22CE" };
-  if (v.includes("suspension"))  return { label:"Susp",   bg:"#FEF2F2", color:"#991B1B" };
-  if (v.includes("ac") || v.includes("a/c")) return { label:"A/C", bg:"#ECFEFF", color:"#0E7490" };
-  if (v.includes("rotat"))       return { label:"Rot",    bg:"#F0FDF4", color:"#15803D" };
-  if (v.includes("wiper"))       return { label:"Wprs",   bg:"#F8FAFC", color:"#475569" };  if (v.includes("belt"))        return { label:"Belt",   bg:"#FFFBEB", color:"#B45309" };
-  if (v.includes("pump"))        return { label:"Pump",   bg:"#ECFEFF", color:"#0E7490" };
-  if (v.includes("axle") || v.includes("cv")) return { label:"Axle", bg:"#FEF2F2", color:"#991B1B" };
-  if (v.includes("arm"))         return { label:"Arm",    bg:"#FEF2F2", color:"#991B1B" };
-  if (v.includes("tie"))         return { label:"Tie",    bg:"#FEF2F2", color:"#991B1B" };
-  // fallback — first 4 chars
-  return { label: j.slice(0,4), bg:"#F8FAFC", color:"#475569" };
+  if (v.includes("oil"))         return { label:"Oil",    bg:"rgba(234,88,12,0.18)",   color:"#FB923C" };
+  if (v.includes("brake"))       return { label:"Brks",   bg:"rgba(190,18,60,0.18)",   color:"#F87171" };
+  if (v.includes("diag"))        return { label:"Diag",   bg:"rgba(29,78,216,0.18)",   color:"#60A5FA" };
+  if (v.includes("trans"))       return { label:"Trans",  bg:"rgba(126,34,206,0.18)",  color:"#C084FC" };
+  if (v.includes("tire"))        return { label:"Tires",  bg:"rgba(21,128,61,0.18)",   color:"#4ADE80" };
+  if (v.includes("align"))       return { label:"Algn",   bg:"rgba(21,128,61,0.18)",   color:"#4ADE80" };
+  if (v.includes("coolant"))     return { label:"Cool",   bg:"rgba(14,116,144,0.18)",  color:"#22D3EE" };
+  if (v.includes("flush"))       return { label:"Flush",  bg:"rgba(14,116,144,0.18)",  color:"#22D3EE" };
+  if (v.includes("filter"))      return { label:"Fltr",   bg:"rgba(194,65,12,0.18)",   color:"#FB923C" };
+  if (v.includes("spark"))       return { label:"Plugs",  bg:"rgba(180,83,9,0.18)",    color:"#FBBF24" };
+  if (v.includes("battery"))     return { label:"Batt",   bg:"rgba(180,83,9,0.18)",    color:"#FBBF24" };
+  if (v.includes("inspect"))     return { label:"Insp",   bg:"rgba(100,116,139,0.18)", color:"#94A3B8" };
+  if (v.includes("general"))     return { label:"Gen",    bg:"rgba(100,116,139,0.18)", color:"#94A3B8" };
+  if (v.includes("pdi"))         return { label:"PDI",    bg:"rgba(126,34,206,0.18)",  color:"#C084FC" };
+  if (v.includes("suspension"))  return { label:"Susp",   bg:"rgba(153,27,27,0.18)",   color:"#FCA5A5" };
+  if (v.includes("ac") || v.includes("a/c")) return { label:"A/C", bg:"rgba(14,116,144,0.18)", color:"#22D3EE" };
+  if (v.includes("rotat"))       return { label:"Rot",    bg:"rgba(21,128,61,0.18)",   color:"#4ADE80" };
+  if (v.includes("wiper"))       return { label:"Wprs",   bg:"rgba(100,116,139,0.18)", color:"#94A3B8" };
+  if (v.includes("belt"))        return { label:"Belt",   bg:"rgba(180,83,9,0.18)",    color:"#FBBF24" };
+  if (v.includes("pump"))        return { label:"Pump",   bg:"rgba(14,116,144,0.18)",  color:"#22D3EE" };
+  if (v.includes("axle") || v.includes("cv")) return { label:"Axle", bg:"rgba(153,27,27,0.18)", color:"#FCA5A5" };
+  if (v.includes("arm"))         return { label:"Arm",    bg:"rgba(153,27,27,0.18)",   color:"#FCA5A5" };
+  if (v.includes("tie"))         return { label:"Tie",    bg:"rgba(153,27,27,0.18)",   color:"#FCA5A5" };
+  return { label: j.slice(0,4),            bg:"rgba(100,116,139,0.18)", color:"#94A3B8" };
 }
 // ─── RO Card — long press to move, tap to open ───────────────────────────────
 function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
