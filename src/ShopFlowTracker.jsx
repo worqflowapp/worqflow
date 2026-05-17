@@ -89,7 +89,7 @@ const SAMPLE_ROS = [
   { id:"ro-55922", roNum:"RO-55922", promiseTime:"", roNotes:[], serviceType:"st-main", year:"2016", make:"Toyota", model:"Highlander", color:"", vin:"5TDDKRFH0GS254800", plate:"", mileageIn:"", mileageOut:"", customer:"Erin Greninger", phone:"(256) 348-3177", email:"", waitStatus:"waiting", priority:"NORMAL", hours:"", jobs:"Sunroof Leak, 5000 Mile Service, Brakes Check", concern:"C/S sunroof is leaking check and advise. 5000 miles basic severe service menu. C/S front and rear brakes might need work — check and advise", cause:"", correction:"", parts:"", notes:"Spoke to Mario" },
   { id:"ro-56003", roNum:"RO-56003", promiseTime:"", roNotes:[], serviceType:"st-main", year:"2023", make:"Toyota", model:"Corolla Cross", color:"", vin:"7MUCAABG2PV053905", plate:"", mileageIn:"", mileageOut:"", customer:"Robert Raffety", phone:"(703) 862-6099", email:"", waitStatus:"dropoff", priority:"NORMAL", hours:"", jobs:"A/C Noise", concern:"C/S AC fan is making a lot of noise — car was just purchased", cause:"", correction:"", parts:"", notes:"" },
 ];
-const DEFAULT_TECHS = USERS.filter(u => u.role === "tech").map(u => ({ id: u.id, name: u.name }));
+const DEFAULT_TECHS = USERS.filter(u => u.role === "tech").map(u => ({ id: u.id, name: u.name, role: u.role, pin: u.pin }));
 const DEFAULT_QUEUES = [
   { id:"q-main", name:"Main Shop Work", subtitle:"Priority #1",              color:"#EF4444", icon:"🔧" },
   { id:"q-pdi",  name:"PDIs",           subtitle:"Pre-Delivery Inspections", color:"#9333EA", icon:"🚗" },
@@ -355,6 +355,13 @@ function KeyIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/>
+    </svg>
+  );
+}
+function HistoryIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/>
     </svg>
   );
 }
@@ -1387,6 +1394,124 @@ function ArchiveModal({ archived, onClose, onRestore, wide }) {
     </Sheet>
   );
 }
+// ─── History Modal ───────────────────────────────────────────────────────────
+function HistoryModal({ archived, onClose, wide }) {
+  const [query, setQuery] = useState("");
+  const [detail, setDetail] = useState(null);
+  const q = query.toLowerCase().trim();
+  const results = (archived||[]).filter(entry => {
+    if (!q) return true;
+    const ro = entry.ro;
+    return (
+      (ro.roNum||"").toLowerCase().includes(q) ||
+      (ro.customer||"").toLowerCase().includes(q) ||
+      (ro.make||"").toLowerCase().includes(q) ||
+      (ro.model||"").toLowerCase().includes(q) ||
+      (ro.jobs||"").toLowerCase().includes(q)
+    );
+  }).slice().reverse();
+  if (detail) {
+    const ro = detail.ro;
+    return (
+      <Sheet title={ro.roNum} subtitle={[ro.year,ro.make,ro.model].filter(Boolean).join(" ")} onClose={() => setDetail(null)} wide={wide}>
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px" }}>
+            <div style={{ fontSize:11, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:8 }}>Customer</div>
+            <div style={{ fontSize:15, fontWeight:600, color:TEXT }}>{ro.customer||"—"}</div>
+            {ro.phone && <div style={{ fontSize:13, color:TEXT2, marginTop:2 }}>{ro.phone}</div>}
+          </div>
+          <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px" }}>
+            <div style={{ fontSize:11, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:8 }}>Jobs</div>
+            <div style={{ fontSize:14, color:TEXT2 }}>{ro.jobs||"—"}</div>
+          </div>
+          {ro.concern && (
+            <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px" }}>
+              <div style={{ fontSize:11, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:6 }}>Concern</div>
+              <div style={{ fontSize:13, color:TEXT2 }}>{ro.concern}</div>
+            </div>
+          )}
+          {ro.cause && (
+            <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px" }}>
+              <div style={{ fontSize:11, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:6 }}>Cause</div>
+              <div style={{ fontSize:13, color:TEXT2 }}>{ro.cause}</div>
+            </div>
+          )}
+          {ro.correction && (
+            <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px" }}>
+              <div style={{ fontSize:11, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:6 }}>Correction</div>
+              <div style={{ fontSize:13, color:TEXT2 }}>{ro.correction}</div>
+            </div>
+          )}
+          <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px", display:"flex", gap:20 }}>
+            <div><div style={{ fontSize:11, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:4 }}>Hours</div><div style={{ fontSize:15, fontWeight:700, color:TEXT }}>{ro.hours||"—"}</div></div>
+            <div><div style={{ fontSize:11, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:4 }}>Archived</div><div style={{ fontSize:13, color:TEXT2 }}>{new Date(detail.archivedAt).toLocaleDateString()}</div></div>
+            {ro.mileageIn && <div><div style={{ fontSize:11, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:4 }}>Mileage</div><div style={{ fontSize:13, color:TEXT2 }}>{ro.mileageIn}</div></div>}
+          </div>
+          {(ro.roNotes||[]).length > 0 && (
+            <div style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px" }}>
+              <div style={{ fontSize:11, fontWeight:600, color:TEXT3, textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:10 }}>Notes</div>
+              {ro.roNotes.map(n => (
+                <div key={n.id} style={{ marginBottom:8, paddingBottom:8, borderBottom:"1px solid "+BORDER }}>
+                  <div style={{ fontSize:12, color:TEXT3, marginBottom:2 }}>{n.author} · {new Date(n.time).toLocaleString()}</div>
+                  <div style={{ fontSize:13, color:TEXT2 }}>{n.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Sheet>
+    );
+  }
+  return (
+    <Sheet title="RO History" subtitle={(archived||[]).length + " archived tickets"} onClose={onClose} wide={wide}>
+      <div>
+        <div style={{ position:"relative", marginBottom:14 }}>
+          <input
+            placeholder="Search by RO#, customer, vehicle, job…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            autoFocus
+            style={{ ...inputStyle, paddingLeft:36 }}
+          />
+          <div style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", color:TEXT3, fontSize:14, pointerEvents:"none" }}>🔍</div>
+          {query && (
+            <button onClick={() => setQuery("")} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:TEXT3, fontSize:16, cursor:"pointer", padding:4 }}>✕</button>
+          )}
+        </div>
+        {results.length === 0 ? (
+          <div style={{ textAlign:"center", color:MUTED, padding:"48px 0", fontSize:15 }}>
+            {query ? `No results for "${query}"` : "No archived tickets yet"}
+          </div>
+        ) : (
+          results.map(entry => {
+            const ro = entry.ro;
+            return (
+              <div key={ro.id + entry.archivedAt}
+                onClick={() => setDetail(entry)}
+                style={{ background:"rgba(255,255,255,0.05)", borderRadius:14, padding:"14px 16px", marginBottom:10, border:"1px solid rgba(255,255,255,0.08)", cursor:"pointer", transition:"background 0.15s ease" }}
+                onPointerEnter={e => e.currentTarget.style.background="rgba(255,255,255,0.08)"}
+                onPointerLeave={e => e.currentTarget.style.background="rgba(255,255,255,0.05)"}
+              >
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:700, fontSize:15, color:TEXT }}>{ro.roNum}</div>
+                    <div style={{ fontSize:13, color:TEXT2, marginTop:2 }}>{[ro.year,ro.make,ro.model].filter(Boolean).join(" ")}</div>
+                    <div style={{ fontSize:12, color:TEXT3, marginTop:1 }}>{ro.customer}</div>
+                    {ro.jobs && <div style={{ fontSize:12, color:TEXT3, marginTop:4, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{ro.jobs}</div>}
+                  </div>
+                  <div style={{ textAlign:"right", flexShrink:0, marginLeft:12 }}>
+                    <div style={{ fontSize:11, color:TEXT3 }}>{new Date(entry.archivedAt).toLocaleDateString()}</div>
+                    {ro.hours && <div style={{ fontSize:12, color:ACCENT, fontWeight:600, marginTop:2 }}>{ro.hours}h</div>}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </Sheet>
+  );
+}
 // ─── Job Presets Editor ──────────────────────────────────────────────────────
 function JobPresetsEditor({ presets, onSave }) {
   const [list, setList] = useState([...presets]);
@@ -1438,10 +1563,14 @@ const COLOR_BG = {
   "#D97706":"#FFFBEB","#0891B2":"#ECFEFF","#DB2777":"#FDF2F8","#65A30D":"#F7FEE7",
   "#7C3AED":"#F5F3FF","#EA580C":"#FFF7ED",
 };
-function ServiceTypeSettings({ serviceTypes, jobPresets, onClose, onSave, onSaveJobs, wide }) {
+function ServiceTypeSettings({ serviceTypes, jobPresets, techs, onClose, onSave, onSaveJobs, onSaveTechs, wide }) {
   const [types, setTypes] = useState(serviceTypes.map(s => ({...s})));
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("#1D6BF3");
+  const [techList, setTechList] = useState((techs||[]).map(t => ({...t})));
+  const [newTechName, setNewTechName] = useState("");
+  const [newTechPin, setNewTechPin] = useState(null); // PIN shown after creation
+  const [removeConfirm, setRemoveConfirm] = useState(null); // id to confirm removal
   function addType() {
     if (!newName.trim()) return;
     const id = "st-" + Date.now();
@@ -1457,9 +1586,82 @@ function ServiceTypeSettings({ serviceTypes, jobPresets, onClose, onSave, onSave
   function updateColor(id, color) {
     setTypes(t => t.map(x => x.id === id ? {...x, color, bg:COLOR_BG[color]||"#F8FAFC"} : x));
   }
+  function addTech() {
+    if (!newTechName.trim()) return;
+    const id = "tech-" + Date.now();
+    const pin = "0000";
+    const newTech = { id, name:newTechName.trim(), role:"tech", pin };
+    setTechList(t => [...t, newTech]);
+    setNewTechName("");
+    setNewTechPin({ name:newTechName.trim(), pin });
+  }
+  function confirmRemoveTech(id) { setRemoveConfirm(id); }
+  function doRemoveTech(id) {
+    setTechList(t => t.filter(x => x.id !== id));
+    setRemoveConfirm(null);
+  }
   return (
-    <Sheet title="Service Types" subtitle="Manage RO categories and colors" onClose={onClose} wide={wide}>
+    <Sheet title="Settings" subtitle="Manage techs, service types, and job presets" onClose={onClose} wide={wide}>
       <div>
+        {/* ── Technicians section ── */}
+        <div style={{ marginBottom:24 }}>
+          <div style={{ fontWeight:700, fontSize:15, color:TEXT, marginBottom:4 }}>Technicians</div>
+          <div style={{ fontSize:12, color:MUTED, marginBottom:12 }}>Add or remove techs. New tech PIN defaults to 0000.</div>
+          {techList.map(tech => (
+            <div key={tech.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 0", borderBottom:"1px solid "+BORDER }}>
+              <div style={{ width:32, height:32, borderRadius:10, background:"rgba(10,132,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, color:ACCENT, flexShrink:0 }}>
+                {tech.name.slice(0,2).toUpperCase()}
+              </div>
+              <span style={{ flex:1, fontSize:14, fontWeight:500, color:TEXT }}>{tech.name}</span>
+              {removeConfirm === tech.id ? (
+                <div style={{ display:"flex", gap:6 }}>
+                  <button onClick={() => doRemoveTech(tech.id)}
+                    style={{ background:"rgba(255,69,58,0.15)", color:DANGER, border:"1px solid rgba(255,69,58,0.3)", borderRadius:8, padding:"6px 10px", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>
+                    Confirm
+                  </button>
+                  <button onClick={() => setRemoveConfirm(null)}
+                    style={{ background:"rgba(255,255,255,0.06)", color:TEXT3, border:"1px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"6px 10px", fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => confirmRemoveTech(tech.id)}
+                  style={{ background:"rgba(255,69,58,0.12)", color:DANGER, border:"1px solid rgba(255,69,58,0.2)", borderRadius:8, padding:"6px 10px", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
+                  Remove
+                </button>
+              )}
+            </div>
+          ))}
+          <div style={{ marginTop:14, display:"flex", gap:8 }}>
+            <input
+              placeholder="New tech name…"
+              value={newTechName}
+              onChange={e => setNewTechName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addTech()}
+              style={{ ...inputStyle, flex:1, padding:"10px" }}
+            />
+            <button onClick={addTech}
+              style={{ background:ACCENT, color:"#fff", border:"none", borderRadius:10, padding:"0 16px", cursor:"pointer", fontWeight:700, fontSize:13, whiteSpace:"nowrap" }}>
+              Add
+            </button>
+          </div>
+          {newTechPin && (
+            <div style={{ marginTop:12, background:"rgba(48,209,88,0.1)", border:"1px solid rgba(48,209,88,0.3)", borderRadius:12, padding:"12px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div>
+                <div style={{ fontSize:12, color:SUCCESS, fontWeight:600 }}>✓ {newTechPin.name} added</div>
+                <div style={{ fontSize:13, color:TEXT2, marginTop:2 }}>Default PIN: <span style={{ fontWeight:700, color:TEXT, letterSpacing:"2px" }}>{newTechPin.pin}</span></div>
+              </div>
+              <button onClick={() => setNewTechPin(null)} style={{ background:"none", border:"none", color:TEXT3, fontSize:18, cursor:"pointer", padding:4 }}>✕</button>
+            </div>
+          )}
+          <button onClick={() => onSaveTechs && onSaveTechs(techList)}
+            style={{ marginTop:14, width:"100%", padding:13, background:"rgba(10,132,255,0.15)", color:ACCENT, border:"1px solid rgba(10,132,255,0.3)", borderRadius:14, fontFamily:"inherit", fontWeight:700, fontSize:14, cursor:"pointer" }}>
+            Save Technicians
+          </button>
+        </div>
+        <div style={{ borderTop:"2px solid "+BORDER, paddingTop:20, marginBottom:4 }}>
+          <div style={{ fontWeight:700, fontSize:15, color:TEXT, marginBottom:12 }}>Service Types</div>
+        </div>
         {types.map(st => (
           <div key={st.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 0", borderBottom:"1px solid "+BORDER }}>
             <span style={{ width:12, height:12, borderRadius:"50%", background:st.color, flexShrink:0 }}/>
@@ -1475,7 +1677,7 @@ function ServiceTypeSettings({ serviceTypes, jobPresets, onClose, onSave, onSave
               ))}
             </div>
             <button onClick={() => removeType(st.id)}
-              style={{ background:"#FEF2F2", color:"#EF4444", border:"1px solid #FECACA", borderRadius:8, padding:"6px 10px", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
+              style={{ background:"rgba(255,69,58,0.12)", color:DANGER, border:"1px solid rgba(255,69,58,0.2)", borderRadius:8, padding:"6px 10px", fontSize:11, fontWeight:700, cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
               Remove
             </button>
           </div>
@@ -2228,14 +2430,15 @@ function ChangePinModal({ user, onClose, onSave }) {
   );
 }
 // ─── Login Screen ─────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin }) {
+function LoginScreen({ onLogin, users }) {
+  const allUsers = users || USERS;
   const [selectedId, setSelectedId] = useState("");
   const [pin,        setPin]        = useState("");
   const [err,        setErr]        = useState("");
   const [shake,      setShake]      = useState(false);
   const [step,       setStep]       = useState("name"); // "name" | "pin"const pinRef  = useRef(null);
   const [dots,  setDots]  = useState([false,false,false,false,false,false]);
-  const selectedUser = USERS.find(u => u.id === selectedId);
+  const selectedUser = allUsers.find(u => u.id === selectedId);
   const PIN_LEN = selectedUser?.pin?.length || 4;  function tryLogin() {
     if (!selectedUser) return;
     const saved = JSON.parse(localStorage.getItem("sft-pins")||"{}");
@@ -2312,7 +2515,7 @@ function LoginScreen({ onLogin }) {
                 style={{ width:"100%", padding:"16px 44px 16px 18px", background:"rgba(255,255,255,0.07)", border:"0.5px solid rgba(255,255,255,0.12)", borderTop:"0.5px solid rgba(255,255,255,0.18)", borderRadius:16, color:selectedId?TEXT:"rgba(255,255,255,0.3)", fontSize:16, fontWeight:selectedId?500:400, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif", outline:"none", appearance:"none", WebkitAppearance:"none", cursor:"pointer", boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset", letterSpacing:"-0.2px", boxSizing:"border-box", colorScheme:"dark" }}
               >
                 <option value="" disabled style={{ color:"#666" }}>Select your name…</option>
-                {USERS.map(u => (
+                {allUsers.map(u => (
                   <option key={u.id} value={u.id} style={{ color:"#fff", background:"#1C1C1E" }}>{u.name}</option>
                 ))}
               </select>
@@ -2395,6 +2598,7 @@ export default function ShopFlowTracker() {
   const [state, setState]             = useState(loadState);
   const [showAdd, setShowAdd]               = useState(false);
   const [showArchive, setShowArchive]       = useState(false);
+  const [showHistory, setShowHistory]       = useState(false);
   const [showServiceTypes, setShowServiceTypes] = useState(false);
   const [partsCollapsed, setPartsCollapsed]   = useState(false);
   const [showChangePin, setShowChangePin]     = useState(false);
@@ -2474,6 +2678,54 @@ export default function ShopFlowTracker() {
   useEffect(() => {
     tickRef.current = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(tickRef.current);
+  }, []);
+  // ── Promise time notifications ──
+  const firedAlertsRef = useRef({}); // tracks { [key]: true } to avoid duplicates
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+  useEffect(() => {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const today = new Date().toDateString();
+      // clean up old day keys
+      Object.keys(firedAlertsRef.current).forEach(k => {
+        if (!k.startsWith(today)) delete firedAlertsRef.current[k];
+      });
+      const allRoIds = new Set();
+      Object.values(stateRef.current.grid||{}).forEach(cols => {
+        ["ondeck","inprogress","completed"].forEach(c => {
+          (cols[c]||[]).forEach(id => allRoIds.add(id));
+        });
+      });
+      allRoIds.forEach(id => {
+        const ro = (stateRef.current.ros||[]).find(r => r.id === id);
+        if (!ro || !ro.promiseTime) return;
+        const due = new Date(ro.promiseTime).getTime();
+        if (isNaN(due)) return;
+        const diff = due - now;
+        const warnKey = today + "_warn_" + id;
+        const overdueKey = today + "_over_" + id;
+        if (diff > 0 && diff <= 30 * 60 * 1000 && !firedAlertsRef.current[warnKey]) {
+          firedAlertsRef.current[warnKey] = true;
+          const timeStr = new Date(due).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+          new Notification("Promise Time — " + ro.roNum, {
+            body: "Due at " + timeStr + " · " + (ro.customer||""),
+            icon: "/favicon.ico",
+          });
+        } else if (diff <= 0 && diff > -60 * 60 * 1000 && !firedAlertsRef.current[overdueKey]) {
+          firedAlertsRef.current[overdueKey] = true;
+          new Notification("OVERDUE — " + ro.roNum, {
+            body: (ro.customer||"") + " · " + (ro.make||"") + " " + (ro.model||""),
+            icon: "/favicon.ico",
+          });
+        }
+      });
+    }, 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
   function upd(fn) { setState(s => fn({ ...s })); }
   function getRO(id) { return state.ros.find(r => r.id === id); }
@@ -2638,6 +2890,16 @@ export default function ShopFlowTracker() {
     upd(s => ({ ...s, jobPresets: presets }));
     setShowServiceTypes(false);
   }
+  function handleSaveTechs(newTechs) {
+    upd(s => {
+      const removedIds = (s.techs||[]).map(t => t.id).filter(id => !newTechs.find(t => t.id === id));
+      const newGrid = { ...s.grid };
+      newTechs.forEach(t => { if (!newGrid[t.id]) newGrid[t.id] = { ondeck:[], inprogress:[], completed:[], delivered:[] }; });
+      removedIds.forEach(id => { delete newGrid[id]; });
+      return { ...s, techs: newTechs, grid: newGrid };
+    });
+    setShowServiceTypes(false);
+  }
   function techStats(techId) {
     const all = COLS.flatMap(c => state.grid[techId] ? (state.grid[techId][c.id]||[]) : []);
     const hrs = all.reduce((sum, id) => {
@@ -2673,7 +2935,10 @@ export default function ShopFlowTracker() {
   const CELL_W_MOBILE = 148;
   const useFluid = isWide;  // fluid = fills screen, fixed = scrolls
   if (!currentUser) {
-    return <LoginScreen onLogin={setCurrentUser} />;
+    const nonTechUsers = USERS.filter(u => u.role !== "tech");
+    const dynamicTechs = (state.techs||DEFAULT_TECHS).map(t => ({ ...t, role:"tech" }));
+    const loginUsers = [...nonTechUsers, ...dynamicTechs];
+    return <LoginScreen onLogin={setCurrentUser} users={loginUsers} />;
   }
   return (
     <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Barlow',sans-serif", background:"radial-gradient(ellipse at 50% 0%, #0A0F1F 0%, #000000 55%)", minHeight:"100vh", maxWidth:"100vw", overflow:"hidden", color:TEXT }}>
@@ -2723,6 +2988,11 @@ export default function ShopFlowTracker() {
           {canSeeAll && (
             <button onClick={() => setShowAnalytics(true)} title="Analytics" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
               <AnalyticsIcon />
+            </button>
+          )}
+          {canSeeAll && (
+            <button onClick={() => setShowHistory(true)} title="RO History" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <HistoryIcon />
             </button>
           )}
           {canSeeAll && (
@@ -3058,8 +3328,11 @@ export default function ShopFlowTracker() {
       {showArchive && (
         <ArchiveModal archived={state.archived||[]} onClose={() => setShowArchive(false)} onRestore={handleRestore} wide={isWide} />
       )}
+      {showHistory && (
+        <HistoryModal archived={state.archived||[]} onClose={() => setShowHistory(false)} wide={isWide} />
+      )}
       {showServiceTypes && (
-        <ServiceTypeSettings serviceTypes={state.serviceTypes||DEFAULT_SERVICE_TYPES} jobPresets={state.jobPresets||DEFAULT_JOB_PRESETS} onClose={() => setShowServiceTypes(false)} onSave={handleSaveServiceTypes} onSaveJobs={handleSaveJobPresets} wide={isWide} />      )}
+        <ServiceTypeSettings serviceTypes={state.serviceTypes||DEFAULT_SERVICE_TYPES} jobPresets={state.jobPresets||DEFAULT_JOB_PRESETS} techs={state.techs||DEFAULT_TECHS} onClose={() => setShowServiceTypes(false)} onSave={handleSaveServiceTypes} onSaveJobs={handleSaveJobPresets} onSaveTechs={handleSaveTechs} wide={isWide} />      )}
       {detailRO && !movingRO && (
         <RODetail
           ro={detailRO.ro}
