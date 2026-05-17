@@ -600,82 +600,114 @@ function abbrevJob(j) {
   if (v.includes("tie"))         return { label:"Tie",    bg:"rgba(153,27,27,0.18)",   color:"#FCA5A5" };
   return { label: j.slice(0,4),            bg:"rgba(100,116,139,0.18)", color:"#94A3B8" };
 }
-// ─── Display Card — fixed-height, uniform, TV board only ─────────────────────
-const DisplayCard = memo(function DisplayCard({ ro, timer, serviceTypes, cardHeight }) {
+// ─── Display Card — dynamic height, scales content with card size ─────────────
+const DisplayCard = memo(function DisplayCard({ ro, timer, serviceTypes, cardHeight, isSingle }) {
   const vehicleStr = [ro.year, ro.make, ro.model].filter(Boolean).join(" ");
   const svcType = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
   const leftColor = svcType ? svcType.color : "#1D6BF3";
   const timerRunning = timer && timer.running;
-  const elapsed = timer ? (timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000) : timer.elapsed) : 0;
+  const elapsed = timer
+    ? (timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000) : timer.elapsed)
+    : 0;
   const allJobs = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
-  const visJobs = allJobs.slice(0, 3);
-  const extraJobs = allJobs.length - visJobs.length;
   const isHigh = ro.priority === "HIGH";
   const isLow  = ro.priority === "LOW";
-  const promiseMs = ro.promiseTime ? new Date(ro.promiseTime).getTime() : null;
-  const isOverdue = promiseMs && (promiseMs - Date.now()) < 0;
-  const isSoon    = promiseMs && !isOverdue && (promiseMs - Date.now()) < 1800000;
+  const promiseMs  = ro.promiseTime ? new Date(ro.promiseTime).getTime() : null;
+  const isOverdue  = promiseMs && (promiseMs - Date.now()) < 0;
+  const isSoon     = promiseMs && !isOverdue && (promiseMs - Date.now()) < 1800000;
   const promiseStr = promiseMs ? new Date(ro.promiseTime).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : null;
-  const h = cardHeight || 68;
+
+  const h       = Math.max(24, cardHeight || 68);
+  const slim    = h < 40;   // rows 1 + 5 only
+  const compact = !slim && h < 52; // rows 1,2,4,5 — no customer
+
+  // Font sizes & geometry scale with h
+  const roNumFs  = Math.max(10, Math.min(22, Math.round(h * 0.145)));
+  const badgeFs  = Math.max(7,  Math.min(14, Math.round(h * 0.09)));
+  const vehicleFs= Math.max(9,  Math.min(18, Math.round(h * 0.11)));
+  const custFs   = Math.max(8,  Math.min(15, Math.round(h * 0.09)));
+  const pillFs   = Math.max(7,  Math.min(13, Math.round(h * 0.08)));
+  const pillH    = Math.max(12, Math.min(22, Math.round(h * 0.14)));
+  const pillPadV = Math.max(1,  Math.min(4,  Math.round(h * 0.02)));
+  const botFs    = Math.max(7,  Math.min(13, Math.round(h * 0.09)));
+  const maxPills = h > 120 ? 6 : h > 80 ? 4 : 3;
+  const visJobs  = allJobs.slice(0, maxPills);
+  const extraJobs= allJobs.length - visJobs.length;
+
+  const borderR  = h > 80 ? 12 : 8;
+  const padH     = h > 80 ? 12 : 8;
+  const padV     = h > 80 ? 10 : 5;
+  const leftBW   = isSingle ? 3 : 2.5;
+
   return (
     <div style={{
-      background:"rgba(28,32,48,0.95)",
-      borderRadius:10,
-      border:"1px solid rgba(255,255,255,0.07)",
-      borderLeft:"2.5px solid "+leftColor,
-      padding:"6px 8px",
-      boxSizing:"border-box",
-      width:"100%",
-      height:h,
-      display:"flex",
-      flexDirection:"column",
-      justifyContent:"space-between",
-      overflow:"hidden",
-      userSelect:"none",
-      flexShrink:0,
-      boxShadow: isHigh ? "0 0 0 1px rgba(255,69,58,0.3)" : "none",
+      background: isSingle ? "rgba(28,32,48,0.98)" : "rgba(28,32,48,0.95)",
+      borderRadius: borderR,
+      border: "1px solid rgba(255,255,255,0.07)",
+      borderLeft: `${leftBW}px solid ${leftColor}`,
+      padding: `${padV}px ${padH}px`,
+      boxSizing: "border-box",
+      width: "100%",
+      height: h,
+      minHeight: h,
+      maxHeight: h,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "space-between",
+      overflow: "hidden",
+      userSelect: "none",
+      flexShrink: 0,
+      boxShadow: isSingle
+        ? "0 1px 0 rgba(255,255,255,0.12) inset, 0 4px 20px rgba(0,0,0,0.3)" + (isHigh ? ", 0 0 0 1px rgba(255,69,58,0.3)" : "")
+        : isHigh ? "0 0 0 1px rgba(255,69,58,0.3)" : "none",
       animation: isHigh ? "urgent-glow 2.4s ease-in-out infinite" : "none",
     }}>
-      {/* Row 1 — RO# | priority | service type */}
+      {/* Row 1 — RO# | priority badge | service type — always shown */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4 }}>
-        <span style={{ fontWeight:800, fontSize:"clamp(10px,1vw,14px)", color:"#FFFFFF", fontFamily:"'Barlow',sans-serif", letterSpacing:"-0.3px", flexShrink:0, lineHeight:1 }}>{ro.roNum}</span>
+        <span style={{ fontWeight:800, fontSize:roNumFs, color:"#FFFFFF", fontFamily:"'Barlow',sans-serif", letterSpacing:"-0.3px", flexShrink:0, lineHeight:1 }}>{ro.roNum}</span>
         <span style={{ flex:1, textAlign:"center", lineHeight:1 }}>
           {isHigh
-            ? <span style={{ background:"rgba(255,69,58,0.15)", color:DANGER, fontSize:"clamp(7px,0.7vw,9px)", fontWeight:700, padding:"1px 5px", borderRadius:4 }}>URGENT</span>
+            ? <span style={{ background:"rgba(255,69,58,0.15)", color:DANGER, fontSize:badgeFs, fontWeight:700, padding:`${pillPadV}px 5px`, borderRadius:4 }}>URGENT</span>
             : isLow
-            ? <span style={{ background:"rgba(99,99,102,0.2)", color:"rgba(255,255,255,0.35)", fontSize:"clamp(7px,0.7vw,9px)", fontWeight:600, padding:"1px 5px", borderRadius:4 }}>LOW</span>
-            : <span style={{ fontSize:"clamp(7px,0.7vw,9px)", color:"transparent" }}>·</span>}
+            ? <span style={{ background:"rgba(99,99,102,0.2)", color:"rgba(255,255,255,0.35)", fontSize:badgeFs, fontWeight:600, padding:`${pillPadV}px 5px`, borderRadius:4 }}>LOW</span>
+            : <span style={{ fontSize:badgeFs, color:"transparent" }}>·</span>}
         </span>
         <span style={{ flexShrink:0, display:"flex", alignItems:"center", gap:3, maxWidth:"42%" }}>
           {svcType
-            ? <><span style={{ width:5, height:5, borderRadius:"50%", background:svcType.color, flexShrink:0, display:"inline-block" }}/><span style={{ fontSize:"clamp(7px,0.7vw,9px)", color:"rgba(255,255,255,0.4)", fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{svcType.name}</span></>
-            : <span style={{ fontSize:"clamp(7px,0.7vw,9px)", color:"rgba(255,255,255,0.12)" }}>—</span>}
+            ? <><span style={{ width:5, height:5, borderRadius:"50%", background:svcType.color, flexShrink:0, display:"inline-block" }}/><span style={{ fontSize:badgeFs, color:"rgba(255,255,255,0.4)", fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{svcType.name}</span></>
+            : <span style={{ fontSize:badgeFs, color:"rgba(255,255,255,0.12)" }}>—</span>}
         </span>
       </div>
-      {/* Row 2 — Vehicle */}
-      <div style={{ fontSize:"clamp(9px,0.85vw,12px)", fontWeight:500, color:vehicleStr?"rgba(255,255,255,0.7)":"rgba(255,255,255,0.2)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.2 }}>
-        {vehicleStr || "— No vehicle —"}
-      </div>
-      {/* Row 3 — Customer */}
-      <div style={{ fontSize:"clamp(8px,0.75vw,11px)", fontWeight:400, color:ro.customer?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.15)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.2 }}>
-        {ro.customer || "—"}
-      </div>
-      {/* Row 4 — Job pills */}
-      <div style={{ display:"flex", alignItems:"center", gap:3, overflow:"hidden", height:14 }}>
-        {allJobs.length === 0
-          ? <span style={{ background:"rgba(255,255,255,0.05)", color:"rgba(255,255,255,0.15)", fontSize:"clamp(7px,0.65vw,9px)", fontWeight:600, padding:"1px 5px", borderRadius:4, height:14, display:"flex", alignItems:"center" }}>No jobs</span>
-          : <>{visJobs.map((j,i) => { const jj=abbrevJob(j); return <span key={i} style={{ background:jj.bg, color:jj.color, fontSize:"clamp(7px,0.65vw,9px)", fontWeight:600, padding:"1px 5px", borderRadius:4, height:14, display:"flex", alignItems:"center", flexShrink:0, whiteSpace:"nowrap" }}>{jj.label}</span>; })}{extraJobs>0&&<span style={{ fontSize:"clamp(7px,0.65vw,9px)", color:"rgba(255,255,255,0.3)", flexShrink:0 }}>+{extraJobs}</span>}</>}
-      </div>
-      {/* Row 5 — Timer | Promise | Hours */}
+      {/* Row 2 — Vehicle — hidden only in slim (h<40) */}
+      {!slim && (
+        <div style={{ fontSize:vehicleFs, fontWeight:500, color:vehicleStr?"rgba(255,255,255,0.7)":"rgba(255,255,255,0.2)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.2 }}>
+          {vehicleStr || "— No vehicle —"}
+        </div>
+      )}
+      {/* Row 3 — Customer — hidden in slim + compact (h<52) */}
+      {!slim && !compact && (
+        <div style={{ fontSize:custFs, fontWeight:400, color:ro.customer?"rgba(255,255,255,0.45)":"rgba(255,255,255,0.15)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.2 }}>
+          {ro.customer || "—"}
+        </div>
+      )}
+      {/* Row 4 — Job pills — hidden in slim (h<40) */}
+      {!slim && (
+        <div style={{ display:"flex", alignItems:"center", gap:3, overflow:"hidden", height:pillH, flexShrink:0 }}>
+          {allJobs.length === 0
+            ? <span style={{ background:"rgba(255,255,255,0.05)", color:"rgba(255,255,255,0.15)", fontSize:pillFs, fontWeight:600, padding:`${pillPadV}px 5px`, borderRadius:4, height:pillH, display:"flex", alignItems:"center" }}>No jobs</span>
+            : <>{visJobs.map((j,i)=>{ const jj=abbrevJob(j); return <span key={i} style={{ background:jj.bg, color:jj.color, fontSize:pillFs, fontWeight:600, padding:`${pillPadV}px 5px`, borderRadius:4, height:pillH, display:"flex", alignItems:"center", flexShrink:0, whiteSpace:"nowrap" }}>{jj.label}</span>; })}{extraJobs>0&&<span style={{ fontSize:pillFs, color:"rgba(255,255,255,0.3)", flexShrink:0 }}>+{extraJobs}</span>}</>}
+        </div>
+      )}
+      {/* Row 5 — Timer | Promise | Hours — always shown */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:3 }}>
-        <span style={{ display:"flex", alignItems:"center", gap:3, background:timerRunning?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", borderRadius:4, padding:"1px 5px", flexShrink:0 }}>
+        <span style={{ display:"flex", alignItems:"center", gap:3, background:timerRunning?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", borderRadius:4, padding:`${pillPadV}px 5px`, flexShrink:0 }}>
           {timerRunning && <span style={{ width:4, height:4, borderRadius:"50%", background:"#FF9F0A", display:"inline-block", animation:"pulse 1.8s ease-in-out infinite" }}/>}
-          <span style={{ fontSize:"clamp(7px,0.65vw,9px)", fontWeight:500, color:timerRunning?"#FF9F0A":"rgba(255,255,255,0.5)" }}>{fmtTime(elapsed)}</span>
+          <span style={{ fontSize:botFs, fontWeight:500, color:timerRunning?"#FF9F0A":"rgba(255,255,255,0.5)" }}>{fmtTime(elapsed)}</span>
         </span>
-        <span style={{ fontSize:"clamp(7px,0.65vw,9px)", fontWeight:500, color:isOverdue?DANGER:isSoon?WARN:promiseStr?"rgba(255,255,255,0.4)":"rgba(255,255,255,0.12)", textAlign:"center", flex:1 }}>
+        <span style={{ fontSize:botFs, fontWeight:500, color:isOverdue?DANGER:isSoon?WARN:promiseStr?"rgba(255,255,255,0.4)":"rgba(255,255,255,0.12)", textAlign:"center", flex:1 }}>
           {isOverdue ? "OVERDUE" : (promiseStr || "—")}
         </span>
-        <span style={{ background:ro.hours?"rgba(48,209,88,0.12)":"rgba(255,255,255,0.04)", color:ro.hours?"#30D158":"rgba(255,255,255,0.15)", fontSize:"clamp(7px,0.65vw,9px)", fontWeight:600, padding:"1px 5px", borderRadius:4, flexShrink:0 }}>
+        <span style={{ background:ro.hours?"rgba(48,209,88,0.12)":"rgba(255,255,255,0.04)", color:ro.hours?"#30D158":"rgba(255,255,255,0.15)", fontSize:botFs, fontWeight:600, padding:`${pillPadV}px 5px`, borderRadius:4, flexShrink:0 }}>
           {ro.hours ? String(ro.hours).replace(/h$/i,"")+"h" : "—h"}
         </span>
       </div>
@@ -3349,17 +3381,21 @@ export default function ShopFlowTracker() {
   if (isDisplay) {
     const nTechs = visibleTechs.length || 1;
     const laborRate = parseFloat(localStorage.getItem("sft-labor-rate")||"125");
-    // Zone 3 card height — uniform across every cell and tech row
-    const cellH    = window.innerHeight * 0.52 / nTechs;
-    const availH   = cellH - 12;                                          // 6px cell padding top+bottom
-    const maxCardsPerCell = Math.max(1, Math.floor((availH + 4) / 56));   // 52px min + 4px gap
-    const rawCardH = Math.floor((availH - (maxCardsPerCell - 1) * 4) / maxCardsPerCell);
-    const cardHeight = Math.max(52, Math.min(90, rawCardH));
-    // Zone 4/5 card heights
-    const partsCardH = Math.max(52, Math.min(90, Math.floor(window.innerHeight * 0.12 - 8)));
-    const queueCardH = Math.max(52, Math.min(90, Math.floor(window.innerHeight * 0.16 - 8)));
-    const maxPartCards  = Math.max(1, Math.floor((window.innerWidth - 32) / 168));
-    const maxQueueCards = Math.max(1, Math.floor((window.innerWidth / (state.queues.length||1) - 24) / 168));
+    // Zone 3: per-cell inner height (available height for cards inside padding)
+    const rowHeightPx    = (window.innerHeight * 0.52 - 3 - (nTechs - 1) * 3) / nTechs;
+    const cellInnerHeight = Math.floor(rowHeightPx - 12); // 6px padding top + bottom
+    // Helper: given how many cards are in a cell, what height does each card get?
+    function calcCardHeight(count) {
+      if (count === 0) return cellInnerHeight;
+      const capped = Math.min(count, 4);
+      const gaps   = (capped - 1) * 4;
+      return Math.max(24, Math.floor((cellInnerHeight - gaps) / capped));
+    }
+    // Zone 4/5 card heights (horizontal rows, height fixed by zone)
+    const partsCardH = Math.max(40, Math.floor(window.innerHeight * 0.12 - 8));
+    const queueCardH = Math.max(40, Math.floor(window.innerHeight * 0.16 - 8));
+    const maxPartCards  = Math.max(1, Math.floor((window.innerWidth - 32) / 184));
+    const maxQueueCards = Math.max(1, Math.floor((window.innerWidth / (state.queues.length||1) - 24) / 176));
     return (
       <div style={{ height:"100vh", width:"100vw", overflow:"hidden", display:"flex", flexDirection:"column", background:BG, position:"fixed", inset:0 }}>
 
@@ -3431,11 +3467,13 @@ export default function ShopFlowTracker() {
                   <div style={{ fontWeight:600, fontSize:"clamp(9px,0.85vw,12px)", color:"rgba(255,255,255,0.8)", textAlign:"center", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", width:"100%", lineHeight:1.2 }}>{tech.name}</div>
                   <div style={{ background:hrs>0?"rgba(48,209,88,0.12)":"rgba(255,255,255,0.05)", color:hrsColor, fontSize:"clamp(8px,0.75vw,11px)", fontWeight:700, padding:"2px 6px", borderRadius:6 }}>{hrs>0?hrs.toFixed(1)+"h":"0h"}</div>
                 </div>
-                {/* Kanban cells */}
+                {/* Kanban cells — each cell computes its own cardHeight from ids.length */}
                 {COLS.map(col => {
-                  const ids = state.grid[tech.id] ? (state.grid[tech.id][col.id]||[]) : [];
-                  const shown = ids.slice(0, maxCardsPerCell);
-                  const extra = ids.length - shown.length;
+                  const ids    = state.grid[tech.id] ? (state.grid[tech.id][col.id]||[]) : [];
+                  const shown  = ids.slice(0, 4);
+                  const extra  = ids.length - shown.length;
+                  const ch     = calcCardHeight(ids.length);
+                  const single = ids.length === 1;
                   return (
                     <div key={col.id} style={{ flex:1, minWidth:0, background:"rgba(8,10,18,0.7)", border:"0.5px solid "+col.border, borderRadius:12, padding:"6px", display:"flex", flexDirection:"column", gap:4, overflow:"hidden", boxSizing:"border-box" }}>
                       {ids.length === 0
@@ -3443,7 +3481,7 @@ export default function ShopFlowTracker() {
                             <div style={{ width:20, height:20, borderRadius:"50%", border:"1px solid rgba(255,255,255,0.06)" }}/>
                             <div style={{ fontSize:"clamp(8px,0.7vw,10px)", color:"rgba(255,255,255,0.1)", fontWeight:500 }}>Empty</div>
                           </div>
-                        : <>{shown.map(roId => { const ro=getRO(roId); if (!ro) return null; return <DisplayCard key={ro.id} ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} cardHeight={cardHeight} />; })}{extra>0&&<div style={{ fontSize:9, color:"rgba(255,255,255,0.3)", textAlign:"center", padding:"1px 0", flexShrink:0 }}>+{extra} more</div>}</>
+                        : <>{shown.map(roId => { const ro=getRO(roId); if (!ro) return null; return <DisplayCard key={ro.id} ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} cardHeight={ch} isSingle={single} />; })}{extra>0&&<div style={{ height:16, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"clamp(8px,0.7vw,10px)", color:"rgba(255,255,255,0.25)", fontWeight:500, flexShrink:0 }}>+{extra} more tickets</div>}</>
                       }
                     </div>
                   );
@@ -3455,9 +3493,11 @@ export default function ShopFlowTracker() {
 
         {/* Zone 4 — Waiting on Parts: 16vh */}
         {(() => {
-          const partIds = state.partsSlots || [];
-          const shownParts = partIds.slice(0, maxPartCards);
-          const extraParts = partIds.length - shownParts.length;
+          const partIds    = state.partsSlots || [];
+          const useFlexW   = partIds.length <= 2;
+          const fixedW     = 180;
+          const shownParts = useFlexW ? partIds : partIds.slice(0, maxPartCards);
+          const extraParts = useFlexW ? 0 : partIds.length - shownParts.length;
           return (
             <div style={{ height:"16vh", flexShrink:0, display:"flex", flexDirection:"column", overflow:"hidden", padding:"3px clamp(8px,1vw,16px) 0" }}>
               <div style={{ background:"linear-gradient(135deg,rgba(191,90,242,0.3),rgba(191,90,242,0.15))", padding:"0 12px", display:"flex", alignItems:"center", gap:8, flexShrink:0, height:"4vh", borderRadius:"8px 8px 0 0" }}>
@@ -3469,7 +3509,15 @@ export default function ShopFlowTracker() {
                 {partIds.length === 0
                   ? <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.2)", fontSize:"clamp(9px,0.9vw,12px)" }}>No tickets waiting on parts</div>
                   : <>
-                      {shownParts.map(roId => { const ro = getRO(roId); if (!ro) return null; return <div key={ro.id} style={{ width:160, flexShrink:0 }}><DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} cardHeight={partsCardH} /></div>; })}
+                      {shownParts.map(roId => {
+                        const ro = getRO(roId);
+                        if (!ro) return null;
+                        return (
+                          <div key={ro.id} style={useFlexW ? { flex:1, minWidth:0 } : { width:fixedW, flexShrink:0 }}>
+                            <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} cardHeight={partsCardH} isSingle={partIds.length===1} />
+                          </div>
+                        );
+                      })}
                       {extraParts > 0 && <div style={{ display:"flex", alignItems:"center", color:"rgba(255,255,255,0.3)", fontSize:"clamp(8px,0.75vw,10px)", padding:"0 8px", flexShrink:0 }}>+{extraParts} more</div>}
                     </>
                 }
@@ -3481,9 +3529,11 @@ export default function ShopFlowTracker() {
         {/* Zone 5 — Staging Queues: 21vh */}
         <div style={{ height:"21vh", flexShrink:0, display:"flex", flexDirection:"row", gap:4, padding:"3px clamp(8px,1vw,16px) 3px", overflow:"hidden" }}>
           {[...state.queues].sort((a,b) => { const o={"q-main":0,"q-used":1,"q-pdi":2}; return (o[a.id]??99)-(o[b.id]??99); }).map(queue => {
-            const ids = state.qSlots[queue.id] || [];
-            const shownIds = ids.slice(0, maxQueueCards);
-            const extra = ids.length - shownIds.length;
+            const ids      = state.qSlots[queue.id] || [];
+            const useFlexW = ids.length <= 2;
+            const fixedW   = 170;
+            const shown    = useFlexW ? ids : ids.slice(0, maxQueueCards);
+            const extra    = useFlexW ? 0 : ids.length - shown.length;
             return (
               <div key={queue.id} style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", overflow:"hidden", background:"rgba(14,18,30,0.97)", borderRadius:10, border:"0.5px solid rgba(255,255,255,0.07)" }}>
                 <div style={{ background:"linear-gradient(135deg,"+queue.color+","+queue.color+"CC)", padding:"0 10px", display:"flex", alignItems:"center", gap:6, flexShrink:0, height:"5vh" }}>
@@ -3495,7 +3545,15 @@ export default function ShopFlowTracker() {
                   {ids.length === 0
                     ? <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.2)", fontSize:"clamp(9px,0.8vw,11px)" }}>No tickets</div>
                     : <>
-                        {shownIds.map(roId => { const ro = getRO(roId); if (!ro) return null; return <div key={ro.id} style={{ width:160, flexShrink:0 }}><DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} cardHeight={queueCardH} /></div>; })}
+                        {shown.map(roId => {
+                          const ro = getRO(roId);
+                          if (!ro) return null;
+                          return (
+                            <div key={ro.id} style={useFlexW ? { flex:1, minWidth:0 } : { width:fixedW, flexShrink:0 }}>
+                              <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} cardHeight={queueCardH} isSingle={ids.length===1} />
+                            </div>
+                          );
+                        })}
                         {extra > 0 && <div style={{ display:"flex", alignItems:"center", color:"rgba(255,255,255,0.3)", fontSize:"clamp(8px,0.75vw,10px)", padding:"0 6px", flexShrink:0 }}>+{extra} more</div>}
                       </>
                   }
