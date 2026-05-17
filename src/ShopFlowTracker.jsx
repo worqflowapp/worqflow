@@ -579,9 +579,10 @@ function abbrevJob(j) {
 // ─── RO Card — long press to move, tap to open ───────────────────────────────
 const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
   const holdRef    = useRef(null);
-  const didHold    = useRef(false);
-  const touchX     = useRef(0);
-  const touchY     = useRef(0);
+  const didHold  = useRef(false);
+  const pressing = useRef(false);
+  const startX   = useRef(0);
+  const startY   = useRef(0);
   const vehicle     = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
   const svcType     = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
   const leftColor   = isMoving ? ACCENT : (svcType ? svcType.color : priorityBorder(ro.priority));
@@ -593,16 +594,21 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
   const allJobs     = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
   const visibleJobs = allJobs.slice(0, 3);
   const extraJobs   = allJobs.length - visibleJobs.length;
-  function startHold() {
+  function startHold(x, y) {
     if (canMove === false) return;
+    pressing.current = true;
+    startX.current = x;
+    startY.current = y;
     didHold.current = false;
     holdRef.current = setTimeout(() => {
+      pressing.current = false;
       didHold.current = true;
       onMove();
       if (navigator.vibrate) navigator.vibrate(30);
     }, 700);
   }
   function cancelHold() {
+    pressing.current = false;
     if (holdRef.current) clearTimeout(holdRef.current);
   }
   function handleClick() {
@@ -612,22 +618,13 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
   }
   return (
     <div
-      onMouseDown={startHold}
-      onMouseUp={cancelHold}
-      onMouseLeave={cancelHold}
-      onTouchStart={e => {
-        e.preventDefault();
-        touchX.current = e.touches[0].clientX;
-        touchY.current = e.touches[0].clientY;
-        startHold();
+      onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); startHold(e.clientX, e.clientY); }}
+      onPointerMove={e => {
+        if (!pressing.current) return;
+        if (Math.abs(e.clientX - startX.current) > 12 || Math.abs(e.clientY - startY.current) > 12) cancelHold();
       }}
-      onTouchMove={e => {
-        const dx = Math.abs(e.touches[0].clientX - touchX.current);
-        const dy = Math.abs(e.touches[0].clientY - touchY.current);
-        if (dx > 10 || dy > 10) cancelHold();
-      }}
-      onTouchEnd={e => { e.preventDefault(); cancelHold(); }}
-      onTouchCancel={cancelHold}
+      onPointerUp={cancelHold}
+      onPointerCancel={cancelHold}
       onContextMenu={e => e.preventDefault()}
       onClick={handleClick}
       className="card-press"
@@ -649,6 +646,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
         width: "100%",
         boxSizing: "border-box",
         transform: isMoving ? "scale(1.02)" : "scale(1)",
+        touchAction: "manipulation",
         WebkitTouchCallout: "none",
         WebkitUserSelect: "none",
       }}
