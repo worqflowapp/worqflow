@@ -670,13 +670,13 @@ const DisplayCard = memo(function DisplayCard({ ro, timer, serviceTypes, cardHei
       </div>
       {/* Row 2 — Vehicle — always shown unless slim (h<40) */}
       {!slim && (
-        <div style={{ fontSize:"clamp(11px,1.1vw,15px)", fontWeight:500, color:vehicleStr?"rgba(255,255,255,0.75)":"rgba(255,255,255,0.2)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", width:"100%", lineHeight:1.3 }}>
+        <div style={{ fontSize:"clamp(12px,1.15vw,17px)", fontWeight:700, color:vehicleStr?"rgba(255,255,255,0.95)":"rgba(255,255,255,0.2)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", width:"100%", lineHeight:1.3 }}>
           {vehicleStr || "— No vehicle —"}
         </div>
       )}
       {/* Row 3 — Customer — hidden in slim + compact (h<52) */}
       {!slim && !compact && (
-        <div style={{ fontSize:"clamp(10px,0.95vw,13px)", fontWeight:400, color:ro.customer?"rgba(255,255,255,0.5)":"rgba(255,255,255,0.15)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", width:"100%", lineHeight:1.3 }}>
+        <div style={{ fontSize:"clamp(10px,0.95vw,13px)", fontWeight:500, color:ro.customer?"rgba(255,255,255,0.72)":"rgba(255,255,255,0.15)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", width:"100%", lineHeight:1.3 }}>
           {ro.customer || "—"}
         </div>
       )}
