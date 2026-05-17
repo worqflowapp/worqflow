@@ -600,10 +600,8 @@ function abbrevJob(j) {
   if (v.includes("tie"))         return { label:"Tie",    bg:"rgba(153,27,27,0.18)",   color:"#FCA5A5" };
   return { label: j.slice(0,4),            bg:"rgba(100,116,139,0.18)", color:"#94A3B8" };
 }
-// ─── Display Card — fixed height, 3 rows, no overlap possible ────────────────
-const DisplayCard = memo(function DisplayCard({ ro, timer, serviceTypes, cardHeight }) {
-  const vehicle = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
-  const customer = ro.customer || null;
+// ─── Display Card — height:100%, container controls sizing ───────────────────
+const DisplayCard = memo(function DisplayCard({ ro, timer, serviceTypes }) {
   const svcType = serviceTypes?.find(s => s.id === ro.serviceType);
   const elapsed = timer
     ? timer.running
@@ -612,92 +610,66 @@ const DisplayCard = memo(function DisplayCard({ ro, timer, serviceTypes, cardHei
     : 0;
   const timerRunning = timer?.running;
   const jobs = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
-  const visibleJobs = jobs.slice(0, 3);
-  const extraJobs = jobs.length - visibleJobs.length;
-  const isOverdue = ro.promiseTime && new Date(ro.promiseTime).getTime() < Date.now();
-  const isSoon = ro.promiseTime && !isOverdue && new Date(ro.promiseTime).getTime() - Date.now() < 3600000;
-
-  const size = cardHeight > 100 ? 'lg' : cardHeight > 65 ? 'md' : 'sm';
-  const fonts = {
-    lg: { ro: 16, vehicle: 14, customer: 12, pill: 11, meta: 11 },
-    md: { ro: 13, vehicle: 12, customer: 10, pill: 9,  meta: 9  },
-    sm: { ro: 11, vehicle: 10, customer: 9,  pill: 8,  meta: 8  },
-  }[size];
-  const pad = size === 'lg' ? '10px 12px' : size === 'md' ? '7px 10px' : '5px 8px';
   const leftColor = svcType?.color || (ro.priority === 'HIGH' ? '#FF453A' : ro.priority === 'LOW' ? '#636366' : '#1D6BF3');
 
   return (
     <div style={{
-      height: cardHeight,
-      minHeight: cardHeight,
-      maxHeight: cardHeight,
+      height: '100%',
       width: '100%',
       boxSizing: 'border-box',
       background: 'rgba(28,32,48,0.95)',
       borderRadius: 10,
       border: '1px solid rgba(255,255,255,0.07)',
-      borderLeft: `3px solid ${leftColor}`,
-      padding: pad,
+      borderLeft: '3px solid ' + leftColor,
+      padding: '8px 10px',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
       overflow: 'hidden',
-      flexShrink: 0,
       userSelect: 'none',
       animation: ro.priority === 'HIGH' ? 'urgent-glow 2.4s ease-in-out infinite' : 'none',
     }}>
 
-      {/* ROW 1 — RO number + priority + service type */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4, flexShrink:0, minHeight:0 }}>
-        <span style={{ fontSize:fonts.ro, fontWeight:800, color:'#FFFFFF', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flexShrink:1, minWidth:0, letterSpacing:'-0.3px' }}>
+      {/* ROW 1 — RO number + service type */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:6, overflow:'hidden' }}>
+        <span style={{ fontSize:14, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', flex:1, letterSpacing:'-0.3px' }}>
           {ro.roNum}
         </span>
-        <span style={{ fontSize:fonts.meta, fontWeight:700, color:'#FF453A', whiteSpace:'nowrap', flexShrink:0, visibility: ro.priority === 'HIGH' ? 'visible' : 'hidden' }}>
-          URGENT
-        </span>
-        {svcType && (
-          <span style={{ fontSize:fonts.meta, fontWeight:600, color:svcType.color, whiteSpace:'nowrap', flexShrink:0, display:'flex', alignItems:'center', gap:3 }}>
-            <span style={{ width:5, height:5, borderRadius:'50%', background:svcType.color, flexShrink:0, display:'inline-block' }}/>
+        <span style={{ fontSize:10, fontWeight:600, color: svcType?.color || 'transparent', whiteSpace:'nowrap', flexShrink:0, display:'flex', alignItems:'center', gap:3 }}>
+          {svcType && <>
+            <span style={{ width:5, height:5, borderRadius:'50%', background:svcType.color, display:'inline-block' }}/>
             {svcType.name}
-          </span>
-        )}
+          </>}
+        </span>
       </div>
 
-      {/* ROW 2 — Vehicle + Customer stacked in one container */}
-      <div style={{ display:'flex', flexDirection:'column', gap:1, flexShrink:0, minHeight:0, overflow:'hidden' }}>
-        <div style={{ fontSize:fonts.vehicle, fontWeight:600, color:'rgba(255,255,255,0.92)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.2 }}>
-          {vehicle}
+      {/* ROW 2 — Vehicle + Customer */}
+      <div style={{ display:'flex', flexDirection:'column', gap:2, overflow:'hidden', flex:1, justifyContent:'center' }}>
+        <div style={{ fontSize:13, fontWeight:600, color:'rgba(255,255,255,0.85)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.3 }}>
+          {[ro.year, ro.make, ro.model].filter(Boolean).join(' ') || '— No vehicle —'}
         </div>
-        {size !== 'sm' && (
-          <div style={{ fontSize:fonts.customer, fontWeight:400, color:'rgba(255,255,255,0.5)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.2 }}>
-            {customer || '—'}
-          </div>
-        )}
+        <div style={{ fontSize:11, fontWeight:400, color:'rgba(255,255,255,0.45)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.3 }}>
+          {ro.customer || '—'}
+        </div>
       </div>
 
       {/* ROW 3 — Job pills + Timer + Hours */}
-      <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0, minHeight:0, overflow:'hidden' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:4, overflow:'hidden', flexShrink:0 }}>
         <div style={{ display:'flex', gap:3, flex:1, overflow:'hidden', alignItems:'center' }}>
-          {visibleJobs.length > 0
-            ? visibleJobs.map((j, i) => {
+          {jobs.length === 0
+            ? <span style={{ fontSize:9, color:'rgba(255,255,255,0.15)' }}>No jobs</span>
+            : jobs.slice(0,3).map((j,i) => {
                 const ab = abbrevJob(j);
-                return (
-                  <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:fonts.pill, fontWeight:600, padding:'1px 5px', borderRadius:4, whiteSpace:'nowrap', flexShrink:0, lineHeight:1.4 }}>
-                    {ab.label}
-                  </span>
-                );
+                return <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:9, fontWeight:600, padding:'2px 6px', borderRadius:4, whiteSpace:'nowrap', flexShrink:0 }}>{ab.label}</span>;
               })
-            : <span style={{ fontSize:fonts.pill, color:'rgba(255,255,255,0.15)', fontStyle:'italic' }}>No jobs</span>
           }
-          {extraJobs > 0 && (
-            <span style={{ fontSize:fonts.pill, color:'rgba(255,255,255,0.3)', flexShrink:0 }}>+{extraJobs}</span>
-          )}
+          {jobs.length > 3 && <span style={{ fontSize:9, color:'rgba(255,255,255,0.3)' }}>+{jobs.length - 3}</span>}
         </div>
-        <span style={{ fontSize:fonts.meta, color:timerRunning?'#FF9F0A':'rgba(255,255,255,0.3)', whiteSpace:'nowrap', flexShrink:0, background:timerRunning?'rgba(255,159,10,0.12)':'rgba(255,255,255,0.05)', padding:'1px 5px', borderRadius:4 }}>
+        <span style={{ fontSize:9, color:timerRunning?'#FF9F0A':'rgba(255,255,255,0.3)', background:timerRunning?'rgba(255,159,10,0.12)':'rgba(255,255,255,0.05)', padding:'2px 5px', borderRadius:4, whiteSpace:'nowrap', flexShrink:0 }}>
           {fmtTime(elapsed)}
         </span>
         {ro.hours && (
-          <span style={{ fontSize:fonts.meta, color:'#30D158', whiteSpace:'nowrap', flexShrink:0, background:'rgba(48,209,88,0.12)', padding:'1px 5px', borderRadius:4, fontWeight:700 }}>
+          <span style={{ fontSize:9, color:'#30D158', background:'rgba(48,209,88,0.12)', padding:'2px 5px', borderRadius:4, whiteSpace:'nowrap', flexShrink:0, fontWeight:700 }}>
             {String(ro.hours).replace(/h$/i,'')}h
           </span>
         )}
@@ -3155,17 +3127,6 @@ export default function ShopFlowTracker() {
   const visibleTechs = (canSeeAll || isDisplay)
     ? state.techs
     : state.techs.filter(t => currentUser && t.id === currentUser.id);
-  const [cellHeightPx, setCellHeightPx] = useState(
-    () => (window.innerHeight * 0.52 / (visibleTechs.length || 4)) - 6
-  );
-  useEffect(() => {
-    function recalc() {
-      setCellHeightPx((window.innerHeight * 0.52 / (visibleTechs.length || 4)) - 6);
-    }
-    recalc();
-    window.addEventListener('resize', recalc);
-    return () => window.removeEventListener('resize', recalc);
-  }, [visibleTechs.length]);
   function removeFromAll(s, roId) {
     const grid = {};
     Object.entries(s.grid).forEach(([tid, cols]) => {
@@ -3383,10 +3344,6 @@ export default function ShopFlowTracker() {
   // ── Display Mode — 5-zone TV layout, 100vh no scroll ──────────────────────
   if (isDisplay) {
     const laborRate = parseFloat(localStorage.getItem("sft-labor-rate")||"125");
-    // cellHeightPx comes from state (updated by resize listener above)
-    // Zone 4/5 card heights (horizontal rows, height fixed by zone)
-    const partsCardH = Math.max(40, Math.floor(window.innerHeight * 0.12 - 8));
-    const queueCardH = Math.max(40, Math.floor(window.innerHeight * 0.16 - 8));
     const maxPartCards  = Math.max(1, Math.floor((window.innerWidth - 32) / 184));
     const maxQueueCards = Math.max(1, Math.floor((window.innerWidth / (state.queues.length||1) - 24) / 176));
     return (
@@ -3453,29 +3410,32 @@ export default function ShopFlowTracker() {
             return (
               <div key={tech.id} style={{ flex:1, minHeight:0, display:"flex", flexDirection:"row", gap:4, overflow:"hidden" }}>
                 {/* Tech card */}
-                <div style={{ width:"clamp(80px,8vw,110px)", flexShrink:0, background:"rgba(22,26,42,0.98)", borderRadius:12, padding:"8px 6px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, overflow:"hidden", border:"0.5px solid rgba(255,255,255,0.08)" }}>
-                  <div style={{ width:"clamp(24px,2.5vw,36px)", height:"clamp(24px,2.5vw,36px)", borderRadius:"50%", background:"linear-gradient(135deg,#1D6BF3,#0A84FF)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, fontSize:"clamp(9px,0.9vw,13px)", flexShrink:0 }}>
+                <div style={{ width:"clamp(70px,8vw,110px)", flexShrink:0, background:"rgba(22,26,42,0.98)", borderRadius:12, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:6, padding:"8px 4px", overflow:"hidden", boxSizing:"border-box", border:"0.5px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#1D6BF3,#0A84FF)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"#fff", flexShrink:0 }}>
                     {initials(tech.name)}
                   </div>
-                  <div style={{ fontWeight:600, fontSize:"clamp(9px,0.85vw,12px)", color:"rgba(255,255,255,0.8)", textAlign:"center", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", width:"100%", lineHeight:1.2 }}>{tech.name}</div>
-                  <div style={{ background:hrs>0?"rgba(48,209,88,0.12)":"rgba(255,255,255,0.05)", color:hrsColor, fontSize:"clamp(8px,0.75vw,11px)", fontWeight:700, padding:"2px 6px", borderRadius:6 }}>{hrs>0?hrs.toFixed(1)+"h":"0h"}</div>
+                  <div style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.8)", textAlign:"center", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", width:"100%", padding:"0 4px", boxSizing:"border-box", lineHeight:1.2 }}>{tech.name}</div>
+                  <div style={{ fontSize:11, fontWeight:700, color:hrs>0?"#30D158":"rgba(255,255,255,0.2)", background:hrs>0?"rgba(48,209,88,0.12)":"rgba(255,255,255,0.05)", padding:"2px 8px", borderRadius:6, whiteSpace:"nowrap" }}>{hrs>0?hrs.toFixed(1)+"h":"0h"}</div>
                 </div>
-                {/* Kanban cells */}
+                {/* Kanban cells — wrapper divs give each card flex:1 height */}
                 {COLS.map(col => {
                   const ids = state.grid[tech.id] ? (state.grid[tech.id][col.id]||[]) : [];
-                  const numCards = ids.length;
-                  const GAP = 4;
-                  const cardH = numCards === 0
-                    ? cellHeightPx
-                    : Math.floor((cellHeightPx - (numCards - 1) * GAP) / numCards);
                   return (
-                    <div key={col.id} style={{ flex:1, minWidth:0, background:"rgba(8,10,18,0.7)", border:"0.5px solid "+col.border, borderRadius:12, padding:"6px", display:"flex", flexDirection:"column", gap:GAP, overflow:"hidden", boxSizing:"border-box" }}>
+                    <div key={col.id} style={{ flex:1, minWidth:0, background:"rgba(8,10,18,0.7)", border:"0.5px solid "+col.border, borderRadius:12, padding:"6px", display:"flex", flexDirection:"column", gap:4, overflow:"hidden", boxSizing:"border-box" }}>
                       {ids.length === 0
-                        ? <div style={{ height:cellHeightPx, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:6 }}>
+                        ? <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:6 }}>
                             <div style={{ width:24, height:24, borderRadius:"50%", border:"1px solid rgba(255,255,255,0.06)" }}/>
                             <span style={{ fontSize:10, color:"rgba(255,255,255,0.1)" }}>Empty</span>
                           </div>
-                        : ids.map(roId => { const ro=getRO(roId); if (!ro) return null; return <DisplayCard key={ro.id} ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} cardHeight={cardH} />; })
+                        : ids.map(roId => {
+                            const ro = getRO(roId);
+                            if (!ro) return null;
+                            return (
+                              <div key={ro.id} style={{ flex:1, minHeight:0, overflow:"hidden" }}>
+                                <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} />
+                              </div>
+                            );
+                          })
                       }
                     </div>
                   );
@@ -3507,8 +3467,8 @@ export default function ShopFlowTracker() {
                         const ro = getRO(roId);
                         if (!ro) return null;
                         return (
-                          <div key={ro.id} style={useFlexW ? { flex:1, minWidth:0, display:"flex", flexDirection:"column" } : { width:fixedW, flexShrink:0, display:"flex", flexDirection:"column" }}>
-                            <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} cardHeight={partsCardH} isSingle={partIds.length===1} />
+                          <div key={ro.id} style={useFlexW ? { flex:1, minWidth:0, minHeight:0, overflow:"hidden" } : { width:fixedW, flexShrink:0, minHeight:0, overflow:"hidden" }}>
+                            <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} />
                           </div>
                         );
                       })}
@@ -3543,8 +3503,8 @@ export default function ShopFlowTracker() {
                           const ro = getRO(roId);
                           if (!ro) return null;
                           return (
-                            <div key={ro.id} style={useFlexW ? { flex:1, minWidth:0, display:"flex", flexDirection:"column" } : { width:fixedW, flexShrink:0, display:"flex", flexDirection:"column" }}>
-                              <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} cardHeight={queueCardH} isSingle={ids.length===1} />
+                            <div key={ro.id} style={useFlexW ? { flex:1, minWidth:0, minHeight:0, overflow:"hidden" } : { width:fixedW, flexShrink:0, minHeight:0, overflow:"hidden" }}>
+                              <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={state.serviceTypes} />
                             </div>
                           );
                         })}
