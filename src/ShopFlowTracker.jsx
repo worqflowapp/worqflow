@@ -3277,16 +3277,49 @@ export default function ShopFlowTracker() {
       {/* Header */}
       <div style={{ background:"rgba(10,14,24,0.92)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"0.5px solid rgba(255,255,255,0.08)", borderTop:"0.5px solid rgba(255,255,255,0.06)", padding:isWide?"10px 24px":"9px 14px", display:"flex", alignItems:"center", gap:12, position:"sticky", top: isDisplay ? 0 : movingRO ? 44 : 0, zIndex:300, boxShadow:"0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05) inset" }}>
         {isDisplay ? (
-          // ── Display mode header: logo (tap = logout) + title + clock + dot ──
+          // ── Display mode header: logo+title | hours bar | clock | dot ──
           <>
-            <div onClick={() => setCurrentUser(null)} style={{ flexShrink:0, filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))", cursor:"pointer" }} title="Tap to logout">
-              <WFLogo size={34} radius={7} />
-            </div>
-            <div onClick={() => setCurrentUser(null)} style={{ flex:1, cursor:"pointer" }}>
-              <div style={{ color:TEXT, fontWeight:700, fontSize:15, letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif" }}>
-                <span style={{color:TEXT}}>Service </span><span style={{color:TEXT2}}>Department</span>
+            <div onClick={() => setCurrentUser(null)} style={{ flexShrink:0, display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} title="Tap to logout">
+              <div style={{ filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))" }}>
+                <WFLogo size={34} radius={7} />
               </div>
-              <div style={{ color:TEXT3, fontSize:10, marginTop:1 }}>Display Board — tap to logout</div>
+              <div>
+                <div style={{ color:TEXT, fontWeight:700, fontSize:"clamp(12px,1.4vw,18px)", letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif", whiteSpace:"nowrap" }}>
+                  <span style={{color:TEXT}}>Service </span><span style={{color:TEXT2}}>Department</span>
+                </div>
+                <div style={{ color:TEXT3, fontSize:"clamp(9px,0.9vw,12px)", marginTop:1 }}>tap to logout</div>
+              </div>
+            </div>
+            <div style={{ flex:1, display:"flex", justifyContent:"center", alignItems:"center", padding:"0 12px" }}>
+              <div style={{ width:"clamp(280px,40vw,600px)", background:"rgba(14,18,30,0.9)", borderRadius:12, padding:"clamp(6px,0.8vh,10px) clamp(12px,1.5vw,20px)", border:"0.5px solid rgba(255,255,255,0.08)", boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 2px 8px rgba(0,0,0,0.4)", borderTop:"0.5px solid rgba(255,255,255,0.12)" }}>
+                {/* Top row: flagged hours + revenue */}
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"clamp(4px,0.5vh,6px)" }}>
+                  <div style={{ display:"flex", alignItems:"baseline", gap:4 }}>
+                    <span style={{ fontSize:"clamp(18px,2vw,28px)", fontWeight:800, color:SUCCESS, fontFamily:"'Barlow',sans-serif", lineHeight:1 }}>{flagged.toFixed(1)}</span>
+                    <span style={{ fontSize:"clamp(12px,1.2vw,18px)", fontWeight:600, color:"rgba(255,255,255,0.35)", fontFamily:"'Barlow',sans-serif" }}>/ {GOAL_HOURS}h</span>
+                  </div>
+                  <span style={{ fontSize:"clamp(11px,1vw,15px)", fontWeight:700, color:SUCCESS, fontFamily:"'Barlow',sans-serif" }}>
+                    ${(flagged * parseFloat(localStorage.getItem("sft-labor-rate")||"125")).toLocaleString("en-US", {maximumFractionDigits:0})}
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div style={{ height:"clamp(5px,0.7vh,8px)", background:"rgba(255,255,255,0.1)", borderRadius:4, overflow:"hidden", marginBottom:"clamp(5px,0.6vh,8px)" }}>
+                  <div style={{ width:(progress*100)+"%", height:"100%", background:"linear-gradient(90deg,#30D158,#0A84FF)", borderRadius:4, transition:"width 0.6s ease" }} />
+                </div>
+                {/* Per-tech chips */}
+                <div style={{ display:"flex", gap:"clamp(4px,0.5vw,8px)", flexWrap:"wrap" }}>
+                  {state.techs.map(t => {
+                    const hrs = techStats(t.id).hrs;
+                    const chipColor = hrs >= 8 ? SUCCESS : hrs >= 4 ? "#FF9F0A" : DANGER;
+                    return (
+                      <div key={t.id} style={{ display:"flex", alignItems:"center", gap:3, background:"rgba(255,255,255,0.06)", borderRadius:6, padding:"2px 7px", border:"0.5px solid rgba(255,255,255,0.1)" }}>
+                        <span style={{ fontSize:"clamp(9px,0.8vw,12px)", color:"rgba(255,255,255,0.6)", fontFamily:"'Barlow',sans-serif", fontWeight:600 }}>{t.name.split(" ")[0]}</span>
+                        <span style={{ fontSize:"clamp(9px,0.8vw,12px)", color:chipColor, fontFamily:"'Barlow',sans-serif", fontWeight:700 }}>{hrs.toFixed(1)}h</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <LiveClock />
             <div title={connected?"Live":"Disconnected"} style={{ width:9, height:9, borderRadius:"50%", background:connected?SUCCESS:DANGER, flexShrink:0, boxShadow:connected?"0 0 6px "+SUCCESS:"none", animation:"pulse 2s ease-in-out infinite" }} />
