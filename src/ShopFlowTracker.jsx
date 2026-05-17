@@ -365,6 +365,13 @@ function HistoryIcon() {
     </svg>
   );
 }
+function ReportIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+    </svg>
+  );
+}
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const labelStyle = {  display: "block",
   fontSize: 10,
@@ -1512,6 +1519,241 @@ function HistoryModal({ archived, onClose, wide }) {
     </Sheet>
   );
 }
+// ─── Report Modal ────────────────────────────────────────────────────────────
+function ReportModal({ state, onClose, wide }) {
+  const LABOR_RATE = parseFloat(localStorage.getItem("sft-labor-rate")||"125");
+  function parseHrs(h) { return parseFloat(String(h||"0").replace(/[^0-9.]/g,""))||0; }
+
+  function buildReport(range) {
+    const now   = Date.now();
+    const today = new Date(); today.setHours(0,0,0,0);
+    let rangeStart, rangeLabel, dateLabel;
+    if (range === "today") {
+      rangeStart = today.getTime();
+      rangeLabel = "Daily Report";
+      dateLabel  = new Date().toLocaleDateString([], {weekday:"long", year:"numeric", month:"long", day:"numeric"});
+    } else {
+      const dow = today.getDay();
+      const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - dow);
+      rangeStart = weekStart.getTime();
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
+      rangeLabel = "Weekly Report";
+      dateLabel  = weekStart.toLocaleDateString([], {month:"short", day:"numeric"}) + " – " + weekEnd.toLocaleDateString([], {month:"short", day:"numeric", year:"numeric"});
+    }
+
+    const ros      = state.ros || [];
+    const archived = (state.archived || []).filter(e => e.archivedAt >= rangeStart);
+    const techs    = state.techs || [];
+    const grid     = state.grid || {};
+    const actLog   = (state.activityLog || []).filter(e => e.endTime && e.startTime >= rangeStart);
+
+    // All active RO ids on board
+    const allGridIds = Object.values(grid).flatMap(cols => Object.values(cols).flat());
+    const partsIds   = state.partsSlots || [];
+    const stagingIds = Object.values(state.qSlots||{}).flat();
+
+    // Board counts
+    const byCol = {};
+    COLS.forEach(c => { byCol[c.id] = Object.values(grid).flatMap(cols => cols[c.id]||[]).length; });
+    byCol.waiting = partsIds.length;
+    byCol.staging = stagingIds.length;
+
+    // Total hours + revenue from active board ROs
+    const totalHrs = allGridIds.reduce((s,id) => { const r=ros.find(x=>x.id===id); return s+parseHrs(r?.hours); }, 0);
+    const archivedHrs = archived.reduce((s,e) => s+parseHrs(e.ro?.hours), 0);
+    const totalROs = allGridIds.length + stagingIds.length + partsIds.length;
+    const estRevenue = (totalHrs + archivedHrs) * LABOR_RATE;
+
+    // Promise time compliance — archived ROs with promise times
+    const withPromise = archived.filter(e => e.ro?.promiseTime);
+    const onTime = withPromise.filter(e => {
+      const due = new Date(e.ro.promiseTime).getTime();
+      return e.archivedAt <= due;
+    });
+
+    // Tech rows
+    const techRows = techs.map(tech => {
+      const cols   = grid[tech.id] || {};
+      const active = COLS.flatMap(c => cols[c.id]||[]);
+      const hrs    = active.reduce((s,id) => { const r=ros.find(x=>x.id===id); return s+parseHrs(r?.hours); }, 0);
+      const archByTech = archived.filter(e => {
+        return Object.values(grid[tech.id]||{}).flat().includes(e.ro?.id) ||
+          (e.ro && archived.some(a => a.ro?.id === e.ro?.id));
+      });
+      const movingMs   = actLog.filter(e => e.userId===tech.id && e.activityId==="moving").reduce((s,e) => s+(e.endTime-e.startTime), 0);
+      const partsRunMs = actLog.filter(e => e.userId===tech.id && e.activityId==="parts_run").reduce((s,e) => s+(e.endTime-e.startTime), 0);
+      function fmtMin(ms) { const m=Math.round(ms/60000); return m>0 ? m+"m" : "—"; }
+      return {
+        name:       tech.name,
+        active:     active.length,
+        completed:  (cols.completed||[]).length,
+        delivered:  (cols.delivered||[]).length,
+        hrs:        hrs.toFixed(1),
+        revenue:    "$" + (hrs * LABOR_RATE).toLocaleString("en-US", {minimumFractionDigits:0, maximumFractionDigits:0}),
+        moving:     fmtMin(movingMs),
+        partsRun:   fmtMin(partsRunMs),
+      };
+    });
+
+    const printDate = new Date().toLocaleString([], {month:"short", day:"numeric", year:"numeric", hour:"2-digit", minute:"2-digit"});
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Service Department ${rangeLabel} — ${dateLabel}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; font-size: 12px; color: #111; background: #fff; padding: 32px 40px; }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 2px; }
+  h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: #555; margin: 24px 0 10px; border-bottom: 1.5px solid #e0e0e0; padding-bottom: 5px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #111; }
+  .header-left .subtitle { font-size: 13px; color: #555; margin-top: 3px; }
+  .header-right { text-align: right; font-size: 11px; color: #777; line-height: 1.6; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 4px; }
+  .stat-box { background: #f7f7f7; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 14px; }
+  .stat-box .label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #888; margin-bottom: 5px; }
+  .stat-box .value { font-size: 22px; font-weight: 700; color: #111; line-height: 1; }
+  .stat-box .sub { font-size: 10px; color: #888; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th { background: #f0f0f0; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #444; padding: 8px 10px; text-align: left; border: 1px solid #ddd; }
+  td { padding: 8px 10px; border: 1px solid #e8e8e8; vertical-align: middle; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .num { text-align: right; font-weight: 600; }
+  .status-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+  .status-pill { background: #f0f0f0; border: 1px solid #ddd; border-radius: 20px; padding: 5px 14px; font-size: 11px; font-weight: 600; }
+  .status-pill span { color: #555; font-weight: 400; margin-left: 5px; }
+  .compliance { font-size: 20px; font-weight: 700; }
+  .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e0e0e0; font-size: 10px; color: #aaa; display: flex; justify-content: space-between; }
+  @media print {
+    body { padding: 16px 20px; }
+    @page { margin: 0.5in; size: letter; }
+    button, .no-print { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <h1>Service Department</h1>
+    <div class="subtitle">${rangeLabel} &nbsp;·&nbsp; ${dateLabel}</div>
+  </div>
+  <div class="header-right">
+    <div style="font-size:18px;font-weight:800;letter-spacing:-0.5px">Worqflow</div>
+    <div>Generated ${printDate}</div>
+    <div>Labor rate: $${LABOR_RATE}/hr</div>
+  </div>
+</div>
+
+<h2>Summary</h2>
+<div class="stat-grid">
+  <div class="stat-box"><div class="label">Active ROs</div><div class="value">${totalROs}</div><div class="sub">on board now</div></div>
+  <div class="stat-box"><div class="label">Archived Today</div><div class="value">${archived.length}</div><div class="sub">completed &amp; closed</div></div>
+  <div class="stat-box"><div class="label">Flagged Hours</div><div class="value">${(totalHrs + archivedHrs).toFixed(1)}</div><div class="sub">active + archived</div></div>
+  <div class="stat-box"><div class="label">Est. Revenue</div><div class="value">$${Math.round(estRevenue).toLocaleString()}</div><div class="sub">@ $${LABOR_RATE}/hr</div></div>
+</div>
+
+<h2>Board Status</h2>
+<div class="status-row">
+  <div class="status-pill">On Deck <span>${byCol.ondeck}</span></div>
+  <div class="status-pill">In Progress <span>${byCol.inprogress}</span></div>
+  <div class="status-pill">Completed / QC <span>${byCol.completed}</span></div>
+  <div class="status-pill">Delivered <span>${byCol.delivered}</span></div>
+  <div class="status-pill">Waiting on Parts <span>${byCol.waiting}</span></div>
+  <div class="status-pill">Staging Queue <span>${byCol.staging}</span></div>
+</div>
+
+<h2>Tech Breakdown</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Technician</th>
+      <th class="num">Active</th>
+      <th class="num">Completed</th>
+      <th class="num">Delivered</th>
+      <th class="num">Flagged Hrs</th>
+      <th class="num">Est. Revenue</th>
+      <th class="num">Moving Cars</th>
+      <th class="num">Parts Run</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${techRows.map(t => `
+    <tr>
+      <td style="font-weight:600">${t.name}</td>
+      <td class="num">${t.active}</td>
+      <td class="num">${t.completed}</td>
+      <td class="num">${t.delivered}</td>
+      <td class="num">${t.hrs}</td>
+      <td class="num">${t.revenue}</td>
+      <td class="num">${t.moving}</td>
+      <td class="num">${t.partsRun}</td>
+    </tr>`).join("")}
+  </tbody>
+</table>
+
+${withPromise.length > 0 ? `
+<h2>Promise Time Compliance</h2>
+<div style="display:flex;align-items:center;gap:24px;padding:14px 0">
+  <div><div class="compliance">${onTime.length} / ${withPromise.length}</div><div style="font-size:11px;color:#555;margin-top:3px">Delivered on time</div></div>
+  <div><div class="compliance" style="color:${onTime.length===withPromise.length?"#15803d":"#b91c1c"}">${withPromise.length>0?Math.round((onTime.length/withPromise.length)*100):0}%</div><div style="font-size:11px;color:#555;margin-top:3px">On-time rate</div></div>
+  <div><div class="compliance" style="color:#b91c1c">${withPromise.length - onTime.length}</div><div style="font-size:11px;color:#555;margin-top:3px">Missed</div></div>
+</div>` : ""}
+
+<div class="footer">
+  <span>Worqflow — Service Department Report</span>
+  <span>${dateLabel}</span>
+</div>
+
+<script>window.onload = function() { window.print(); }<\/script>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) { alert("Pop-up blocked. Please allow pop-ups for this site."); return; }
+    win.document.write(html);
+    win.document.close();
+  }
+
+  return (
+    <Sheet title="Generate Report" subtitle="Print or save as PDF" onClose={onClose} wide={wide}>
+      <div style={{ display:"flex", flexDirection:"column", gap:14, paddingTop:8 }}>
+        <div style={{ fontSize:13, color:TEXT2, lineHeight:1.5, marginBottom:4 }}>
+          Choose a time range. Your browser's print dialog will open — select "Save as PDF" to download.
+        </div>
+        <button
+          onClick={() => buildReport("today")}
+          style={{ padding:"18px 20px", background:"rgba(10,132,255,0.12)", border:"1px solid rgba(10,132,255,0.3)", borderRadius:16, cursor:"pointer", textAlign:"left", fontFamily:"inherit" }}
+        >
+          <div style={{ fontSize:16, fontWeight:700, color:TEXT }}>Today's Report</div>
+          <div style={{ fontSize:12, color:TEXT3, marginTop:3 }}>
+            {new Date().toLocaleDateString([], {weekday:"long", month:"long", day:"numeric"})}
+          </div>
+        </button>
+        <button
+          onClick={() => buildReport("week")}
+          style={{ padding:"18px 20px", background:"rgba(48,209,88,0.1)", border:"1px solid rgba(48,209,88,0.25)", borderRadius:16, cursor:"pointer", textAlign:"left", fontFamily:"inherit" }}
+        >
+          <div style={{ fontSize:16, fontWeight:700, color:TEXT }}>This Week's Report</div>
+          <div style={{ fontSize:12, color:TEXT3, marginTop:3 }}>
+            {(() => {
+              const d = new Date(); d.setHours(0,0,0,0);
+              const ws = new Date(d); ws.setDate(ws.getDate() - ws.getDay());
+              const we = new Date(ws); we.setDate(we.getDate() + 6);
+              return ws.toLocaleDateString([], {month:"short", day:"numeric"}) + " – " + we.toLocaleDateString([], {month:"short", day:"numeric", year:"numeric"});
+            })()}
+          </div>
+        </button>
+        <div style={{ marginTop:4, padding:"12px 14px", background:"rgba(255,255,255,0.04)", borderRadius:12, border:"1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ fontSize:11, color:TEXT3 }}>
+            Labor rate used for revenue estimates: <strong style={{ color:TEXT2 }}>${LABOR_RATE}/hr</strong>
+            <br/>Change this in the Analytics screen.
+          </div>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
 // ─── Job Presets Editor ──────────────────────────────────────────────────────
 function JobPresetsEditor({ presets, onSave }) {
   const [list, setList] = useState([...presets]);
@@ -2599,6 +2841,7 @@ export default function ShopFlowTracker() {
   const [showAdd, setShowAdd]               = useState(false);
   const [showArchive, setShowArchive]       = useState(false);
   const [showHistory, setShowHistory]       = useState(false);
+  const [showReport,  setShowReport]        = useState(false);
   const [showServiceTypes, setShowServiceTypes] = useState(false);
   const [partsCollapsed, setPartsCollapsed]   = useState(false);
   const [showChangePin, setShowChangePin]     = useState(false);
@@ -2990,6 +3233,11 @@ export default function ShopFlowTracker() {
               <AnalyticsIcon />
             </button>
           )}
+          {(isAdmin || isManager) && (
+            <button onClick={() => setShowReport(true)} title="Generate Report" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <ReportIcon />
+            </button>
+          )}
           {canSeeAll && (
             <button onClick={() => setShowHistory(true)} title="RO History" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
               <HistoryIcon />
@@ -3330,6 +3578,9 @@ export default function ShopFlowTracker() {
       )}
       {showHistory && (
         <HistoryModal archived={state.archived||[]} onClose={() => setShowHistory(false)} wide={isWide} />
+      )}
+      {showReport && (
+        <ReportModal state={state} onClose={() => setShowReport(false)} wide={isWide} />
       )}
       {showServiceTypes && (
         <ServiceTypeSettings serviceTypes={state.serviceTypes||DEFAULT_SERVICE_TYPES} jobPresets={state.jobPresets||DEFAULT_JOB_PRESETS} techs={state.techs||DEFAULT_TECHS} onClose={() => setShowServiceTypes(false)} onSave={handleSaveServiceTypes} onSaveJobs={handleSaveJobPresets} onSaveTechs={handleSaveTechs} wide={isWide} />      )}
