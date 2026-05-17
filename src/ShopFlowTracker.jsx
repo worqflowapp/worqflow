@@ -134,6 +134,7 @@ function freshState() {
     archived: [],
     serviceTypes: DEFAULT_SERVICE_TYPES,
     jobPresets: DEFAULT_JOB_PRESETS,
+    displayPin: "9999",
   };
 }
 function loadState() {
@@ -1821,7 +1822,7 @@ const COLOR_BG = {
   "#D97706":"#FFFBEB","#0891B2":"#ECFEFF","#DB2777":"#FDF2F8","#65A30D":"#F7FEE7",
   "#7C3AED":"#F5F3FF","#EA580C":"#FFF7ED",
 };
-function ServiceTypeSettings({ serviceTypes, jobPresets, techs, onClose, onSave, onSaveJobs, onSaveTechs, wide }) {
+function ServiceTypeSettings({ serviceTypes, jobPresets, techs, displayPin, onClose, onSave, onSaveJobs, onSaveTechs, onSaveDisplayPin, wide }) {
   const [types, setTypes] = useState(serviceTypes.map(s => ({...s})));
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState("#1D6BF3");
@@ -1829,6 +1830,17 @@ function ServiceTypeSettings({ serviceTypes, jobPresets, techs, onClose, onSave,
   const [newTechName, setNewTechName] = useState("");
   const [newTechPin, setNewTechPin] = useState(null); // PIN shown after creation
   const [removeConfirm, setRemoveConfirm] = useState(null); // id to confirm removal
+  const [newDisplayPin, setNewDisplayPin] = useState("");
+  const [displayPinErr, setDisplayPinErr] = useState("");
+  const [displayPinSaved, setDisplayPinSaved] = useState(false);
+  function saveDisplayPin() {
+    if (!/^[0-9]{4,8}$/.test(newDisplayPin)) { setDisplayPinErr("Must be 4–8 digits"); return; }
+    onSaveDisplayPin && onSaveDisplayPin(newDisplayPin);
+    setNewDisplayPin("");
+    setDisplayPinErr("");
+    setDisplayPinSaved(true);
+    setTimeout(() => setDisplayPinSaved(false), 2500);
+  }
   function addType() {
     if (!newName.trim()) return;
     const id = "st-" + Date.now();
@@ -1973,6 +1985,31 @@ function ServiceTypeSettings({ serviceTypes, jobPresets, techs, onClose, onSave,
           <div style={{ fontWeight:800, fontSize:16, color:TEXT, fontFamily:"'Barlow',sans-serif", marginBottom:4 }}>Job Presets</div>
           <div style={{ fontSize:12, color:MUTED, marginBottom:14 }}>Edit the list of common jobs shown in the job picker</div>
           <JobPresetsEditor presets={jobPresets} onSave={onSaveJobs} />
+        </div>
+        {/* Display PIN section */}
+        <div style={{ marginTop:28, paddingTop:20, borderTop:"2px solid "+BORDER }}>
+          <div style={{ fontWeight:800, fontSize:16, color:TEXT, fontFamily:"'Barlow',sans-serif", marginBottom:4 }}>Display PIN</div>
+          <div style={{ fontSize:12, color:MUTED, marginBottom:14 }}>PIN for the TV/wall board read-only display login</div>
+          <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:12, padding:"10px 14px", marginBottom:12, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <span style={{ fontSize:13, color:TEXT2 }}>Current PIN</span>
+            <span style={{ fontFamily:"monospace", fontSize:16, fontWeight:700, color:TEXT, letterSpacing:"4px" }}>{"•".repeat((displayPin||"9999").length)}</span>
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <input
+              type="password"
+              inputMode="numeric"
+              placeholder="New display PIN (4–8 digits)"
+              value={newDisplayPin}
+              onChange={e => { setNewDisplayPin(e.target.value.replace(/\D/g,"")); setDisplayPinErr(""); }}
+              onKeyDown={e => e.key === "Enter" && saveDisplayPin()}
+              style={{ ...inputStyle, flex:1, textAlign:"center", letterSpacing:"3px", fontSize:18 }}
+            />
+            <button onClick={saveDisplayPin} style={{ background:ACCENT, color:"#fff", border:"none", borderRadius:10, padding:"0 16px", cursor:"pointer", fontWeight:700, fontSize:13, whiteSpace:"nowrap", fontFamily:"inherit" }}>
+              Save
+            </button>
+          </div>
+          {displayPinErr && <div style={{ color:DANGER, fontSize:12, marginTop:6 }}>{displayPinErr}</div>}
+          {displayPinSaved && <div style={{ color:SUCCESS, fontSize:12, marginTop:6, fontWeight:600 }}>✓ Display PIN updated</div>}
         </div>
       </div>
     </Sheet>
@@ -2850,10 +2887,186 @@ function LoginScreen({ onLogin, users }) {
     </div>
   );
 }
+// ─── DisplayROCard — read-only card for TV display ──────────────────────────
+function DisplayROCard({ ro, serviceTypes }) {
+  const st = (serviceTypes || DEFAULT_SERVICE_TYPES).find(s => s.id === ro.serviceType);
+  const borderColor = st ? st.color : "rgba(255,255,255,0.2)";
+  const jobs = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
+  const vehicle = [ro.year, ro.make, ro.model].filter(Boolean).join(" ");
+  const now = Date.now();
+  const due = ro.promiseTime ? new Date(ro.promiseTime).getTime() : null;
+  const diff = due ? due - now : null;
+  const isOverdue = diff !== null && diff <= 0;
+  const isSoon    = diff !== null && diff > 0 && diff <= 30 * 60 * 1000;
+  const promiseFmt = due && !isNaN(due) ? new Date(due).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }) : null;
+  return (
+    <div style={{
+      background: "rgba(22,26,42,0.95)",
+      borderRadius: 8,
+      borderLeft: "3px solid " + borderColor,
+      padding: "7px 9px",
+      marginBottom: 5,
+      flexShrink: 0,
+      animation: isOverdue ? "urgent-glow 1.5s ease-in-out infinite" : "none",
+    }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:4 }}>
+        <span style={{ fontSize:"clamp(13px,1.2vw,18px)", fontWeight:800, color:"#FFFFFF", letterSpacing:"-0.3px", lineHeight:1.1 }}>{ro.roNum}</span>
+        {ro.hours && <span style={{ fontSize:"clamp(9px,0.75vw,11px)", fontWeight:700, color:SUCCESS, background:"rgba(48,209,88,0.15)", padding:"2px 6px", borderRadius:5, flexShrink:0, whiteSpace:"nowrap" }}>{ro.hours}h</span>}
+      </div>
+      {vehicle && <div style={{ fontSize:"clamp(11px,1vw,15px)", color:"rgba(255,255,255,0.7)", marginTop:2, lineHeight:1.2 }}>{vehicle}</div>}
+      {ro.customer && <div style={{ fontSize:"clamp(10px,0.9vw,13px)", color:"rgba(255,255,255,0.4)", marginTop:1, lineHeight:1.2 }}>{ro.customer}</div>}
+      {jobs.length > 0 && (
+        <div style={{ display:"flex", gap:3, flexWrap:"wrap", marginTop:4 }}>
+          {jobs.slice(0,3).map((j,i) => {
+            const ab = abbrevJob(j);
+            return <span key={i} style={{ fontSize:"clamp(8px,0.65vw,10px)", fontWeight:700, background:ab.bg, color:ab.color, padding:"2px 6px", borderRadius:20 }}>{j}</span>;
+          })}
+          {jobs.length > 3 && <span style={{ fontSize:"clamp(8px,0.65vw,10px)", color:"rgba(255,255,255,0.3)" }}>+{jobs.length-3}</span>}
+        </div>
+      )}
+      {promiseFmt && (
+        <div style={{ marginTop:3, fontSize:"clamp(8px,0.65vw,10px)", fontWeight:700, color:isOverdue?DANGER:isSoon?WARN:"rgba(255,255,255,0.35)" }}>
+          ⏰ {promiseFmt}{isOverdue?" — OVERDUE":isSoon?" — SOON":""}
+        </div>
+      )}
+    </div>
+  );
+}
+// ─── DisplayScreen — full-screen TV/wall board ───────────────────────────────
+function DisplayScreen({ state, onLogout, connected }) {
+  const techs = state.techs || DEFAULT_TECHS;
+  const numTechs = Math.max(techs.length, 1);
+  const colRefs = useRef([]);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Auto-scroll tech columns with >4 cards every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      colRefs.current.forEach(ref => {
+        if (!ref || ref.scrollHeight <= ref.clientHeight + 10) return;
+        const atBottom = ref.scrollTop + ref.clientHeight >= ref.scrollHeight - 20;
+        ref.scrollTo({ top: atBottom ? 0 : ref.scrollHeight, behavior:"smooth" });
+      });
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  function getRO(id) { return (state.ros || []).find(r => r.id === id); }
+
+  function getTechAllROs(techId) {
+    const cols = state.grid[techId] || {};
+    return COLS.flatMap(c => (cols[c.id] || []).map(id => ({ id, col: c })));
+  }
+
+  const timeStr = now.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+  const dateStr = now.toLocaleDateString([], { weekday:"long", month:"long", day:"numeric" });
+  const queues = state.queues || DEFAULT_QUEUES;
+  const partsIds = state.partsSlots || [];
+  const svcTypes = state.serviceTypes || DEFAULT_SERVICE_TYPES;
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"#000000", display:"flex", flexDirection:"column", overflow:"hidden", fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Space Grotesk',sans-serif" }}>
+      {/* ── Top bar — tap anywhere to logout ── */}
+      <div
+        onClick={onLogout}
+        style={{ height:"5vh", minHeight:44, maxHeight:56, display:"flex", alignItems:"center", padding:"0 14px", borderBottom:"1px solid rgba(255,255,255,0.08)", background:"rgba(8,10,18,0.97)", cursor:"pointer", flexShrink:0, gap:10, userSelect:"none" }}
+      >
+        <WFLogo size={26} radius={6} />
+        <span style={{ fontSize:"clamp(11px,1vw,15px)", fontWeight:700, color:"rgba(255,255,255,0.7)", flex:1, letterSpacing:"-0.2px" }}>Service Department</span>
+        <div style={{ textAlign:"right", marginRight:8 }}>
+          <div style={{ fontSize:"clamp(13px,1.2vw,17px)", fontWeight:700, color:"#FFFFFF", fontVariantNumeric:"tabular-nums", letterSpacing:"-0.3px" }}>{timeStr}</div>
+          <div style={{ fontSize:"clamp(8px,0.65vw,10px)", color:"rgba(255,255,255,0.3)", marginTop:1 }}>{dateStr}</div>
+        </div>
+        <div title={connected?"Live":"Disconnected"} style={{ width:9, height:9, borderRadius:"50%", background:connected?SUCCESS:DANGER, flexShrink:0, boxShadow:connected?"0 0 6px "+SUCCESS:"none" }} />
+      </div>
+
+      {/* ── Main board — top ~60vh ── */}
+      <div style={{ height:"60vh", display:"flex", gap:"clamp(4px,0.5vw,8px)", padding:"clamp(4px,0.5vw,8px) clamp(6px,0.8vw,10px) clamp(3px,0.4vw,5px)", overflow:"hidden" }}>
+        {techs.map((tech, i) => {
+          const roEntries = getTechAllROs(tech.id);
+          const totalHrs = roEntries.reduce((s, { id }) => {
+            const r = getRO(id);
+            return s + (parseFloat(String(r?.hours||"0").replace(/[^0-9.]/g,""))||0);
+          }, 0);
+          return (
+            <div key={tech.id} style={{ width:`calc((100vw - clamp(12px,1.6vw,20px)) / ${numTechs})`, flexShrink:0, display:"flex", flexDirection:"column", minWidth:0 }}>
+              {/* Tech header */}
+              <div style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 8px", background:"rgba(255,255,255,0.04)", borderRadius:"8px 8px 0 0", border:"1px solid rgba(255,255,255,0.08)", borderBottom:"none", flexShrink:0 }}>
+                <div style={{ width:"clamp(26px,2.2vw,34px)", height:"clamp(26px,2.2vw,34px)", borderRadius:8, background:"rgba(10,132,255,0.18)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"clamp(9px,0.8vw,13px)", fontWeight:800, color:ACCENT, flexShrink:0 }}>
+                  {tech.name.slice(0,2).toUpperCase()}
+                </div>
+                <span style={{ flex:1, fontSize:"clamp(11px,1vw,15px)", fontWeight:700, color:"#FFFFFF", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{tech.name}</span>
+                {totalHrs > 0 && (
+                  <span style={{ background:"rgba(48,209,88,0.15)", color:SUCCESS, fontSize:"clamp(8px,0.65vw,10px)", fontWeight:800, padding:"2px 7px", borderRadius:20, flexShrink:0, whiteSpace:"nowrap" }}>{totalHrs % 1 === 0 ? totalHrs : totalHrs.toFixed(1)}h</span>
+                )}
+              </div>
+              {/* Scrollable card list */}
+              <div
+                ref={el => { colRefs.current[i] = el; }}
+                style={{ flex:1, overflowY:"auto", padding:"6px 6px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.07)", borderRadius:"0 0 8px 8px", WebkitOverflowScrolling:"touch" }}
+              >
+                {roEntries.length === 0 ? (
+                  <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.18)", fontSize:"clamp(10px,0.85vw,13px)" }}>—</div>
+                ) : roEntries.map(({ id, col }) => {
+                  const ro = getRO(id);
+                  if (!ro) return null;
+                  return (
+                    <div key={id} style={{ marginBottom:6 }}>
+                      <div style={{ fontSize:"clamp(7px,0.6vw,9px)", fontWeight:700, color:col.color, textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:2 }}>{col.label}</div>
+                      <DisplayROCard ro={ro} serviceTypes={svcTypes} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Bottom queues — remaining ~35vh ── */}
+      <div style={{ flex:1, display:"flex", gap:"clamp(4px,0.5vw,8px)", padding:"clamp(3px,0.4vw,5px) clamp(6px,0.8vw,10px) clamp(6px,0.8vw,10px)", overflow:"hidden", minHeight:0 }}>
+        {queues.map(queue => {
+          const ids = (state.qSlots || {})[queue.id] || [];
+          return (
+            <div key={queue.id} style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0 }}>
+              <div style={{ padding:"5px 8px", background:queue.color+"20", borderRadius:"7px 7px 0 0", border:"1px solid "+queue.color+"40", borderBottom:"none", flexShrink:0 }}>
+                <div style={{ fontSize:"clamp(10px,0.9vw,13px)", fontWeight:800, color:queue.color }}>{queue.icon} {queue.name}</div>
+                <div style={{ fontSize:"clamp(8px,0.6vw,10px)", color:"rgba(255,255,255,0.3)", marginTop:1 }}>{ids.length} ticket{ids.length!==1?"s":""}</div>
+              </div>
+              <div style={{ flex:1, overflowY:"auto", padding:"5px 6px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderTop:"1px solid "+queue.color+"30", borderRadius:"0 0 7px 7px", WebkitOverflowScrolling:"touch" }}>
+                {ids.length === 0
+                  ? <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.15)", fontSize:"clamp(10px,0.85vw,12px)" }}>—</div>
+                  : ids.map(id => { const ro = getRO(id); return ro ? <DisplayROCard key={id} ro={ro} serviceTypes={svcTypes} /> : null; })}
+              </div>
+            </div>
+          );
+        })}
+        {/* Waiting on Parts */}
+        <div style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0 }}>
+          <div style={{ padding:"5px 8px", background:"rgba(191,90,242,0.14)", borderRadius:"7px 7px 0 0", border:"1px solid rgba(191,90,242,0.3)", borderBottom:"none", flexShrink:0 }}>
+            <div style={{ fontSize:"clamp(10px,0.9vw,13px)", fontWeight:800, color:"#BF5AF2" }}>⚙️ Waiting on Parts</div>
+            <div style={{ fontSize:"clamp(8px,0.6vw,10px)", color:"rgba(255,255,255,0.3)", marginTop:1 }}>{partsIds.length} ticket{partsIds.length!==1?"s":""}</div>
+          </div>
+          <div style={{ flex:1, overflowY:"auto", padding:"5px 6px", background:"rgba(255,255,255,0.02)", border:"1px solid rgba(255,255,255,0.06)", borderTop:"1px solid rgba(191,90,242,0.2)", borderRadius:"0 0 7px 7px", WebkitOverflowScrolling:"touch" }}>
+            {partsIds.length === 0
+              ? <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"rgba(255,255,255,0.15)", fontSize:"clamp(10px,0.85vw,12px)" }}>—</div>
+              : partsIds.map(id => { const ro = getRO(id); return ro ? <DisplayROCard key={id} ro={ro} serviceTypes={svcTypes} /> : null; })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function ShopFlowTracker() {
   const [currentUser, setCurrentUser] = useState(null);
   const [state, setState]             = useState(loadState);
+  const [connected, setConnected]     = useState(true);
   const [showAdd, setShowAdd]               = useState(false);
   const [showArchive, setShowArchive]       = useState(false);
   const [showHistory, setShowHistory]       = useState(false);
@@ -2886,6 +3099,7 @@ export default function ShopFlowTracker() {
   useEffect(() => {
     const ref = doc(db, 'shopstate', 'main');
     const unsub = onSnapshot(ref, snap => {
+      setConnected(true);
       if (snap.exists()) {
         isRemote.current = true;
         // Merge with freshState() so missing fields from schema changes don't crash the app
@@ -2907,12 +3121,13 @@ export default function ShopFlowTracker() {
           activityLog:     data.activityLog     || [],
           timeClockLog:    data.timeClockLog     || [],
           ros:             data.ros             || fresh.ros,
+          displayPin:      data.displayPin      || "9999",
         });
       } else {
         setDoc(ref, stateRef.current)
           .catch(e => console.error('[ShopFlow] seed failed', e));
       }
-    }, err => console.error('[ShopFlow] snapshot error', err));
+    }, err => { setConnected(false); console.error('[ShopFlow] snapshot error', err); });
     return unsub;
   }, []);
 
@@ -3149,6 +3364,9 @@ export default function ShopFlowTracker() {
     upd(s => ({ ...s, jobPresets: presets }));
     setShowServiceTypes(false);
   }
+  function handleSaveDisplayPin(pin) {
+    upd(s => ({ ...s, displayPin: pin }));
+  }
   function handleSaveTechs(newTechs) {
     upd(s => {
       const removedIds = (s.techs||[]).map(t => t.id).filter(id => !newTechs.find(t => t.id === id));
@@ -3196,8 +3414,12 @@ export default function ShopFlowTracker() {
   if (!currentUser) {
     const nonTechUsers = USERS.filter(u => u.role !== "tech");
     const dynamicTechs = (state.techs||DEFAULT_TECHS).map(t => ({ ...t, role:"tech" }));
-    const loginUsers = [...nonTechUsers, ...dynamicTechs];
+    const displayUser = { id:"display", name:"Display Board", role:"display", pin: state.displayPin || "9999" };
+    const loginUsers = [...nonTechUsers, ...dynamicTechs, displayUser];
     return <LoginScreen onLogin={setCurrentUser} users={loginUsers} />;
+  }
+  if (currentUser.role === "display") {
+    return <DisplayScreen state={state} onLogout={() => setCurrentUser(null)} connected={connected} />;
   }
   return (
     <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Barlow',sans-serif", background:"radial-gradient(ellipse at 50% 0%, #0A0F1F 0%, #000000 55%)", minHeight:"100vh", maxWidth:"100vw", overflow:"hidden", color:TEXT }}>
@@ -3597,7 +3819,7 @@ export default function ShopFlowTracker() {
         <ReportModal state={state} onClose={() => setShowReport(false)} wide={isWide} />
       )}
       {showServiceTypes && (
-        <ServiceTypeSettings serviceTypes={state.serviceTypes||DEFAULT_SERVICE_TYPES} jobPresets={state.jobPresets||DEFAULT_JOB_PRESETS} techs={state.techs||DEFAULT_TECHS} onClose={() => setShowServiceTypes(false)} onSave={handleSaveServiceTypes} onSaveJobs={handleSaveJobPresets} onSaveTechs={handleSaveTechs} wide={isWide} />      )}
+        <ServiceTypeSettings serviceTypes={state.serviceTypes||DEFAULT_SERVICE_TYPES} jobPresets={state.jobPresets||DEFAULT_JOB_PRESETS} techs={state.techs||DEFAULT_TECHS} displayPin={state.displayPin||"9999"} onClose={() => setShowServiceTypes(false)} onSave={handleSaveServiceTypes} onSaveJobs={handleSaveJobPresets} onSaveTechs={handleSaveTechs} onSaveDisplayPin={handleSaveDisplayPin} wide={isWide} />      )}
       {detailRO && !movingRO && (
         <RODetail
           ro={detailRO.ro}
