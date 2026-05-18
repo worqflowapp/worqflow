@@ -632,6 +632,8 @@ function DisplayCard({ ro, timer, serviceTypes }) {
   return (
     <div style={{
       height: '100%',
+      flex: 1,
+      minHeight: 0,
       width: '100%',
       boxSizing: 'border-box',
       background: 'rgba(28,32,48,0.95)',
@@ -648,14 +650,15 @@ function DisplayCard({ ro, timer, serviceTypes }) {
         : 'none',
     }}>
 
-      {/* ROW 1 — RO number + service type */}
+      {/* ROW 1 — RO number + service type dot */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 4,
+        height: 20,
         flexShrink: 0,
-        minHeight: 0,
+        overflow: 'hidden',
       }}>
         <span style={{
           fontSize: 15,
@@ -700,71 +703,61 @@ function DisplayCard({ ro, timer, serviceTypes }) {
               gap: 3,
             }}>
               <span style={{
-                width: 5,
-                height: 5,
+                width: 6,
+                height: 6,
                 borderRadius: '50%',
                 background: svcType.color,
                 display: 'inline-block',
                 flexShrink: 0,
               }}/>
-              {svcType.name}
             </span>
           )}
         </div>
       </div>
 
-      {/* ROW 2 — Vehicle + Customer */}
+      {/* ROW 2 — Vehicle */}
       <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 3,
+        height: 18,
         flexShrink: 0,
-        minHeight: 0,
         overflow: 'hidden',
+        fontSize: 13,
+        fontWeight: 600,
+        color: 'rgba(255,255,255,0.9)',
+        whiteSpace: 'nowrap',
+        textOverflow: 'ellipsis',
+        lineHeight: '18px',
       }}>
-        <div style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: 'rgba(255,255,255,0.9)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          lineHeight: 1.2,
-        }}>
-          {vehicle || (
-            <span style={{
-              color: 'rgba(255,255,255,0.2)',
-              fontStyle: 'italic',
-              fontWeight: 400,
-            }}>
-              No vehicle
-            </span>
-          )}
-        </div>
-        <div style={{
-          fontSize: 11,
-          fontWeight: 400,
-          color: 'rgba(255,255,255,0.45)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          lineHeight: 1.2,
-        }}>
-          {ro.customer || (
-            <span style={{ color: 'rgba(255,255,255,0.15)' }}>
-              —
-            </span>
-          )}
-        </div>
+        {vehicle || (
+          <span style={{ color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', fontWeight: 400 }}>
+            No vehicle
+          </span>
+        )}
       </div>
 
-      {/* ROW 3 — Jobs + Timer + Hours */}
+      {/* ROW 3 — Customer */}
       <div style={{
+        height: 16,
+        flexShrink: 0,
+        overflow: 'hidden',
+        fontSize: 11,
+        fontWeight: 400,
+        color: 'rgba(255,255,255,0.45)',
+        whiteSpace: 'nowrap',
+        textOverflow: 'ellipsis',
+        lineHeight: '16px',
+      }}>
+        {ro.customer || (
+          <span style={{ color: 'rgba(255,255,255,0.15)' }}>—</span>
+        )}
+      </div>
+
+      {/* ROW 4 — Jobs + Timer + Hours (always shown) */}
+      <div style={{
+        height: 18,
+        flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
         gap: 4,
-        flexShrink: 0,
-        minHeight: 0,
         overflow: 'hidden',
       }}>
         <div style={{
@@ -776,11 +769,7 @@ function DisplayCard({ ro, timer, serviceTypes }) {
           minWidth: 0,
         }}>
           {jobs.length === 0 && (
-            <span style={{
-              fontSize: 9,
-              color: 'rgba(255,255,255,0.15)',
-              fontStyle: 'italic',
-            }}>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.15)', fontStyle: 'italic' }}>
               No jobs
             </span>
           )}
@@ -803,11 +792,7 @@ function DisplayCard({ ro, timer, serviceTypes }) {
             );
           })}
           {jobs.length > 3 && (
-            <span style={{
-              fontSize: 9,
-              color: 'rgba(255,255,255,0.3)',
-              flexShrink: 0,
-            }}>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
               +{jobs.length - 3}
             </span>
           )}
@@ -988,7 +973,7 @@ function DisplayScreen({ state, currentUser, onLogout }) {
                         const ro = getRO(roId);
                         if (!ro) return null;
                         return (
-                          <div key={ro.id} style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                          <div key={ro.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                             <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={serviceTypes} />
                           </div>
                         );
