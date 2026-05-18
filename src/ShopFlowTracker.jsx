@@ -742,7 +742,7 @@ function DisplayScreen({ state, onLogout }) {
       maxHeight: '100vh',
       background: '#000000',
       display: 'grid',
-      gridTemplateRows: '44px 26px 1fr 80px 148px',
+      gridTemplateRows: '44px 26px 1fr 80px 80px',
       overflow: 'hidden',
       fontFamily: '-apple-system,BlinkMacSystemFont,sans-serif',
       boxSizing: 'border-box',
@@ -914,19 +914,19 @@ function DisplayScreen({ state, onLogout }) {
         );
       })()}
 
-      {/* ── ZONE 5: STAGING QUEUES 148px ── */}
-      <div style={{ gridRow: 5, display: 'flex', gap: 4, padding: '4px 6px 6px', boxSizing: 'border-box', overflow: 'hidden' }}>
+      {/* ── ZONE 5: STAGING QUEUES 80px ── */}
+      <div style={{ gridRow: 5, display: 'flex', gap: 4, padding: '3px 6px 4px', boxSizing: 'border-box', overflow: 'hidden' }}>
         {(state.queues || []).map(queue => {
           const ids = state.qSlots[queue.id] || [];
           return (
             <div key={queue.id} style={{ flex: 1, minWidth: 0, background: 'rgba(14,18,30,0.97)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ height: 32, flexShrink: 0, background: 'linear-gradient(135deg,' + queue.color + 'DD,' + queue.color + '88)', display: 'flex', alignItems: 'center', padding: '0 10px', gap: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{queue.name}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.25)', padding: '1px 8px', borderRadius: 10, flexShrink: 0 }}>{ids.length}</span>
+              <div style={{ height: 20, flexShrink: 0, background: 'linear-gradient(135deg,' + queue.color + 'DD,' + queue.color + '88)', display: 'flex', alignItems: 'center', padding: '0 8px', gap: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{queue.name}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.25)', padding: '1px 6px', borderRadius: 8, flexShrink: 0 }}>{ids.length}</span>
               </div>
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 5, padding: '5px', overflowX: 'auto', overflowY: 'hidden', alignItems: 'stretch', boxSizing: 'border-box' }}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 4, padding: '3px 4px', overflowX: 'auto', overflowY: 'hidden', alignItems: 'stretch', boxSizing: 'border-box' }}>
                 {ids.length === 0 ? (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>No tickets</div>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>No tickets</div>
                 ) : (
                   ids.map(roId => {
                     const ro = getRO(roId);
