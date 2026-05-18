@@ -3106,7 +3106,6 @@ function RequestAccessScreen({ deviceId, onRequested, onApproved }) {
   const [role, setRole] = useState('tech');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showBypass, setShowBypass] = useState(false);
   const [bypassCode, setBypassCode] = useState('');
   const [bypassErr, setBypassErr] = useState(false);
 
@@ -3166,31 +3165,32 @@ function RequestAccessScreen({ deviceId, onRequested, onApproved }) {
             ))}
           </div>
         </div>
-        <button
-          onClick={handleRequest}
-          disabled={!name.trim() || loading}
-          style={{ padding:15, background:name.trim()?'#0A84FF':'rgba(255,255,255,0.06)', color:name.trim()?'#fff':'rgba(255,255,255,0.2)', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:name.trim()?'pointer':'default', marginTop:8 }}
-        >
-          {loading ? 'Sending...' : submitted ? '✓ Sent!' : 'Request Access'}
-        </button>
+        {role === 'admin' ? (
+          <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
+            <input
+              autoFocus
+              placeholder="Admin bypass code"
+              value={bypassCode}
+              onChange={e => setBypassCode(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && tryBypass()}
+              type="password"
+              style={{ width:'100%', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid '+(bypassErr?'#FF453A':'rgba(255,255,255,0.1)'), borderRadius:12, color:'#fff', fontSize:16, outline:'none', boxSizing:'border-box', colorScheme:'dark', textAlign:'center', letterSpacing:'3px' }}
+            />
+            <button onClick={tryBypass} style={{ padding:15, background:'#0A84FF', color:'#fff', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:'pointer' }}>
+              {bypassErr ? 'Incorrect code' : 'Unlock as Admin'}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleRequest}
+            disabled={!name.trim() || loading}
+            style={{ padding:15, background:name.trim()?'#0A84FF':'rgba(255,255,255,0.06)', color:name.trim()?'#fff':'rgba(255,255,255,0.2)', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:name.trim()?'pointer':'default', marginTop:8 }}
+          >
+            {loading ? 'Sending...' : submitted ? '✓ Sent!' : 'Request Access'}
+          </button>
+        )}
       </div>
       <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center' }}>{deviceId}</div>
-      {!showBypass ? (
-        <button onClick={() => setShowBypass(true)} style={{ padding:'8px 18px', background:'transparent', border:'none', color:'rgba(255,255,255,0.12)', fontSize:11, cursor:'pointer' }}>Admin bypass</button>
-      ) : (
-        <div style={{ width:'100%', maxWidth:280, display:'flex', flexDirection:'column', gap:8 }}>
-          <input
-            autoFocus
-            placeholder="Bypass code"
-            value={bypassCode}
-            onChange={e => setBypassCode(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && tryBypass()}
-            type="password"
-            style={{ width:'100%', padding:'12px 14px', background:'rgba(255,255,255,0.06)', border:'1px solid '+(bypassErr?'#FF453A':'rgba(255,255,255,0.1)'), borderRadius:10, color:'#fff', fontSize:15, outline:'none', boxSizing:'border-box', colorScheme:'dark', textAlign:'center', letterSpacing:'2px' }}
-          />
-          <button onClick={tryBypass} style={{ padding:12, background:'#0A84FF', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer' }}>Unlock</button>
-        </div>
-      )}
     </div>
   );
 }
