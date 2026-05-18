@@ -608,7 +608,7 @@ function abbrevJob(j) {
 }
 // ─── Display Mode ────────────────────────────────────────────────────────────
 
-function DisplayCard({ ro, timer, serviceTypes }) {
+function DisplayCard({ ro, timer, serviceTypes, cardH }) {
   const svcType = serviceTypes?.find(
     s => s.id === ro.serviceType
   );
@@ -631,9 +631,9 @@ function DisplayCard({ ro, timer, serviceTypes }) {
 
   return (
     <div style={{
-      height: '100%',
-      flex: 1,
-      minHeight: 0,
+      height: cardH,
+      minHeight: cardH,
+      maxHeight: cardH,
       width: '100%',
       boxSizing: 'border-box',
       background: 'rgba(28,32,48,0.95)',
@@ -834,6 +834,20 @@ function DisplayCard({ ro, timer, serviceTypes }) {
 function DisplayScreen({ state, currentUser, onLogout }) {
   const techs = state.techs || [];
   const serviceTypes = state.serviceTypes || [];
+  const [rowH, setRowH] = useState(120);
+
+  useEffect(() => {
+    function calc() {
+      const vh = window.innerHeight;
+      const gridH = vh - 72 - 32 - 80 - 140 - 20;
+      const numTechs = techs.length || 4;
+      const rh = Math.floor((gridH - (numTechs - 1) * 3) / numTechs);
+      setRowH(Math.max(rh, 80));
+    }
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, [techs.length]);
 
   function getRO(id) {
     return (state.ros || []).find(r => r.id === id);
@@ -846,6 +860,7 @@ function DisplayScreen({ state, currentUser, onLogout }) {
   return (
     <div style={{
       width: '100vw',
+      maxWidth: '100vw',
       height: '100vh',
       background: '#000000',
       display: 'flex',
@@ -925,8 +940,8 @@ function DisplayScreen({ state, currentUser, onLogout }) {
       </div>
 
       {/* ── COLUMN HEADERS — fixed 32px ── */}
-      <div style={{ height: 32, minHeight: 32, maxHeight: 32, flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 8px', gap: 4, boxSizing: 'border-box' }}>
-        <div style={{ width: 90, flexShrink: 0 }}/>
+      <div style={{ height: 32, minHeight: 32, maxHeight: 32, flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 6px', gap: 3, boxSizing: 'border-box' }}>
+        <div style={{ width: 110, minWidth: 110, flexShrink: 0 }}/>
         {COLS.map(col => (
           <div key={col.id} style={{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: 700, color: col.color, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
             {col.label}
@@ -935,22 +950,24 @@ function DisplayScreen({ state, currentUser, onLogout }) {
       </div>
 
       {/* ── KANBAN GRID — flex:1 fills remaining ── */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '0 8px', gap: 3, boxSizing: 'border-box', overflow: 'hidden' }}>
+      {console.log('[Display] vh:', window.innerHeight, 'rowH:', rowH, 'techs:', techs.length) || null}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '0 6px', gap: 3, boxSizing: 'border-box', overflow: 'hidden' }}>
         {techs.map(tech => {
           const allIds = COLS.flatMap(c => (state.grid[tech.id] || {})[c.id] || []);
           const techHrs = allIds.reduce((s, id) => {
             const ro = getRO(id);
             return s + (parseFloat(String(ro?.hours || '0').replace(/[^0-9.]/g, '')) || 0);
           }, 0);
+          const GAP = 4;
 
           return (
-            <div key={tech.id} style={{ flex: 1, minHeight: 0, display: 'flex', gap: 4, alignItems: 'stretch' }}>
+            <div key={tech.id} style={{ height: rowH, minHeight: rowH, maxHeight: rowH, display: 'flex', gap: 3, alignItems: 'stretch', flexShrink: 0 }}>
               {/* Tech card */}
-              <div style={{ width: 90, minWidth: 90, flexShrink: 0, background: 'rgba(22,26,42,0.98)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 4px', boxSizing: 'border-box', overflow: 'hidden' }}>
+              <div style={{ width: 110, minWidth: 110, height: rowH, flexShrink: 0, background: 'rgba(22,26,42,0.98)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 4px', boxSizing: 'border-box', overflow: 'hidden' }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg,#1D6BF3,#0A84FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
                   {initials(tech.name)}
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.8)', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 4px', boxSizing: 'border-box' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.9)', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 6px', boxSizing: 'border-box' }}>
                   {tech.name}
                 </div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: techHrs > 0 ? '#30D158' : 'rgba(255,255,255,0.2)', background: techHrs > 0 ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 5, whiteSpace: 'nowrap' }}>
@@ -961,8 +978,10 @@ function DisplayScreen({ state, currentUser, onLogout }) {
               {/* Kanban cells */}
               {COLS.map(col => {
                 const ids = (state.grid[tech.id] || {})[col.id] || [];
+                const numCards = ids.length;
+                const cardH = numCards === 0 ? rowH : Math.floor((rowH - 10 - (numCards - 1) * GAP) / numCards);
                 return (
-                  <div key={col.id} style={{ flex: 1, minWidth: 0, minHeight: 0, background: 'rgba(8,10,18,0.7)', border: '0.5px solid ' + col.border, borderRadius: 10, padding: 5, display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden', boxSizing: 'border-box' }}>
+                  <div key={col.id} style={{ flex: 1, minWidth: 0, height: rowH, background: 'rgba(8,10,18,0.7)', border: '0.5px solid ' + col.border, borderRadius: 10, padding: 5, display: 'flex', flexDirection: 'column', gap: GAP, overflow: 'hidden', boxSizing: 'border-box' }}>
                     {ids.length === 0 ? (
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                         <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)' }}/>
@@ -973,8 +992,8 @@ function DisplayScreen({ state, currentUser, onLogout }) {
                         const ro = getRO(roId);
                         if (!ro) return null;
                         return (
-                          <div key={ro.id} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                            <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={serviceTypes} />
+                          <div key={ro.id} style={{ height: cardH, minHeight: cardH, maxHeight: cardH, width: '100%', flexShrink: 0, overflow: 'hidden' }}>
+                            <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={serviceTypes} cardH={cardH} />
                           </div>
                         );
                       })
