@@ -3687,8 +3687,9 @@ export default function ShopFlowTracker() {
     upd(s => {
       const ns = removeFromAll(s, roId);
       if (dest.type === "grid") {
-        const existing = ns.grid[dest.techId][dest.colId] || [];
-        const newState = { ...ns, grid: { ...ns.grid, [dest.techId]: { ...ns.grid[dest.techId], [dest.colId]: [...existing, roId] } } };
+        const techGrid = ns.grid[dest.techId] || { ondeck:[], inprogress:[], completed:[], delivered:[] };
+        const existing = techGrid[dest.colId] || [];
+        const newState = { ...ns, grid: { ...ns.grid, [dest.techId]: { ...techGrid, [dest.colId]: [...existing, roId] } } };
         // Track cumulative completed — only add once per RO per tech
         if (dest.colId === "completed" || dest.colId === "delivered") {
           const key = dest.techId + "_" + roId;
