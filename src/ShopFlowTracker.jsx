@@ -35,7 +35,7 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
     "@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)} 40%{transform:translateX(9px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }",
     "* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }",
     "input, select, textarea { color-scheme: dark; }",
-    "::-webkit-scrollbar { width: 0px; }",
+    "::-webkit-scrollbar { width: 0px; height: 0px; }",
     ".card-press { transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease, background 0.15s ease; }",
     ".card-press:active { transform: scale(0.96) !important; }",
     ".col-snap { scroll-snap-type: x mandatory; }",
@@ -3953,12 +3953,12 @@ export default function ShopFlowTracker() {
             <div style={{ flexShrink:0, filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))" }}>
               <WFLogo size={34} radius={7} />
             </div>
-            <div style={{ flex:isWide?0:1 }}>
+            <div style={{ flexShrink:0 }}>
               <div style={{ color:TEXT, fontWeight:700, fontSize:isWide?15:14, letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif" }}><span style={{color:TEXT}}>Worq</span><span style={{background:"linear-gradient(135deg,#60B3FF,#0A84FF)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>flow</span></div>
               <div style={{ color:TEXT3, fontSize:10, marginTop:1, letterSpacing:"0.1px" }}>{currentUser.name}</div>
             </div>
-            <LiveClock />
-            {!isAdvisor && (
+            {isWide && <LiveClock />}
+            {!isAdvisor && isWide && (
               <div style={{ flex:1, display:"flex", justifyContent:"center" }}>
                 <div style={{ background:"rgba(14,18,30,0.9)", borderRadius:12, padding:"8px 16px", display:"flex", alignItems:"center", gap:12, minWidth:isWide?260:180, border:"0.5px solid rgba(255,255,255,0.08)", boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 2px 8px rgba(0,0,0,0.4)", borderTop:"0.5px solid rgba(255,255,255,0.12)" }}>
                   <span style={{ color:SUCCESS, display:"flex", alignItems:"center" }}><DollarIcon /></span>
@@ -3977,8 +3977,8 @@ export default function ShopFlowTracker() {
                 </div>
               </div>
             )}
-            {isAdvisor && <div style={{ flex:1 }}/>}
-            <div style={{ display:"flex", gap:8 }}>
+            {(isAdvisor || !isWide) && <div style={{ flex:1 }}/>}
+            <div style={{ display:"flex", gap:8, ...(isWide ? {} : { overflowX:"auto", flexShrink:0, maxWidth:"calc(100vw - 150px)", WebkitOverflowScrolling:"touch", scrollbarWidth:"none", msOverflowStyle:"none", paddingBottom:2 }) }}>
               {canSeeAll && (
                 <button onClick={() => setShowAnalytics(true)} title="Analytics" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                   <AnalyticsIcon />
