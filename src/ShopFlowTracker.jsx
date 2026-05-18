@@ -3803,34 +3803,7 @@ export default function ShopFlowTracker() {
     setCurrentUser(adminUser);
   }
 
-  if (deviceStatus === 'checking') {
-    return (
-      <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16, fontFamily:'-apple-system,sans-serif' }}>
-        <WFLogo size={64} radius={10} />
-        <div style={{ fontSize:14, color:'rgba(255,255,255,0.3)', letterSpacing:'0.02em' }}>Verifying device…</div>
-      </div>
-    );
-  }
-  if (deviceStatus === 'unregistered') {
-    return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} onAdminOverride={(user, devId) => handleAdminDeviceOverride(user, devId)} onDisplayBypass={() => handleDisplayBypass(deviceId.current)} />;
-  }
-  if (deviceStatus === 'pending') {
-    return <PendingScreen deviceId={deviceId.current} onAdminOverride={(user, devId) => handleAdminDeviceOverride(user, devId)} onRecheck={() => setDeviceStatus('checking')} onDisplayBypass={() => handleDisplayBypass(deviceId.current)} />;
-  }
-  if (deviceStatus === 'denied') {
-    return (
-      <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:20, padding:32, fontFamily:'-apple-system,sans-serif' }}>
-        <WFLogo size={72} radius={11} />
-        <div style={{ textAlign:'center' }}>
-          <div style={{ fontSize:24, fontWeight:700, color:'#FF453A', marginBottom:8 }}>Access Denied</div>
-          <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>This device has been denied access.<br/>Contact your admin for assistance.</div>
-        </div>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center', marginTop:8 }}>{deviceId.current}</div>
-        <DisplayBypassButton onDisplayBypass={() => handleDisplayBypass(deviceId.current)} />
-      </div>
-    );
-  }
-
+  // Login screen is ALWAYS shown first — display PIN 9999 works on any device
   if (!currentUser) {
     const nonTechUsers = USERS.filter(u => u.role !== "tech");
     const dynamicTechs = (state.techs||DEFAULT_TECHS).map(t => ({ ...t, role:"tech" }));
@@ -3855,6 +3828,37 @@ export default function ShopFlowTracker() {
       }
     }
     return <LoginScreen onLogin={handleLogin} users={loginUsers} />;
+  }
+
+  // ── Device gate — only for non-display users on unapproved devices ──────────
+  if (currentUser.role !== 'display' && deviceStatus !== 'approved') {
+    if (deviceStatus === 'checking') {
+      return (
+        <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16, fontFamily:'-apple-system,sans-serif' }}>
+          <WFLogo size={64} radius={10} />
+          <div style={{ fontSize:14, color:'rgba(255,255,255,0.3)', letterSpacing:'0.02em' }}>Verifying device…</div>
+        </div>
+      );
+    }
+    if (deviceStatus === 'unregistered') {
+      return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} onAdminOverride={(user, devId) => handleAdminDeviceOverride(user, devId)} onDisplayBypass={() => handleDisplayBypass(deviceId.current)} />;
+    }
+    if (deviceStatus === 'pending') {
+      return <PendingScreen deviceId={deviceId.current} onAdminOverride={(user, devId) => handleAdminDeviceOverride(user, devId)} onRecheck={() => setDeviceStatus('checking')} onDisplayBypass={() => handleDisplayBypass(deviceId.current)} />;
+    }
+    if (deviceStatus === 'denied') {
+      return (
+        <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:20, padding:32, fontFamily:'-apple-system,sans-serif' }}>
+          <WFLogo size={72} radius={11} />
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:24, fontWeight:700, color:'#FF453A', marginBottom:8 }}>Access Denied</div>
+            <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>This device has been denied access.<br/>Contact your admin for assistance.</div>
+          </div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center', marginTop:8 }}>{deviceId.current}</div>
+          <button onClick={() => setCurrentUser(null)} style={{ marginTop:8, padding:'8px 20px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, color:'rgba(255,255,255,0.3)', fontSize:12, cursor:'pointer' }}>← Back to login</button>
+        </div>
+      );
+    }
   }
 
   // ── Display Mode — 5-zone TV layout, 100vh no scroll ──────────────────────
