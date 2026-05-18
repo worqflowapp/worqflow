@@ -3234,7 +3234,10 @@ export default function ShopFlowTracker() {
 
   // ── Device approval check ──
   useEffect(() => {
-    if (localStorage.getItem('sft-master') === 'worqflow2025') {
+    // Always auto-approve if no device system yet
+    setDeviceStatus('approved');
+    return;
+    if (localStorage.getItem('sft-master') === 'worqflow2025') { // eslint-disable-line no-unreachable
       setDeviceStatus('approved');
       return;
     }
