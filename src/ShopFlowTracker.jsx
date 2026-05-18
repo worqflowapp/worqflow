@@ -3101,96 +3101,132 @@ function PendingScreen({ deviceId, onApproved, onRecheck }) {
 }
 
 // ─── Request Access Screen ────────────────────────────────────────────────────
-function RequestAccessScreen({ deviceId, onRequested, onApproved }) {
+function RequestAccessScreen({ deviceId, onRequested, onAdminOverride }) {
   const [name, setName] = useState('');
   const [role, setRole] = useState('tech');
-  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [bypassCode, setBypassCode] = useState('');
-  const [bypassErr, setBypassErr] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [showAdminPin, setShowAdminPin] = useState(false);
+  const [adminPin, setAdminPin] = useState('');
+  const [pinErr, setPinErr] = useState('');
+  const [pinShake, setPinShake] = useState(false);
+  const adminUser = USERS.find(u => u.role === 'admin');
+  const PIN_LEN = adminUser?.pin?.length || 6;
+  const [adminDots, setAdminDots] = useState(() => Array(PIN_LEN).fill(false));
+
+  function handleAdminPadPress(val) {
+    if (pinShake) return;
+    if (val === 'del') {
+      const np = adminPin.slice(0, -1);
+      setAdminPin(np);
+      setAdminDots(d => { const n = [...d]; n[np.length] = false; return n; });
+      setPinErr('');
+    } else {
+      if (adminPin.length >= PIN_LEN) return;
+      const np = adminPin + val;
+      setAdminPin(np);
+      setAdminDots(d => { const n = [...d]; n[np.length - 1] = true; return n; });
+      if (np.length === PIN_LEN) {
+        setTimeout(() => {
+          const saved = JSON.parse(localStorage.getItem('sft-pins') || '{}');
+          const activePin = saved[adminUser.id] || adminUser.pin;
+          if (np === activePin) {
+            onAdminOverride(adminUser, deviceId);
+          } else {
+            setPinShake(true);
+            setPinErr('Incorrect admin PIN');
+            setTimeout(() => {
+              setPinShake(false); setPinErr('');
+              setAdminPin(''); setAdminDots(Array(PIN_LEN).fill(false));
+            }, 1200);
+          }
+        }, 120);
+      }
+    }
+  }
 
   async function handleRequest() {
     if (!name.trim()) return;
     setLoading(true);
     try {
       await setDoc(doc(db, 'devices', deviceId), {
-        deviceId,
-        name: name.trim(),
-        role,
-        status: 'pending',
-        requestedAt: Date.now(),
-        userAgent: navigator.userAgent,
+        deviceId, name: name.trim(), role,
+        status: 'pending', requestedAt: Date.now(), userAgent: navigator.userAgent,
       });
       setSubmitted(true);
       setTimeout(() => onRequested(), 1500);
-    } catch(e) {
-      console.error('Request failed', e);
-    }
+    } catch(e) { console.error('Request failed', e); }
     setLoading(false);
   }
 
-  function tryBypass() {
-    if (bypassCode === 'worqflow2025') {
-      localStorage.setItem('sft-master', 'worqflow2025');
-      onApproved();
-    } else {
-      setBypassErr(true);
-      setTimeout(() => setBypassErr(false), 1500);
-    }
-  }
+  const PAD = [['1','2','3'],['4','5','6'],['7','8','9'],['','0','del']];
 
   return (
-    <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:24, padding:32, fontFamily:'-apple-system,sans-serif' }}>
-      <WFLogo size={72} radius={11} />
-      <div style={{ textAlign:'center' }}>
-        <div style={{ fontSize:26, fontWeight:700, color:'#fff', marginBottom:8 }}>Request Access</div>
-        <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.6 }}>This device is not registered.<br/>Enter your info to request access.</div>
-      </div>
-      <div style={{ width:'100%', maxWidth:320, display:'flex', flexDirection:'column', gap:12 }}>
-        <div>
-          <label style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.8px', display:'block', marginBottom:6 }}>Your Name</label>
-          <input
-            placeholder="e.g. Marcus"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleRequest()}
-            style={{ width:'100%', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, color:'#fff', fontSize:16, outline:'none', boxSizing:'border-box', colorScheme:'dark' }}
-          />
-        </div>
-        <div>
-          <label style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.8px', display:'block', marginBottom:6 }}>Role</label>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-            {[['tech','Technician'],['advisor','Advisor'],['manager','Manager'],['admin','Admin']].map(([v,l]) => (
-              <button key={v} onClick={() => setRole(v)} style={{ flex:'1 1 calc(50% - 4px)', padding:'10px 0', borderRadius:12, border:'2px solid '+(role===v?'#0A84FF':'rgba(255,255,255,0.08)'), background:role===v?'rgba(10,132,255,0.12)':'transparent', color:role===v?'#0A84FF':'rgba(255,255,255,0.4)', fontSize:12, fontWeight:600, cursor:'pointer' }}>{l}</button>
-            ))}
+    <div style={{ minHeight:'100vh', background:'#000000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', padding:'32px 24px', fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif', position:'relative', overflow:'hidden' }}>
+      <div style={{ position:'absolute', top:'-20%', left:'50%', transform:'translateX(-50%)', width:400, height:400, borderRadius:'50%', background:'radial-gradient(circle,rgba(10,132,255,0.08) 0%,transparent 70%)', pointerEvents:'none' }}/>
+
+      {!showAdminPin ? (
+        <>
+          <div style={{ marginBottom:28, textAlign:'center' }}><WFLogo size={72} radius={11} /></div>
+          <div style={{ textAlign:'center', marginBottom:32 }}>
+            <div style={{ fontSize:26, fontWeight:700, color:'#fff', marginBottom:8, letterSpacing:'-0.5px' }}>Request Access</div>
+            <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.6, maxWidth:280 }}>This device is not registered.<br/>Enter your info to request access from your admin.</div>
           </div>
-        </div>
-        {role === 'admin' ? (
-          <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
-            <input
-              autoFocus
-              placeholder="Admin bypass code"
-              value={bypassCode}
-              onChange={e => setBypassCode(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && tryBypass()}
-              type="password"
-              style={{ width:'100%', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid '+(bypassErr?'#FF453A':'rgba(255,255,255,0.1)'), borderRadius:12, color:'#fff', fontSize:16, outline:'none', boxSizing:'border-box', colorScheme:'dark', textAlign:'center', letterSpacing:'3px' }}
-            />
-            <button onClick={tryBypass} style={{ padding:15, background:'#0A84FF', color:'#fff', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:'pointer' }}>
-              {bypassErr ? 'Incorrect code' : 'Unlock as Admin'}
+          <div style={{ width:'100%', maxWidth:340, display:'flex', flexDirection:'column', gap:14 }}>
+            <div>
+              <label style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.8px', display:'block', marginBottom:6 }}>Your Name</label>
+              <input autoFocus placeholder="e.g. Marcus" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key==='Enter' && handleRequest()}
+                style={{ width:'100%', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, color:'#fff', fontSize:16, outline:'none', boxSizing:'border-box', colorScheme:'dark' }} />
+            </div>
+            <div>
+              <label style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.8px', display:'block', marginBottom:6 }}>Role</label>
+              <div style={{ display:'flex', gap:8 }}>
+                {[['tech','Tech'],['advisor','Advisor'],['manager','Manager']].map(([v,l]) => (
+                  <button key={v} onClick={() => setRole(v)} style={{ flex:1, padding:'10px 0', borderRadius:12, border:'2px solid '+(role===v?'#0A84FF':'rgba(255,255,255,0.08)'), background:role===v?'rgba(10,132,255,0.12)':'transparent', color:role===v?'#0A84FF':'rgba(255,255,255,0.4)', fontSize:12, fontWeight:600, cursor:'pointer' }}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <button onClick={handleRequest} disabled={!name.trim()||loading}
+              style={{ padding:15, background:name.trim()?'linear-gradient(135deg,#1D6BF3,#0A84FF)':'rgba(255,255,255,0.06)', color:name.trim()?'#fff':'rgba(255,255,255,0.2)', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:name.trim()?'pointer':'default', marginTop:4, letterSpacing:'-0.2px' }}>
+              {loading ? 'Sending…' : submitted ? '✓ Request Sent!' : 'Request Access'}
             </button>
           </div>
-        ) : (
-          <button
-            onClick={handleRequest}
-            disabled={!name.trim() || loading}
-            style={{ padding:15, background:name.trim()?'#0A84FF':'rgba(255,255,255,0.06)', color:name.trim()?'#fff':'rgba(255,255,255,0.2)', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:name.trim()?'pointer':'default', marginTop:8 }}
-          >
-            {loading ? 'Sending...' : submitted ? '✓ Sent!' : 'Request Access'}
+          <div style={{ marginTop:24, fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center' }}>{deviceId}</div>
+          <button onClick={() => setShowAdminPin(true)} style={{ marginTop:32, background:'none', border:'none', color:'rgba(255,255,255,0.15)', fontSize:12, cursor:'pointer', padding:'8px 16px' }}>Admin? Sign in here</button>
+        </>
+      ) : (
+        <>
+          <div style={{ marginBottom:28, textAlign:'center' }}><WFLogo size={72} radius={11} /></div>
+          <div style={{ textAlign:'center', marginBottom:8 }}>
+            <div style={{ fontSize:22, fontWeight:700, color:'#fff', letterSpacing:'-0.4px', marginBottom:4 }}>Admin Access</div>
+            <div style={{ fontSize:13, color:'rgba(255,255,255,0.35)' }}>Enter your admin PIN to continue</div>
+          </div>
+          <div style={{ display:'flex', gap:16, marginTop:24, marginBottom:8, animation:pinShake?'shake 0.4s ease':'none' }}>
+            {Array.from({ length:PIN_LEN }).map((_,i) => (
+              <div key={i} style={{ width:14, height:14, borderRadius:'50%', background:adminDots[i]?'#0A84FF':'rgba(255,255,255,0.15)', transition:'background 0.15s ease' }}/>
+            ))}
+          </div>
+          <div style={{ height:20, marginBottom:16, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {pinErr && <span style={{ fontSize:12, color:'#FF453A', fontWeight:500 }}>{pinErr}</span>}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, width:'100%', maxWidth:300 }}>
+            {PAD.flat().map((key,i) => {
+              if (key==='') return <div key={i}/>;
+              const isDel = key==='del';
+              return (
+                <button key={i} className="pad-btn" onPointerDown={e => { e.preventDefault(); handleAdminPadPress(key); }}
+                  style={{ height:76, borderRadius:22, border:'none', background:isDel?'rgba(255,255,255,0.05)':'rgba(255,255,255,0.09)', color:isDel?'rgba(255,255,255,0.55)':'#fff', fontSize:isDel?20:28, fontWeight:300, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:isDel?'0 1px 0 rgba(255,255,255,0.06) inset':'0 1px 0 rgba(255,255,255,0.14) inset,0 4px 16px rgba(0,0,0,0.5)', fontFamily:'-apple-system,sans-serif', WebkitUserSelect:'none', userSelect:'none', touchAction:'manipulation' }}>
+                  {isDel ? '⌫' : key}
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={() => { setShowAdminPin(false); setAdminPin(''); setPinErr(''); setAdminDots(Array(PIN_LEN).fill(false)); }}
+            style={{ marginTop:28, background:'none', border:'none', color:'rgba(255,255,255,0.3)', fontSize:13, cursor:'pointer', padding:'8px 16px' }}>
+            ← Back to request form
           </button>
-        )}
-      </div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center' }}>{deviceId}</div>
+        </>
+      )}
     </div>
   );
 }
@@ -3234,25 +3270,21 @@ export default function ShopFlowTracker() {
 
   // ── Device approval check ──
   useEffect(() => {
-    // Always auto-approve if no device system yet
-    setDeviceStatus('approved');
-    return;
-    if (localStorage.getItem('sft-master') === 'worqflow2025') { // eslint-disable-line no-unreachable
-      setDeviceStatus('approved');
-      return;
-    }
     async function checkDevice() {
       try {
+        if (localStorage.getItem('sft-master') === 'worqflow2025') {
+          setDeviceStatus('approved');
+          return;
+        }
         const snap = await getDoc(doc(db, 'devices', deviceId.current));
-        if (!snap.exists()) {
-          setDeviceStatus('unregistered');
+        if (snap.exists()) {
+          setDeviceStatus(snap.data().status || 'pending');
         } else {
-          const data = snap.data();
-          setDeviceStatus(data.status === 'approved' ? 'approved' : data.status === 'denied' ? 'denied' : 'pending');
+          setDeviceStatus('unregistered');
         }
       } catch(e) {
-        console.error('Device check failed', e);
-        setDeviceStatus('approved'); // fail open so Firebase errors don't lock users out
+        console.warn('[ShopFlow] Device check failed', e);
+        setDeviceStatus('approved'); // fail open — Firebase errors must never lock users out
       }
     }
     checkDevice();
@@ -3593,6 +3625,22 @@ export default function ShopFlowTracker() {
   // We pass this as a string for CSS calc
   const CELL_W_MOBILE = 148;
   const useFluid = isWide;  // fluid = fills screen, fixed = scrolls
+  async function handleAdminDeviceOverride(adminUser, devId) {
+    try {
+      await setDoc(doc(db, 'devices', devId), {
+        deviceId: devId,
+        name: adminUser.name || 'Admin Device',
+        role: 'admin',
+        status: 'approved',
+        requestedAt: Date.now(),
+        approvedAt: Date.now(),
+        userAgent: navigator.userAgent,
+      }, { merge: true });
+    } catch(e) { /* non-critical — still let them in */ }
+    setDeviceStatus('approved');
+    setCurrentUser(adminUser);
+  }
+
   if (deviceStatus === 'checking') {
     return (
       <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16, fontFamily:'-apple-system,sans-serif' }}>
@@ -3602,7 +3650,7 @@ export default function ShopFlowTracker() {
     );
   }
   if (deviceStatus === 'unregistered') {
-    return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} onApproved={() => setDeviceStatus('approved')} />;
+    return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} onAdminOverride={(user, devId) => handleAdminDeviceOverride(user, devId)} />;
   }
   if (deviceStatus === 'pending') {
     return <PendingScreen deviceId={deviceId.current} onApproved={() => setDeviceStatus('approved')} onRecheck={() => setDeviceStatus('checking')} />;
