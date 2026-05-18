@@ -3579,9 +3579,11 @@ export default function ShopFlowTracker() {
   // ── Debounced save ──
   const scheduleSave = useCallback((s) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
+    // Capture and immediately reset the remote flag so any user change
+    // made after a remote snapshot is never mistakenly skipped.
+    const fromRemote = isRemote.current;
+    isRemote.current = false;
     saveTimer.current = setTimeout(async () => {
-      const fromRemote = isRemote.current;
-      isRemote.current = false;
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
       if (!fromRemote) {
         try { await setDoc(doc(db, 'shopstate', 'main'), s); }
