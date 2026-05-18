@@ -4199,10 +4199,12 @@ export default function ShopFlowTracker() {
               <button onClick={() => setShowChangePin(true)} title="Change PIN" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <KeyIcon />
               </button>
-              <button onClick={() => handleLogout()} style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            </div>}
+            {(isAdmin || (isTech && isWide)) && (
+              <button onClick={() => handleLogout()} title="Switch Account" style={{ flexShrink:0, width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <LogoutIcon />
               </button>
-            </div>}
+            )}
           </>
         )}
       </div>
