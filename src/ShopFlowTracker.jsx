@@ -3057,6 +3057,49 @@ function getDeviceId() {
   return id;
 }
 
+// ─── Pending Screen ───────────────────────────────────────────────────────────
+function PendingScreen({ deviceId, onApproved, onRecheck }) {
+  const [showBypass, setShowBypass] = useState(false);
+  const [code, setCode] = useState('');
+  const [err, setErr] = useState(false);
+  function tryBypass() {
+    if (code === 'worqflow2025') {
+      localStorage.setItem('sft-master', 'worqflow2025');
+      onApproved();
+    } else {
+      setErr(true);
+      setTimeout(() => setErr(false), 1500);
+    }
+  }
+  return (
+    <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:20, padding:32, fontFamily:'-apple-system,sans-serif' }}>
+      <WFLogo size={72} radius={11} />
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontSize:24, fontWeight:700, color:'#fff', marginBottom:8 }}>Awaiting Approval</div>
+        <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>Your access request has been submitted.<br/>An admin will approve this device shortly.</div>
+      </div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center' }}>{deviceId}</div>
+      <button onClick={onRecheck} style={{ padding:'10px 24px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, color:'rgba(255,255,255,0.4)', fontSize:13, cursor:'pointer' }}>Check Again</button>
+      {!showBypass ? (
+        <button onClick={() => setShowBypass(true)} style={{ padding:'8px 18px', background:'transparent', border:'none', color:'rgba(255,255,255,0.12)', fontSize:11, cursor:'pointer' }}>Enter bypass code</button>
+      ) : (
+        <div style={{ width:'100%', maxWidth:280, display:'flex', flexDirection:'column', gap:8 }}>
+          <input
+            autoFocus
+            placeholder="Bypass code"
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && tryBypass()}
+            type="password"
+            style={{ width:'100%', padding:'12px 14px', background:'rgba(255,255,255,0.06)', border:'1px solid '+(err?'#FF453A':'rgba(255,255,255,0.1)'), borderRadius:10, color:'#fff', fontSize:15, outline:'none', boxSizing:'border-box', colorScheme:'dark', textAlign:'center', letterSpacing:'2px' }}
+          />
+          <button onClick={tryBypass} style={{ padding:12, background:'#0A84FF', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer' }}>Unlock</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Request Access Screen ────────────────────────────────────────────────────
 function RequestAccessScreen({ deviceId, onRequested }) {
   const [name, setName] = useState('');
@@ -3530,17 +3573,7 @@ export default function ShopFlowTracker() {
     return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} />;
   }
   if (deviceStatus === 'pending') {
-    return (
-      <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:20, padding:32, fontFamily:'-apple-system,sans-serif' }}>
-        <WFLogo size={72} radius={11} />
-        <div style={{ textAlign:'center' }}>
-          <div style={{ fontSize:24, fontWeight:700, color:'#fff', marginBottom:8 }}>Awaiting Approval</div>
-          <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>Your access request has been submitted.<br/>An admin will approve this device shortly.</div>
-        </div>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center', marginTop:8 }}>{deviceId.current}</div>
-        <button onClick={() => { setDeviceStatus('checking'); }} style={{ marginTop:8, padding:'10px 24px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, color:'rgba(255,255,255,0.4)', fontSize:13, cursor:'pointer' }}>Check Again</button>
-      </div>
-    );
+    return <PendingScreen deviceId={deviceId.current} onApproved={() => setDeviceStatus('approved')} onRecheck={() => setDeviceStatus('checking')} />;
   }
   if (deviceStatus === 'denied') {
     return (
