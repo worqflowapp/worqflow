@@ -625,31 +625,31 @@ function DisplayCard({ ro, timer, serviceTypes }) {
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      justifyContent: 'space-between',
+      justifyContent: 'space-around',
       boxSizing: 'border-box',
       background: 'rgba(28,32,48,0.95)',
       borderRadius: 8,
       border: '1px solid rgba(255,255,255,0.08)',
       borderLeft: '3px solid ' + leftColor,
-      padding: '5px 7px',
+      padding: '4px 6px',
       overflow: 'hidden',
       animation: ro.priority === 'HIGH' ? 'urgent-glow 2.4s ease-in-out infinite' : 'none',
     }}>
 
       {/* ROW 1 — RO# + service type */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, overflow: 'hidden', flexShrink: 0 }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: '#FFFFFF', whiteSpace: 'nowrap', letterSpacing: '-0.2px', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ fontSize: 10, fontWeight: 800, color: '#FFFFFF', whiteSpace: 'nowrap', letterSpacing: '-0.2px', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {ro.roNum}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           {ro.priority === 'HIGH' && (
-            <span style={{ fontSize: 6, fontWeight: 700, color: '#FF453A', background: 'rgba(255,69,58,0.15)', padding: '1px 4px', borderRadius: 3, lineHeight: 1.4 }}>
+            <span style={{ fontSize: 5, fontWeight: 700, color: '#FF453A', background: 'rgba(255,69,58,0.15)', padding: '1px 4px', borderRadius: 3, lineHeight: 1.4 }}>
               URGENT
             </span>
           )}
           {svcType && (
-            <span style={{ fontSize: 7, fontWeight: 600, color: svcType.color, display: 'flex', alignItems: 'center', gap: 2, lineHeight: 1 }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: svcType.color, display: 'inline-block', flexShrink: 0 }}/>
+            <span style={{ fontSize: 6, fontWeight: 600, color: svcType.color, display: 'flex', alignItems: 'center', gap: 2, lineHeight: 1 }}>
+              <span style={{ width: 4, height: 4, borderRadius: '50%', background: svcType.color, display: 'inline-block', flexShrink: 0 }}/>
               {svcType.name}
             </span>
           )}
@@ -659,7 +659,7 @@ function DisplayCard({ ro, timer, serviceTypes }) {
       {/* ROW 2 — Vehicle */}
       <div style={{ overflow: 'hidden', flexShrink: 0 }}>
         <span style={{
-          fontSize: 10, fontWeight: 600,
+          fontSize: 9, fontWeight: 600,
           color: vehicle ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.2)',
           whiteSpace: 'nowrap', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
           lineHeight: 1.2, fontStyle: vehicle ? 'normal' : 'italic',
@@ -671,7 +671,7 @@ function DisplayCard({ ro, timer, serviceTypes }) {
       {/* ROW 3 — Customer */}
       <div style={{ overflow: 'hidden', flexShrink: 0 }}>
         <span style={{
-          fontSize: 9, fontWeight: 400,
+          fontSize: 8, fontWeight: 400,
           color: ro.customer ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.12)',
           whiteSpace: 'nowrap', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2,
         }}>
@@ -683,32 +683,32 @@ function DisplayCard({ ro, timer, serviceTypes }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 3, overflow: 'hidden', flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 2, flex: 1, overflow: 'hidden', alignItems: 'center', minWidth: 0 }}>
           {jobs.length === 0 ? (
-            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.15)', fontStyle: 'italic' }}>No jobs</span>
+            <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.15)', fontStyle: 'italic' }}>No jobs</span>
           ) : (
             <>
               {jobs.slice(0, 3).map((j, i) => {
                 const ab = abbrevJob(j);
                 return (
-                  <span key={i} style={{ background: ab.bg, color: ab.color, fontSize: 7, fontWeight: 700, padding: '1px 3px', borderRadius: 3, whiteSpace: 'nowrap', flexShrink: 0, lineHeight: 1.4 }}>
+                  <span key={i} style={{ background: ab.bg, color: ab.color, fontSize: 6, fontWeight: 700, padding: '1px 3px', borderRadius: 2, whiteSpace: 'nowrap', flexShrink: 0, lineHeight: 1.4 }}>
                     {ab.label}
                   </span>
                 );
               })}
               {jobs.length > 3 && (
-                <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>+{jobs.length - 3}</span>
+                <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>+{jobs.length - 3}</span>
               )}
             </>
           )}
         </div>
         <span style={{
-          fontSize: 7, color: timer?.running ? '#FF9F0A' : 'rgba(255,255,255,0.3)',
+          fontSize: 6, color: timer?.running ? '#FF9F0A' : 'rgba(255,255,255,0.3)',
           background: timer?.running ? 'rgba(255,159,10,0.12)' : 'rgba(255,255,255,0.05)',
           padding: '1px 3px', borderRadius: 3, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'monospace', lineHeight: 1.4,
         }}>
           {fmtTime(elapsed)}
         </span>
         <span style={{
-          fontSize: 7, fontWeight: 700,
+          fontSize: 6, fontWeight: 700,
           color: ro.hours ? '#30D158' : 'rgba(255,255,255,0.12)',
           background: ro.hours ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.03)',
           padding: '1px 3px', borderRadius: 3, whiteSpace: 'nowrap', flexShrink: 0, lineHeight: 1.4,
