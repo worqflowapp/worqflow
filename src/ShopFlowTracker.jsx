@@ -3545,10 +3545,9 @@ export default function ShopFlowTracker() {
       setConnected(true);
       if (snap.exists()) {
         isRemote.current = true;
-        // Merge with freshState() so missing fields from schema changes don't crash the app
         const data = snap.data();
         const fresh = freshState();
-        setState({
+        const remote = {
           ...fresh,
           ...data,
           timers:          data.timers          || {},
@@ -3567,10 +3566,40 @@ export default function ShopFlowTracker() {
           timeClockLog:    data.timeClockLog     || [],
           ros:             data.ros             || fresh.ros,
           displayPin:      data.displayPin      || "9999",
+        };
+        // Merge: preserve any locally-created ROs not yet flushed to Firestore.
+        // Without this, a snapshot from another device arriving mid-session
+        // would overwrite in-memory ROs that haven't been saved yet.
+        setState(prev => {
+          const remoteIds = new Set((remote.ros || []).map(r => r.id));
+          const localOnly = (prev.ros || []).filter(r => !remoteIds.has(r.id));
+          if (localOnly.length === 0) return remote;
+          const localOnlyIds = new Set(localOnly.map(r => r.id));
+          // Re-add local-only ROs to their grid/qSlots positions
+          const mergedGrid = { ...remote.grid };
+          Object.entries(prev.grid || {}).forEach(([tid, cols]) => {
+            Object.entries(cols || {}).forEach(([cid, ids]) => {
+              const keep = (ids || []).filter(id => localOnlyIds.has(id));
+              if (keep.length) {
+                const base = mergedGrid[tid] || { ondeck:[], inprogress:[], completed:[], delivered:[] };
+                mergedGrid[tid] = { ...base, [cid]: [...(base[cid] || []), ...keep] };
+              }
+            });
+          });
+          const mergedQSlots = { ...remote.qSlots };
+          Object.entries(prev.qSlots || {}).forEach(([qid, ids]) => {
+            const keep = (ids || []).filter(id => localOnlyIds.has(id));
+            if (keep.length) mergedQSlots[qid] = [...(mergedQSlots[qid] || []), ...keep];
+          });
+          return { ...remote, ros: [...remote.ros, ...localOnly], grid: mergedGrid, qSlots: mergedQSlots };
         });
       } else {
-        setDoc(ref, stateRef.current)
-          .catch(e => console.error('[ShopFlow] seed failed', e));
+        // Only seed Firestore if local state has real data to avoid wiping with empty state
+        if ((stateRef.current.ros || []).length > 0 || Object.keys(stateRef.current.grid || {}).length > 0) {
+          setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
+        } else {
+          setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
+        }
       }
     }, err => { setConnected(false); console.error('[ShopFlow] snapshot error', err); });
     return unsub;
@@ -3579,8 +3608,7 @@ export default function ShopFlowTracker() {
   // ── Debounced save ──
   const scheduleSave = useCallback((s) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    // Capture and immediately reset the remote flag so any user change
-    // made after a remote snapshot is never mistakenly skipped.
+    // Capture and reset remote flag immediately so user changes after a snapshot are never skipped
     const fromRemote = isRemote.current;
     isRemote.current = false;
     saveTimer.current = setTimeout(async () => {
@@ -3589,7 +3617,7 @@ export default function ShopFlowTracker() {
         try { await setDoc(doc(db, 'shopstate', 'main'), s); }
         catch (e) { console.error('[ShopFlow] save failed', e); }
       }
-    }, 800);
+    }, 300);
   }, []);
 
   useEffect(() => {
