@@ -623,61 +623,65 @@ function DisplayCard({ ro, timer, serviceTypes }) {
     <div style={{
       width: '100%',
       height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
       boxSizing: 'border-box',
       background: 'rgba(28,32,48,0.95)',
       borderRadius: 10,
       border: '1px solid rgba(255,255,255,0.08)',
       borderLeft: '3px solid ' + leftColor,
-      padding: '10px 12px',
-      display: 'grid',
-      gridTemplateRows: 'auto 1fr auto',
-      gap: 4,
+      padding: '8px 10px',
       overflow: 'hidden',
       animation: ro.priority === 'HIGH' ? 'urgent-glow 2.4s ease-in-out infinite' : 'none',
     }}>
 
-      {/* TOP ROW — RO# + badges */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, minWidth: 0 }}>
-        <span style={{ fontSize: 16, fontWeight: 800, color: '#FFFFFF', whiteSpace: 'nowrap', letterSpacing: '-0.3px', lineHeight: 1 }}>
+      {/* ROW 1 — RO# + service type badge */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, lineHeight: 1 }}>
+        <span style={{ fontSize: 15, fontWeight: 800, color: '#FFFFFF', whiteSpace: 'nowrap', letterSpacing: '-0.3px' }}>
           {ro.roNum}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
           {ro.priority === 'HIGH' && (
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#FF453A', background: 'rgba(255,69,58,0.15)', padding: '2px 6px', borderRadius: 4 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#FF453A', background: 'rgba(255,69,58,0.15)', padding: '2px 5px', borderRadius: 4 }}>
               URGENT
             </span>
           )}
           {svcType && (
             <span style={{ fontSize: 10, fontWeight: 600, color: svcType.color, display: 'flex', alignItems: 'center', gap: 3 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: svcType.color, display: 'inline-block' }}/>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: svcType.color, display: 'inline-block', flexShrink: 0 }}/>
               {svcType.name}
             </span>
           )}
         </div>
       </div>
 
-      {/* MIDDLE ROW — Vehicle + Customer (1fr — fills leftover space) */}
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3, minHeight: 0, overflow: 'hidden' }}>
-        <div style={{
-          fontSize: 14, fontWeight: 600,
-          color: vehicle ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.2)',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          lineHeight: 1.3, fontStyle: vehicle ? 'normal' : 'italic',
+      {/* ROW 2 — Vehicle */}
+      <div style={{ lineHeight: 1.2, overflow: 'hidden' }}>
+        <span style={{
+          fontSize: 13, fontWeight: 600,
+          color: vehicle ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.2)',
+          whiteSpace: 'nowrap', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
+          fontStyle: vehicle ? 'normal' : 'italic',
         }}>
           {vehicle || 'No vehicle'}
-        </div>
-        <div style={{
-          fontSize: 12, fontWeight: 400,
-          color: ro.customer ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3,
-        }}>
-          {ro.customer || '—'}
-        </div>
+        </span>
       </div>
 
-      {/* BOTTOM ROW — Jobs + Timer + Hours */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', gap: 3, flex: 1, overflow: 'hidden', alignItems: 'center' }}>
+      {/* ROW 3 — Customer */}
+      <div style={{ lineHeight: 1.2, overflow: 'hidden' }}>
+        <span style={{
+          fontSize: 11, fontWeight: 400,
+          color: ro.customer ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
+          whiteSpace: 'nowrap', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
+        }}>
+          {ro.customer || '—'}
+        </span>
+      </div>
+
+      {/* ROW 4 — Jobs + Timer + Hours */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', lineHeight: 1 }}>
+        <div style={{ display: 'flex', gap: 3, flex: 1, overflow: 'hidden', alignItems: 'center', minWidth: 0 }}>
           {jobs.length === 0 ? (
             <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.15)', fontStyle: 'italic' }}>No jobs</span>
           ) : (
@@ -685,7 +689,7 @@ function DisplayCard({ ro, timer, serviceTypes }) {
               {jobs.slice(0, 3).map((j, i) => {
                 const ab = abbrevJob(j);
                 return (
-                  <span key={i} style={{ background: ab.bg, color: ab.color, fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  <span key={i} style={{ background: ab.bg, color: ab.color, fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {ab.label}
                   </span>
                 );
@@ -697,17 +701,17 @@ function DisplayCard({ ro, timer, serviceTypes }) {
           )}
         </div>
         <span style={{
-          fontSize: 10, color: timer?.running ? '#FF9F0A' : 'rgba(255,255,255,0.3)',
+          fontSize: 9, color: timer?.running ? '#FF9F0A' : 'rgba(255,255,255,0.3)',
           background: timer?.running ? 'rgba(255,159,10,0.12)' : 'rgba(255,255,255,0.05)',
-          padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'monospace',
+          padding: '2px 5px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'monospace',
         }}>
           {fmtTime(elapsed)}
         </span>
         <span style={{
-          fontSize: 10, fontWeight: 700,
-          color: ro.hours ? '#30D158' : 'rgba(255,255,255,0.15)',
-          background: ro.hours ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.04)',
-          padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0,
+          fontSize: 9, fontWeight: 700,
+          color: ro.hours ? '#30D158' : 'rgba(255,255,255,0.12)',
+          background: ro.hours ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.03)',
+          padding: '2px 5px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0,
         }}>
           {ro.hours ? String(ro.hours).replace(/h$/i, '') + 'h' : '—h'}
         </span>
@@ -834,13 +838,13 @@ function DisplayScreen({ state, onLogout }) {
             <div key={tech.id} style={{ display: 'flex', gap: 4, minHeight: 0, overflow: 'hidden' }}>
               {/* Tech card */}
               <div style={{ width: 110, minWidth: 110, flexShrink: 0, background: 'rgba(22,26,42,0.98)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '6px', boxSizing: 'border-box', overflow: 'hidden' }}>
-                <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#1D6BF3,#0A84FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#1D6BF3,#0A84FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
                   {initials(tech.name)}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 4px', boxSizing: 'border-box' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.85)', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 3px', boxSizing: 'border-box' }}>
                   {tech.name}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: techHrs > 0 ? '#30D158' : 'rgba(255,255,255,0.2)', background: techHrs > 0 ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 5, whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: techHrs > 0 ? '#30D158' : 'rgba(255,255,255,0.2)', background: techHrs > 0 ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: 5, whiteSpace: 'nowrap' }}>
                   {techHrs > 0 ? techHrs.toFixed(1) + 'h' : '0h'}
                 </div>
               </div>
