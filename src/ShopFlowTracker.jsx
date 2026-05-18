@@ -742,58 +742,59 @@ function DisplayScreen({ state, onLogout }) {
       maxHeight: '100vh',
       background: '#000000',
       display: 'grid',
-      gridTemplateRows: '56px 26px 1fr 80px 148px',
+      gridTemplateRows: '44px 26px 1fr 80px 148px',
       overflow: 'hidden',
       fontFamily: '-apple-system,BlinkMacSystemFont,sans-serif',
       boxSizing: 'border-box',
     }}>
 
-      {/* ── ZONE 1: HEADER 56px ── */}
+      {/* ── ZONE 1: HEADER 44px ── */}
       <div style={{
-        gridRow: 1,
-        height: 56,
-        minHeight: 56,
-        maxHeight: 56,
+        height: 44,
+        minHeight: 44,
+        maxHeight: 44,
         flexShrink: 0,
-        background: 'rgba(10,14,24,0.95)',
+        background: 'rgba(10,14,24,0.98)',
         borderBottom: '0.5px solid rgba(255,255,255,0.07)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
         padding: '0 14px',
+        gap: 0,
         boxSizing: 'border-box',
         overflow: 'hidden',
       }}>
 
-        {/* LEFT — Logo + hours stacked */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, cursor: 'pointer' }} onClick={onLogout}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <WFLogo size={22} radius={5} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.2px', lineHeight: 1 }}>
+        {/* LEFT — Logo + Title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0, cursor: 'pointer' }} onClick={onLogout}>
+          <WFLogo size={24} radius={5} />
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
               Service Department
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, paddingLeft: 28 }}>
-            <span style={{ fontSize: 18, fontWeight: 800, color: '#30D158', letterSpacing: '-0.5px', lineHeight: 1 }}>
-              {flagged.toFixed(1)}
-            </span>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', lineHeight: 1 }}>
-              / {GOAL_HOURS}h goal
-            </span>
-            <span style={{ fontSize: 9, fontWeight: 600, color: '#30D158', lineHeight: 1 }}>
-              ${revenue}
-            </span>
-          </div>
-          <div style={{ marginLeft: 28, height: 3, width: 160, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-            <div style={{ width: (progress * 100) + '%', height: '100%', background: 'linear-gradient(90deg,#30D158,#0A84FF)', borderRadius: 2 }}/>
-          </div>
-          <div style={{ paddingLeft: 28, fontSize: 8, color: 'rgba(255,255,255,0.18)', lineHeight: 1 }}>
-            tap to logout
+            </div>
+            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.18)', lineHeight: 1 }}>
+              tap to logout
+            </div>
           </div>
         </div>
 
-        {/* RIGHT — Clock + dot only */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        {/* CENTER — Hours tracker */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <span style={{ fontSize: 20, fontWeight: 800, color: '#30D158', letterSpacing: '-0.5px', lineHeight: 1, flexShrink: 0 }}>
+            {flagged.toFixed(1)}
+          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>/ {GOAL_HOURS}h goal</span>
+              <span style={{ fontSize: 8, fontWeight: 700, color: '#30D158', whiteSpace: 'nowrap' }}>${revenue}</span>
+            </div>
+            <div style={{ width: 140, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
+              <div style={{ width: (progress * 100) + '%', height: '100%', background: 'linear-gradient(90deg,#30D158,#0A84FF)', borderRadius: 2 }}/>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT — Clock + dot */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
           <LiveClock />
           <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#30D158', boxShadow: '0 0 6px #30D158' }}/>
         </div>
