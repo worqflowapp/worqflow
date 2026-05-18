@@ -3101,11 +3101,14 @@ function PendingScreen({ deviceId, onApproved, onRecheck }) {
 }
 
 // ─── Request Access Screen ────────────────────────────────────────────────────
-function RequestAccessScreen({ deviceId, onRequested }) {
+function RequestAccessScreen({ deviceId, onRequested, onApproved }) {
   const [name, setName] = useState('');
   const [role, setRole] = useState('tech');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showBypass, setShowBypass] = useState(false);
+  const [bypassCode, setBypassCode] = useState('');
+  const [bypassErr, setBypassErr] = useState(false);
 
   async function handleRequest() {
     if (!name.trim()) return;
@@ -3125,6 +3128,16 @@ function RequestAccessScreen({ deviceId, onRequested }) {
       console.error('Request failed', e);
     }
     setLoading(false);
+  }
+
+  function tryBypass() {
+    if (bypassCode === 'worqflow2025') {
+      localStorage.setItem('sft-master', 'worqflow2025');
+      onApproved();
+    } else {
+      setBypassErr(true);
+      setTimeout(() => setBypassErr(false), 1500);
+    }
   }
 
   return (
@@ -3147,9 +3160,9 @@ function RequestAccessScreen({ deviceId, onRequested }) {
         </div>
         <div>
           <label style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.8px', display:'block', marginBottom:6 }}>Role</label>
-          <div style={{ display:'flex', gap:8 }}>
-            {[['tech','Technician'],['advisor','Advisor'],['manager','Manager']].map(([v,l]) => (
-              <button key={v} onClick={() => setRole(v)} style={{ flex:1, padding:'10px 0', borderRadius:12, border:'2px solid '+(role===v?'#0A84FF':'rgba(255,255,255,0.08)'), background:role===v?'rgba(10,132,255,0.12)':'transparent', color:role===v?'#0A84FF':'rgba(255,255,255,0.4)', fontSize:12, fontWeight:600, cursor:'pointer' }}>{l}</button>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+            {[['tech','Technician'],['advisor','Advisor'],['manager','Manager'],['admin','Admin']].map(([v,l]) => (
+              <button key={v} onClick={() => setRole(v)} style={{ flex:'1 1 calc(50% - 4px)', padding:'10px 0', borderRadius:12, border:'2px solid '+(role===v?'#0A84FF':'rgba(255,255,255,0.08)'), background:role===v?'rgba(10,132,255,0.12)':'transparent', color:role===v?'#0A84FF':'rgba(255,255,255,0.4)', fontSize:12, fontWeight:600, cursor:'pointer' }}>{l}</button>
             ))}
           </div>
         </div>
@@ -3162,6 +3175,22 @@ function RequestAccessScreen({ deviceId, onRequested }) {
         </button>
       </div>
       <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center' }}>{deviceId}</div>
+      {!showBypass ? (
+        <button onClick={() => setShowBypass(true)} style={{ padding:'8px 18px', background:'transparent', border:'none', color:'rgba(255,255,255,0.12)', fontSize:11, cursor:'pointer' }}>Admin bypass</button>
+      ) : (
+        <div style={{ width:'100%', maxWidth:280, display:'flex', flexDirection:'column', gap:8 }}>
+          <input
+            autoFocus
+            placeholder="Bypass code"
+            value={bypassCode}
+            onChange={e => setBypassCode(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && tryBypass()}
+            type="password"
+            style={{ width:'100%', padding:'12px 14px', background:'rgba(255,255,255,0.06)', border:'1px solid '+(bypassErr?'#FF453A':'rgba(255,255,255,0.1)'), borderRadius:10, color:'#fff', fontSize:15, outline:'none', boxSizing:'border-box', colorScheme:'dark', textAlign:'center', letterSpacing:'2px' }}
+          />
+          <button onClick={tryBypass} style={{ padding:12, background:'#0A84FF', color:'#fff', border:'none', borderRadius:10, fontSize:14, fontWeight:700, cursor:'pointer' }}>Unlock</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -3570,7 +3599,7 @@ export default function ShopFlowTracker() {
     );
   }
   if (deviceStatus === 'unregistered') {
-    return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} />;
+    return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} onApproved={() => setDeviceStatus('approved')} />;
   }
   if (deviceStatus === 'pending') {
     return <PendingScreen deviceId={deviceId.current} onApproved={() => setDeviceStatus('approved')} onRecheck={() => setDeviceStatus('checking')} />;
