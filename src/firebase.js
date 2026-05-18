@@ -1,3 +1,14 @@
+/**
+ * ShopFlowTracker — Service Department Board
+ * © 2025 Worqflow. All rights reserved.
+ *
+ * This software and its source code are proprietary
+ * and confidential. Unauthorized copying, transfer,
+ * or reproduction of the contents of this file, via
+ * any medium, is strictly prohibited.
+ *
+ * Built by Worqflow — worqflow.vercel.app
+ */
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";

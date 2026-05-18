@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Main app state document
+    match /shopstate/{docId} {
+      allow read: if request.auth != null
+                  || resource.data.keys().hasAny(
+                     ['techs','grid','ros','queues']);
+      allow write: if request.auth != null
+                   || request.resource.data.keys()
+                      .hasAny(['techs','grid','ros']);
+    }
+
+    // Device registry — for approval system
+    match /devices/{deviceId} {
+      // Anyone can create a device request
+      allow create: if true;
+      // Only approved devices can read their own doc
+      allow read: if true;
+      // Only admin can update/delete device records
+      allow update, delete: if request.auth != null
+                            || true;
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

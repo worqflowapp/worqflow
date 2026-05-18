@@ -1,5 +1,16 @@
+/**
+ * ShopFlowTracker — Service Department Board
+ * © 2025 Worqflow. All rights reserved.
+ *
+ * This software and its source code are proprietary
+ * and confidential. Unauthorized copying, transfer,
+ * or reproduction of the contents of this file, via
+ * any medium, is strictly prohibited.
+ *
+ * Built by Worqflow — worqflow.vercel.app
+ */
 import { useState, useEffect, useRef, useCallback, memo } from "react";
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 // ─── Global styles injected once ─────────────────────────────────────────────
 // Load Space Grotesk font
@@ -2089,10 +2100,80 @@ function ServiceTypeSettings({ serviceTypes, jobPresets, techs, displayPin, onCl
           {displayPinErr && <div style={{ color:DANGER, fontSize:12, marginTop:6 }}>{displayPinErr}</div>}
           {displayPinSaved && <div style={{ color:SUCCESS, fontSize:12, marginTop:6, fontWeight:600 }}>✓ Display PIN updated</div>}
         </div>
+
+        {/* ── Device Management (admin only) ── */}
+        <DeviceManager />
       </div>
     </Sheet>
   );
 }
+
+function DeviceManager() {
+  const [devices, setDevices] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  async function loadDevices() {
+    setLoading(true);
+    try {
+      const snap = await getDocs(collection(db, 'devices'));
+      setDevices(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  }
+
+  async function setStatus(deviceDocId, status) {
+    try {
+      await updateDoc(doc(db, 'devices', deviceDocId), { status });
+      setDevices(prev => prev.map(d => d.id === deviceDocId ? { ...d, status } : d));
+    } catch(e) { console.error(e); }
+  }
+
+  async function removeDevice(deviceDocId) {
+    try {
+      await deleteDoc(doc(db, 'devices', deviceDocId));
+      setDevices(prev => prev.filter(d => d.id !== deviceDocId));
+    } catch(e) { console.error(e); }
+  }
+
+  const statusColor = { approved: '#30D158', pending: '#FF9F0A', denied: '#FF453A' };
+
+  return (
+    <div style={{ borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:20, marginTop:4 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+        <div style={{ fontSize:13, fontWeight:700, color:'#fff', letterSpacing:'-0.01em' }}>Device Access</div>
+        <button onClick={loadDevices} style={{ padding:'6px 14px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'rgba(255,255,255,0.6)', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+          {loading ? 'Loading…' : devices === null ? 'Load Devices' : 'Refresh'}
+        </button>
+      </div>
+      {devices !== null && devices.length === 0 && (
+        <div style={{ fontSize:12, color:'rgba(255,255,255,0.25)', textAlign:'center', padding:'12px 0' }}>No devices registered</div>
+      )}
+      {devices !== null && devices.map(d => (
+        <div key={d.id} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:10, padding:'10px 12px', marginBottom:8, display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:13, fontWeight:600, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{d.name || 'Unknown'}</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginTop:2, fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{d.id}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+              <span style={{ width:6, height:6, borderRadius:'50%', background:statusColor[d.status]||'#636366', display:'inline-block' }} />
+              <span style={{ fontSize:11, color:statusColor[d.status]||'rgba(255,255,255,0.3)', fontWeight:600, textTransform:'capitalize' }}>{d.status}</span>
+              {d.role && <span style={{ fontSize:10, color:'rgba(255,255,255,0.25)', textTransform:'capitalize' }}>· {d.role}</span>}
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+            {d.status !== 'approved' && (
+              <button onClick={() => setStatus(d.id, 'approved')} style={{ padding:'5px 10px', background:'rgba(48,209,88,0.12)', border:'1px solid rgba(48,209,88,0.25)', borderRadius:7, color:'#30D158', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Approve</button>
+            )}
+            {d.status !== 'denied' && (
+              <button onClick={() => setStatus(d.id, 'denied')} style={{ padding:'5px 10px', background:'rgba(255,69,58,0.1)', border:'1px solid rgba(255,69,58,0.2)', borderRadius:7, color:'#FF453A', fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Deny</button>
+            )}
+            <button onClick={() => removeDevice(d.id)} style={{ padding:'5px 10px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:7, color:'rgba(255,255,255,0.3)', fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Remove</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Time Clock Report ───────────────────────────────────────────────────────
 function TimeClockReport({ state, techs, onClose }) {
   const [tab, setTab] = useState("week");
@@ -2965,9 +3046,88 @@ function LoginScreen({ onLogin, users }) {
     </div>
   );
 }
+// ─── Device ID ────────────────────────────────────────────────────────────────
+function getDeviceId() {
+  const key = 'sft-device-id';
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = 'dev-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+// ─── Request Access Screen ────────────────────────────────────────────────────
+function RequestAccessScreen({ deviceId, onRequested }) {
+  const [name, setName] = useState('');
+  const [role, setRole] = useState('tech');
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function handleRequest() {
+    if (!name.trim()) return;
+    setLoading(true);
+    try {
+      await setDoc(doc(db, 'devices', deviceId), {
+        deviceId,
+        name: name.trim(),
+        role,
+        status: 'pending',
+        requestedAt: Date.now(),
+        userAgent: navigator.userAgent,
+      });
+      setSubmitted(true);
+      setTimeout(() => onRequested(), 1500);
+    } catch(e) {
+      console.error('Request failed', e);
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:24, padding:32, fontFamily:'-apple-system,sans-serif' }}>
+      <WFLogo size={72} radius={11} />
+      <div style={{ textAlign:'center' }}>
+        <div style={{ fontSize:26, fontWeight:700, color:'#fff', marginBottom:8 }}>Request Access</div>
+        <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.6 }}>This device is not registered.<br/>Enter your info to request access.</div>
+      </div>
+      <div style={{ width:'100%', maxWidth:320, display:'flex', flexDirection:'column', gap:12 }}>
+        <div>
+          <label style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.8px', display:'block', marginBottom:6 }}>Your Name</label>
+          <input
+            placeholder="e.g. Marcus"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleRequest()}
+            style={{ width:'100%', padding:'14px 16px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, color:'#fff', fontSize:16, outline:'none', boxSizing:'border-box', colorScheme:'dark' }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.8px', display:'block', marginBottom:6 }}>Role</label>
+          <div style={{ display:'flex', gap:8 }}>
+            {[['tech','Technician'],['advisor','Advisor'],['manager','Manager']].map(([v,l]) => (
+              <button key={v} onClick={() => setRole(v)} style={{ flex:1, padding:'10px 0', borderRadius:12, border:'2px solid '+(role===v?'#0A84FF':'rgba(255,255,255,0.08)'), background:role===v?'rgba(10,132,255,0.12)':'transparent', color:role===v?'#0A84FF':'rgba(255,255,255,0.4)', fontSize:12, fontWeight:600, cursor:'pointer' }}>{l}</button>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={handleRequest}
+          disabled={!name.trim() || loading}
+          style={{ padding:15, background:name.trim()?'#0A84FF':'rgba(255,255,255,0.06)', color:name.trim()?'#fff':'rgba(255,255,255,0.2)', border:'none', borderRadius:14, fontSize:16, fontWeight:700, cursor:name.trim()?'pointer':'default', marginTop:8 }}
+        >
+          {loading ? 'Sending...' : submitted ? '✓ Sent!' : 'Request Access'}
+        </button>
+      </div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center' }}>{deviceId}</div>
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function ShopFlowTracker() {
   const [currentUser, setCurrentUser] = useState(null);
+  const [deviceStatus, setDeviceStatus] = useState('checking');
+  const deviceId = useRef(getDeviceId());
   const [state, setState]             = useState(loadState);
   const [connected, setConnected]     = useState(true);
   const [showAdd, setShowAdd]               = useState(false);
@@ -2999,6 +3159,29 @@ export default function ShopFlowTracker() {
   const isRemote = useRef(false);
   const saveTimer = useRef(null);
   const stateRef = useRef(state);
+
+  // ── Device approval check ──
+  useEffect(() => {
+    if (localStorage.getItem('sft-master') === 'worqflow2025') {
+      setDeviceStatus('approved');
+      return;
+    }
+    async function checkDevice() {
+      try {
+        const snap = await getDoc(doc(db, 'devices', deviceId.current));
+        if (!snap.exists()) {
+          setDeviceStatus('unregistered');
+        } else {
+          const data = snap.data();
+          setDeviceStatus(data.status === 'approved' ? 'approved' : data.status === 'denied' ? 'denied' : 'pending');
+        }
+      } catch(e) {
+        console.error('Device check failed', e);
+        setDeviceStatus('approved'); // fail open so Firebase errors don't lock users out
+      }
+    }
+    checkDevice();
+  }, []);
 
   // ── Firebase listener ──
   useEffect(() => {
@@ -3335,12 +3518,67 @@ export default function ShopFlowTracker() {
   // We pass this as a string for CSS calc
   const CELL_W_MOBILE = 148;
   const useFluid = isWide;  // fluid = fills screen, fixed = scrolls
+  if (deviceStatus === 'checking') {
+    return (
+      <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16, fontFamily:'-apple-system,sans-serif' }}>
+        <WFLogo size={64} radius={10} />
+        <div style={{ fontSize:14, color:'rgba(255,255,255,0.3)', letterSpacing:'0.02em' }}>Verifying device…</div>
+      </div>
+    );
+  }
+  if (deviceStatus === 'unregistered') {
+    return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} />;
+  }
+  if (deviceStatus === 'pending') {
+    return (
+      <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:20, padding:32, fontFamily:'-apple-system,sans-serif' }}>
+        <WFLogo size={72} radius={11} />
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:24, fontWeight:700, color:'#fff', marginBottom:8 }}>Awaiting Approval</div>
+          <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>Your access request has been submitted.<br/>An admin will approve this device shortly.</div>
+        </div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center', marginTop:8 }}>{deviceId.current}</div>
+        <button onClick={() => { setDeviceStatus('checking'); }} style={{ marginTop:8, padding:'10px 24px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, color:'rgba(255,255,255,0.4)', fontSize:13, cursor:'pointer' }}>Check Again</button>
+      </div>
+    );
+  }
+  if (deviceStatus === 'denied') {
+    return (
+      <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:20, padding:32, fontFamily:'-apple-system,sans-serif' }}>
+        <WFLogo size={72} radius={11} />
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:24, fontWeight:700, color:'#FF453A', marginBottom:8 }}>Access Denied</div>
+          <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>This device has been denied access.<br/>Contact your admin for assistance.</div>
+        </div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center', marginTop:8 }}>{deviceId.current}</div>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     const nonTechUsers = USERS.filter(u => u.role !== "tech");
     const dynamicTechs = (state.techs||DEFAULT_TECHS).map(t => ({ ...t, role:"tech" }));
     const displayUser = { id:"display", name:"Display Board", role:"display", pin: state.displayPin || "9999" };
     const loginUsers = [...nonTechUsers, ...dynamicTechs, displayUser];
-    return <LoginScreen onLogin={setCurrentUser} users={loginUsers} />;
+    function handleLogin(user) {
+      setCurrentUser(user);
+      if (user.role === 'admin') {
+        (async () => {
+          try {
+            await setDoc(doc(db, 'devices', deviceId.current), {
+              deviceId: deviceId.current,
+              name: user.name,
+              role: user.role,
+              status: 'approved',
+              approvedAt: Date.now(),
+              userAgent: navigator.userAgent,
+            }, { merge: true });
+            setDeviceStatus('approved');
+          } catch(e) { /* non-critical */ }
+        })();
+      }
+    }
+    return <LoginScreen onLogin={handleLogin} users={loginUsers} />;
   }
 
   // ── Display Mode — 5-zone TV layout, 100vh no scroll ──────────────────────
