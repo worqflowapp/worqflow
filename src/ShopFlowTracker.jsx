@@ -2447,6 +2447,135 @@ function ActivityTracker({ currentUser, activityLog, onStart, onStop, onClose })
     </div>
   );
 }
+// ─── Activity Report ─────────────────────────────────────────────────────────
+function ActivityReport({ activityLog, techs, onClose }) {
+  const [tab, setTab] = useState('week');
+  const TABS = [['today','Today'],['week','This Week'],['month','This Month'],['year','This Year']];
+
+  function getRangeStart(t) {
+    const d = new Date();
+    if (t === 'today')  { d.setHours(0,0,0,0); return d.getTime(); }
+    if (t === 'week')   { d.setDate(d.getDate() - d.getDay()); d.setHours(0,0,0,0); return d.getTime(); }
+    if (t === 'month')  { d.setDate(1); d.setHours(0,0,0,0); return d.getTime(); }
+    if (t === 'year')   { d.setMonth(0,1); d.setHours(0,0,0,0); return d.getTime(); }
+    return 0;
+  }
+
+  function fmtDur(ms) {
+    if (!ms) return '—';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+
+  const rangeStart = getRangeStart(tab);
+  const logs = activityLog.filter(e => e.endTime && e.startTime >= rangeStart);
+
+  // Per tech, per activity totals
+  const techTotals = techs.map(tech => {
+    const techLogs = logs.filter(e => e.userId === tech.id);
+    const byActivity = {};
+    ACTIVITIES.forEach(a => { byActivity[a.id] = 0; });
+    techLogs.forEach(e => {
+      if (byActivity[e.activityId] !== undefined) byActivity[e.activityId] += (e.endTime - e.startTime);
+    });
+    const total = Object.values(byActivity).reduce((s, v) => s + v, 0);
+    return { tech, byActivity, total };
+  }).filter(r => r.total > 0);
+
+  // Grand totals per activity
+  const grandTotals = {};
+  ACTIVITIES.forEach(a => { grandTotals[a.id] = 0; });
+  techTotals.forEach(r => { ACTIVITIES.forEach(a => { grandTotals[a.id] += r.byActivity[a.id]; }); });
+  const grandTotal = Object.values(grandTotals).reduce((s, v) => s + v, 0);
+
+  const tabLabel = TABS.find(t => t[0] === tab)?.[1] || tab;
+
+  function handlePrint() {
+    const rows = techTotals.map(r =>
+      `<tr><td>${r.tech.name}</td>${ACTIVITIES.map(a => `<td>${fmtDur(r.byActivity[a.id])}</td>`).join('')}<td><b>${fmtDur(r.total)}</b></td></tr>`
+    ).join('');
+    const totalsRow = `<tr style="font-weight:700;border-top:2px solid #ccc"><td>TOTAL</td>${ACTIVITIES.map(a => `<td>${fmtDur(grandTotals[a.id])}</td>`).join('')}<td>${fmtDur(grandTotal)}</td></tr>`;
+    const html = `<html><head><title>Activity Report — ${tabLabel}</title><style>
+      body{font-family:-apple-system,sans-serif;padding:24px;color:#111}
+      h2{margin-bottom:4px}p{margin:0 0 16px;color:#666;font-size:13px}
+      table{border-collapse:collapse;width:100%}
+      th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:13px}
+      th{background:#f5f5f5;font-weight:700}tr:nth-child(even){background:#fafafa}
+    </style></head><body>
+      <h2>Activity Report — ${tabLabel}</h2>
+      <p>Generated ${new Date().toLocaleString()}</p>
+      <table><thead><tr><th>Technician</th>${ACTIVITIES.map(a => `<th>${a.emoji} ${a.label}</th>`).join('')}<th>Total</th></tr></thead>
+      <tbody>${rows}${totalsRow}</tbody></table>
+    </body></html>`;
+    const w = window.open('','_blank');
+    w.document.write(html);
+    w.document.close();
+    w.print();
+  }
+
+  return (
+    <Sheet onClose={onClose} title="Activity Report">
+      <div style={{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' }}>
+        {TABS.map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            style={{ padding:'6px 14px', borderRadius:20, border:'none', background:tab===id?ACCENT:'rgba(255,255,255,0.07)', color:tab===id?'#fff':TEXT3, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            {label}
+          </button>
+        ))}
+        <button onClick={handlePrint}
+          style={{ marginLeft:'auto', padding:'6px 14px', borderRadius:20, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:TEXT2, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:6 }}>
+          🖨 Print
+        </button>
+      </div>
+
+      {techTotals.length === 0 ? (
+        <div style={{ textAlign:'center', color:TEXT3, fontSize:13, padding:'32px 0' }}>No activity logged {tabLabel.toLowerCase()}</div>
+      ) : (
+        <>
+          {/* Grand total summary */}
+          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            {ACTIVITIES.map(a => (
+              <div key={a.id} style={{ flex:1, background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'10px 12px', border:'0.5px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize:11, color:a.color, fontWeight:700, marginBottom:4 }}>{a.emoji} {a.label}</div>
+                <div style={{ fontSize:18, fontWeight:800, color:'#fff', letterSpacing:'-0.3px' }}>{fmtDur(grandTotals[a.id])}</div>
+              </div>
+            ))}
+            <div style={{ flex:1, background:'rgba(255,255,255,0.06)', borderRadius:10, padding:'10px 12px', border:'0.5px solid rgba(255,255,255,0.12)' }}>
+              <div style={{ fontSize:11, color:TEXT3, fontWeight:700, marginBottom:4 }}>Total Time</div>
+              <div style={{ fontSize:18, fontWeight:800, color:WARN, letterSpacing:'-0.3px' }}>{fmtDur(grandTotal)}</div>
+            </div>
+          </div>
+
+          {/* Per tech breakdown */}
+          {techTotals.map(({ tech, byActivity, total }) => (
+            <div key={tech.id} style={{ background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.08)', borderRadius:12, padding:'12px 14px', marginBottom:8 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', background:'linear-gradient(135deg,#1D6BF3,#0EA5E9)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:10 }}>{initials(tech.name)}</div>
+                  <div style={{ fontWeight:600, fontSize:13, color:TEXT }}>{tech.name}</div>
+                </div>
+                <div style={{ fontSize:13, fontWeight:700, color:WARN }}>{fmtDur(total)}</div>
+              </div>
+              <div style={{ display:'flex', gap:6 }}>
+                {ACTIVITIES.map(a => (
+                  <div key={a.id} style={{ flex:1, background:a.color+'11', borderRadius:8, padding:'6px 8px', border:'0.5px solid '+a.color+'33' }}>
+                    <div style={{ fontSize:9, color:a.color, fontWeight:700, marginBottom:2 }}>{a.emoji} {a.label}</div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'#fff' }}>{fmtDur(byActivity[a.id])}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+    </Sheet>
+  );
+}
+
 // ─── Analytics Screen ────────────────────────────────────────────────────────
 function AnalyticsScreen({ state, onClose }) {  const [timeTab,  setTimeTab]  = useState("today");
   const [mainTab,  setMainTab]  = useState("overview");
@@ -3253,6 +3382,7 @@ export default function ShopFlowTracker() {
   const [showChangePin, setShowChangePin]     = useState(false);
   const [showAnalytics, setShowAnalytics]     = useState(false);
   const [showActivity,  setShowActivity]      = useState(false);
+  const [showActivityReport, setShowActivityReport] = useState(false);
   const [showTimeClock, setShowTimeClock]     = useState(false);
   const [detailRO, setDetailRO]       = useState(null);  const [movingRO, setMovingRO]       = useState(null);
   const [collapsed, setCollapsed]     = useState({});
@@ -4014,9 +4144,9 @@ export default function ShopFlowTracker() {
                   <PlusIcon /> New RO
                 </button>
               )}
-              {isTech && (
-                <button onClick={() => setShowActivity(true)} title="Activity Tracker" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  <ActivityIcon />
+              {isAdmin && (
+                <button onClick={() => setShowActivityReport(true)} title="Activity Report" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
+                  🏃
                 </button>
               )}
               {isAdmin && (
@@ -4092,8 +4222,8 @@ export default function ShopFlowTracker() {
                       </div>
                     </div>
                   </div>
-                  {/* Admin activity controls — hidden in display mode */}
-                  {isAdmin && !isDisplay && (
+                  {/* Activity controls — admin sees all techs, tech sees own row only */}
+                  {(isAdmin || (isTech && tech.id === currentUser?.id)) && !isDisplay && (
                     <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
                       {/* Activity buttons */}
                       <div style={{ display:"flex", gap:4 }}>
@@ -4101,18 +4231,25 @@ export default function ShopFlowTracker() {
                           const active = (state.activityLog||[]).find(e => e.userId === tech.id && !e.endTime);
                           if (active) {
                             const act = ACTIVITIES.find(a => a.id === active.activityId);
+                            const elapsed = Math.floor((Date.now() - active.startTime) / 1000);
+                            const elapsedStr = elapsed >= 3600
+                              ? `${Math.floor(elapsed/3600)}h ${Math.floor((elapsed%3600)/60)}m`
+                              : `${Math.floor(elapsed/60)}m ${elapsed%60}s`;
                             return (
                               <button
                                 onClick={() => handleStopActivity(active)}
-                                style={{ flex:1, background:act?.color+"22", color:act?.color, border:"0.5px solid "+act?.color+"44", borderRadius:8, padding:"5px 4px", fontSize:9, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:3 }}>
-                                {act?.emoji} Stop                              </button>
+                                style={{ flex:1, background:act?.color+"22", color:act?.color, border:"1px solid "+act?.color+"55", borderRadius:8, padding:"6px 4px", fontSize:9, fontWeight:700, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:3, flexDirection:"column", lineHeight:1.3 }}>
+                                <span>{act?.emoji} {act?.label}</span>
+                                <span style={{ fontSize:8, opacity:0.8 }}>{elapsedStr} · tap to stop</span>
+                              </button>
                             );
                           }
                           return ACTIVITIES.map(act => (
                             <button key={act.id}
                               onClick={() => handleStartActivity(act.id, tech.id)}
-                              style={{ flex:1, background:"rgba(255,255,255,0.04)", color:TEXT3, border:"0.5px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"5px 4px", fontSize:9, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:2 }}>
-                              {act.emoji}
+                              style={{ flex:1, background:"rgba(255,255,255,0.04)", color:TEXT3, border:"0.5px solid rgba(255,255,255,0.1)", borderRadius:8, padding:"6px 4px", fontSize:9, fontWeight:600, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:2, flexDirection:"column", lineHeight:1.3 }}>
+                              <span style={{ fontSize:13 }}>{act.emoji}</span>
+                              <span style={{ fontSize:8 }}>{act.label}</span>
                             </button>
                           ));
                         })()}
@@ -4313,6 +4450,9 @@ export default function ShopFlowTracker() {
       )}
       {showTimeClock && (
         <TimeClockReport state={state} techs={state.techs} onClose={() => setShowTimeClock(false)} />
+      )}
+      {showActivityReport && (
+        <ActivityReport activityLog={state.activityLog||[]} techs={state.techs||DEFAULT_TECHS} onClose={() => setShowActivityReport(false)} />
       )}
       {showActivity && currentUser && (
         <ActivityTracker
