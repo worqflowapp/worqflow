@@ -3017,7 +3017,9 @@ export default function ShopFlowTracker() {
           grid:            data.grid            || fresh.grid,
           qSlots:          data.qSlots          || fresh.qSlots,
           partsSlots:      data.partsSlots      || [],
-          techs:           data.techs           || fresh.techs,
+          techs:           data.techs
+                           ? data.techs.map(t => ({ ...t, pin: t.pin || DEFAULT_TECHS.find(d => d.id === t.id)?.pin || "0000" }))
+                           : fresh.techs,
           queues:          data.queues          || fresh.queues,
           serviceTypes:    data.serviceTypes    || fresh.serviceTypes,
           jobPresets:      data.jobPresets      || fresh.jobPresets,
