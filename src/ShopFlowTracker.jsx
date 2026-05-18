@@ -2108,9 +2108,24 @@ function ServiceTypeSettings({ serviceTypes, jobPresets, techs, displayPin, onCl
   );
 }
 
-function DeviceManager() {
+function DeviceManagerModal({ onClose }) {
+  return (
+    <Sheet onClose={onClose} title="Device Access">
+      <div style={{ padding:'0 4px' }}>
+        <div style={{ fontSize:13, color:'rgba(255,255,255,0.4)', marginBottom:16, lineHeight:1.5 }}>
+          Approve or deny devices requesting access to Worqflow. Approved devices can reach the login screen.
+        </div>
+        <DeviceManager autoLoad />
+      </div>
+    </Sheet>
+  );
+}
+
+function DeviceManager({ autoLoad }) {
   const [devices, setDevices] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => { if (autoLoad) loadDevices(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadDevices() {
     setLoading(true);
@@ -3107,24 +3122,24 @@ function RequestAccessScreen({ deviceId, onRequested, onAdminOverride }) {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showAdminPin, setShowAdminPin] = useState(false);
-  const [adminPin, setAdminPin] = useState('');
   const [pinErr, setPinErr] = useState('');
   const [pinShake, setPinShake] = useState(false);
   const adminUser = USERS.find(u => u.role === 'admin');
   const PIN_LEN = adminUser?.pin?.length || 6;
   const [adminDots, setAdminDots] = useState(() => Array(PIN_LEN).fill(false));
+  const adminPinRef = useRef(''); // useRef avoids stale closure between rapid taps
 
   function handleAdminPadPress(val) {
     if (pinShake) return;
     if (val === 'del') {
-      const np = adminPin.slice(0, -1);
-      setAdminPin(np);
+      const np = adminPinRef.current.slice(0, -1);
+      adminPinRef.current = np;
       setAdminDots(d => { const n = [...d]; n[np.length] = false; return n; });
       setPinErr('');
     } else {
-      if (adminPin.length >= PIN_LEN) return;
-      const np = adminPin + val;
-      setAdminPin(np);
+      if (adminPinRef.current.length >= PIN_LEN) return;
+      const np = adminPinRef.current + val;
+      adminPinRef.current = np;
       setAdminDots(d => { const n = [...d]; n[np.length - 1] = true; return n; });
       if (np.length === PIN_LEN) {
         setTimeout(() => {
@@ -3137,7 +3152,8 @@ function RequestAccessScreen({ deviceId, onRequested, onAdminOverride }) {
             setPinErr('Incorrect admin PIN');
             setTimeout(() => {
               setPinShake(false); setPinErr('');
-              setAdminPin(''); setAdminDots(Array(PIN_LEN).fill(false));
+              adminPinRef.current = '';
+              setAdminDots(Array(PIN_LEN).fill(false));
             }, 1200);
           }
         }, 120);
@@ -3243,6 +3259,7 @@ export default function ShopFlowTracker() {
   const [showHistory, setShowHistory]       = useState(false);
   const [showReport,  setShowReport]        = useState(false);
   const [showServiceTypes, setShowServiceTypes] = useState(false);
+  const [showDevices, setShowDevices] = useState(false);
   const [partsCollapsed, setPartsCollapsed]   = useState(false);
   const [showChangePin, setShowChangePin]     = useState(false);
   const [showAnalytics, setShowAnalytics]     = useState(false);
@@ -3994,9 +4011,14 @@ export default function ShopFlowTracker() {
                 </button>
               )}
               {canSettings && (
-                <button onClick={() => setShowServiceTypes(true)} title="Settings" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  <SettingsIcon />
-                </button>
+                <>
+                  <button onClick={() => setShowDevices(true)} title="Device Access" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17 }}>
+                    📱
+                  </button>
+                  <button onClick={() => setShowServiceTypes(true)} title="Settings" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <SettingsIcon />
+                  </button>
+                </>
               )}
               {canCreateRO && (
                 <button onClick={() => setShowAdd(true)} style={{ height:34, padding:"0 16px", borderRadius:20, border:"none", background:ACCENT, color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif", fontWeight:600, fontSize:13, letterSpacing:"-0.1px", boxShadow:"0 4px 16px rgba(10,132,255,0.45)" }}>
@@ -4328,7 +4350,11 @@ export default function ShopFlowTracker() {
         <ReportModal state={state} onClose={() => setShowReport(false)} wide={isWide} />
       )}
       {showServiceTypes && (
-        <ServiceTypeSettings serviceTypes={state.serviceTypes||DEFAULT_SERVICE_TYPES} jobPresets={state.jobPresets||DEFAULT_JOB_PRESETS} techs={state.techs||DEFAULT_TECHS} displayPin={state.displayPin||"9999"} onClose={() => setShowServiceTypes(false)} onSave={handleSaveServiceTypes} onSaveJobs={handleSaveJobPresets} onSaveTechs={handleSaveTechs} onSaveDisplayPin={handleSaveDisplayPin} wide={isWide} />      )}
+        <ServiceTypeSettings serviceTypes={state.serviceTypes||DEFAULT_SERVICE_TYPES} jobPresets={state.jobPresets||DEFAULT_JOB_PRESETS} techs={state.techs||DEFAULT_TECHS} displayPin={state.displayPin||"9999"} onClose={() => setShowServiceTypes(false)} onSave={handleSaveServiceTypes} onSaveJobs={handleSaveJobPresets} onSaveTechs={handleSaveTechs} onSaveDisplayPin={handleSaveDisplayPin} wide={isWide} />
+      )}
+      {showDevices && (
+        <DeviceManagerModal onClose={() => setShowDevices(false)} />
+      )}
       {detailRO && !movingRO && (
         <RODetail
           ro={detailRO.ro}
