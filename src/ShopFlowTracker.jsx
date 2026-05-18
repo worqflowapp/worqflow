@@ -1345,7 +1345,98 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
       </div>
     </Sheet>
   );
-}// ─── New RO Modal ─────────────────────────────────────────────────────────────
+}
+// ─── Quick Add Modal ──────────────────────────────────────────────────────────
+function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes }) {
+  const defaultRoNum = "RO-" + String(nextNum).padStart(4, "0");
+  const [f, setF] = useState({
+    roNum: defaultRoNum,
+    year: "", make: "", model: "",
+    serviceType: "st-main",
+    waitStatus: "dropoff",
+  });
+  const roNumRef = useRef(null);
+  useEffect(() => { setTimeout(() => roNumRef.current?.select(), 80); }, []);
+
+  const queueMap = { "st-main":"q-main", "st-pdi":"q-pdi", "st-used":"q-used" };
+
+  function handleAdd() {
+    if (!f.roNum.trim()) return;
+    onAdd({
+      ...f,
+      color:"", plate:"", mileageIn:"", vin:"", customer:"", phone:"", email:"",
+      priority:"NORMAL", hours:"", jobs:"", parts:"", concern:"", cause:"", correction:"", notes:"", promiseTime:"",
+      dest: "queue",
+      assignQueue: queueMap[f.serviceType] || "q-main",
+    });
+  }
+
+  const ready = f.roNum.trim().length > 0;
+
+  return (
+    <Sheet title="Quick Add RO" subtitle="Add details later by tapping the card" onClose={onClose}>
+      <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+        {/* RO Number */}
+        <div>
+          <label style={labelStyle}>RO Number</label>
+          <input
+            ref={roNumRef}
+            value={f.roNum}
+            onChange={e => setF(p => ({ ...p, roNum: e.target.value.toUpperCase() }))}
+            placeholder="e.g. RO-1006"
+            style={{ ...inputStyle, fontWeight:800, fontSize:18, letterSpacing:"1px", textAlign:"center" }}
+          />
+        </div>
+
+        {/* Vehicle */}
+        <div>
+          <label style={labelStyle}>Vehicle</label>
+          <div style={{ display:"grid", gridTemplateColumns:"72px 1fr 1fr", gap:8 }}>
+            <input placeholder="Year" value={f.year} onChange={e => setF(p => ({ ...p, year: e.target.value }))} style={inputStyle} inputMode="numeric" />
+            <input placeholder="Make" value={f.make} onChange={e => setF(p => ({ ...p, make: e.target.value }))} style={inputStyle} />
+            <input placeholder="Model" value={f.model} onChange={e => setF(p => ({ ...p, model: e.target.value }))} style={inputStyle} />
+          </div>
+        </div>
+
+        {/* Service Type */}
+        <div>
+          <label style={labelStyle}>Service Type</label>
+          <div style={{ display:"flex", gap:8 }}>
+            {(serviceTypes || DEFAULT_SERVICE_TYPES).map(st => (
+              <button key={st.id} onClick={() => setF(p => ({ ...p, serviceType: st.id }))}
+                style={{ flex:1, padding:"13px 6px", borderRadius:12, border:"2px solid "+(f.serviceType===st.id ? st.color : BORDER), background: f.serviceType===st.id ? st.color+"22" : "rgba(255,255,255,0.05)", color: f.serviceType===st.id ? st.color : SUB, fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:6, transition:"all 0.15s" }}>
+                <span style={{ width:8, height:8, borderRadius:"50%", background:st.color, display:"inline-block", flexShrink:0 }} />
+                {st.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Wait / Drop-off */}
+        <div>
+          <label style={labelStyle}>Customer Status</label>
+          <div style={{ display:"flex", gap:10 }}>
+            {[["dropoff","Drop-Off","🚗"],["waiting","Waiting","⏳"]].map(([v,l,em]) => (
+              <button key={v} onClick={() => setF(p => ({ ...p, waitStatus: v }))}
+                style={{ flex:1, padding:"16px 0", borderRadius:14, border:"2px solid "+(f.waitStatus===v ? ACCENT : BORDER), background: f.waitStatus===v ? "rgba(10,132,255,0.18)" : "rgba(255,255,255,0.05)", color: f.waitStatus===v ? "#60A5FA" : "rgba(255,255,255,0.4)", fontWeight:700, fontSize:14, cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", gap:5, transition:"all 0.15s" }}>
+                <span style={{ fontSize:22 }}>{em}</span>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Submit */}
+        <button onClick={handleAdd} disabled={!ready}
+          style={{ marginTop:2, padding:17, background: ready ? ACCENT : "rgba(255,255,255,0.07)", color: ready ? "#fff" : "rgba(255,255,255,0.2)", border:"none", borderRadius:14, fontFamily:"'Barlow',sans-serif", fontWeight:800, fontSize:17, cursor: ready ? "pointer" : "default", letterSpacing:"-0.2px", boxShadow: ready ? "0 4px 20px rgba(10,132,255,0.4)" : "none", transition:"all 0.2s" }}>
+          Add RO →
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+// ─── New RO Modal ─────────────────────────────────────────────────────────────
 function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes, jobPresets }) {
   const defaultRoNum = "RO-" + String(nextNum).padStart(4,"0");
   const [f, setF] = useState({ roNum:defaultRoNum, serviceType:"st-main", year:"", make:"", model:"", color:"", plate:"", mileageIn:"", vin:"", customer:"", phone:"", email:"", waitStatus:"none", priority:"NORMAL", hours:"", jobs:"", parts:"", concern:"", cause:"", correction:"", notes:"", promiseTime:"", dest:"queue", assignQueue:"q-main", assignTech:"", assignCol:"ondeck" });
@@ -4183,7 +4274,7 @@ export default function ShopFlowTracker() {
               )}
               {canCreateRO && (
                 <button onClick={() => setShowAdd(true)} style={{ height:34, padding:"0 16px", borderRadius:20, border:"none", background:ACCENT, color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif", fontWeight:600, fontSize:13, letterSpacing:"-0.1px", boxShadow:"0 4px 16px rgba(10,132,255,0.45)" }}>
-                  <PlusIcon /> New RO
+                  <PlusIcon /> Add RO
                 </button>
               )}
               {isAdmin && (
@@ -4511,7 +4602,7 @@ export default function ShopFlowTracker() {
         <ChangePinModal user={currentUser} onClose={() => setShowChangePin(false)} onSave={handleSavePin} />
       )}
       {showAdd && (
-        <NewROModal onAdd={handleAddRO} onClose={() => setShowAdd(false)} nextNum={state.nextNum} techs={state.techs} queues={state.queues} wide={isWide} serviceTypes={state.serviceTypes} jobPresets={state.jobPresets} />
+        <QuickAddModal onAdd={handleAddRO} onClose={() => setShowAdd(false)} nextNum={state.nextNum} serviceTypes={state.serviceTypes} />
       )}
       {showArchive && (
         <ArchiveModal archived={state.archived||[]} onClose={() => setShowArchive(false)} onRestore={handleRestore} wide={isWide} />
