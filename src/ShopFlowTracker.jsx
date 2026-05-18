@@ -3957,16 +3957,16 @@ export default function ShopFlowTracker() {
               <div style={{ color:TEXT, fontWeight:700, fontSize:isWide?15:14, letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif" }}><span style={{color:TEXT}}>Worq</span><span style={{background:"linear-gradient(135deg,#60B3FF,#0A84FF)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>flow</span></div>
               <div style={{ color:TEXT3, fontSize:10, marginTop:1, letterSpacing:"0.1px" }}>{currentUser.name}</div>
             </div>
-            {isWide && <LiveClock />}
-            {!isAdvisor && isWide && (
+            {(isWide || isAdmin || isTech) && <LiveClock />}
+            {(isWide ? !isAdvisor : (isAdmin || isTech)) && (
               <div style={{ flex:1, display:"flex", justifyContent:"center" }}>
-                <div style={{ background:"rgba(14,18,30,0.9)", borderRadius:12, padding:"8px 16px", display:"flex", alignItems:"center", gap:12, minWidth:isWide?260:180, border:"0.5px solid rgba(255,255,255,0.08)", boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 2px 8px rgba(0,0,0,0.4)", borderTop:"0.5px solid rgba(255,255,255,0.12)" }}>
+                <div style={{ background:"rgba(14,18,30,0.9)", borderRadius:12, padding:"8px 16px", display:"flex", alignItems:"center", gap:12, minWidth:isWide?260:130, border:"0.5px solid rgba(255,255,255,0.08)", boxShadow:"0 1px 0 rgba(255,255,255,0.08) inset, 0 2px 8px rgba(0,0,0,0.4)", borderTop:"0.5px solid rgba(255,255,255,0.12)" }}>
                   <span style={{ color:SUCCESS, display:"flex", alignItems:"center" }}><DollarIcon /></span>
                   <div style={{ flex:1 }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:4 }}>
-                      <span style={{ fontSize:isWide?16:14, fontWeight:800, color:"#F0F4FF", fontFamily:"'Barlow',sans-serif" }}>
+                      <span style={{ fontSize:isWide?16:13, fontWeight:800, color:"#F0F4FF", fontFamily:"'Barlow',sans-serif" }}>
                         <span style={{ color:SUCCESS }}>{flagged.toFixed(1)}</span>
-                        <span style={{ color:"rgba(255,255,255,0.35)", fontSize:11, fontWeight:600 }}> / {GOAL_HOURS}h</span>
+                        <span style={{ color:"rgba(255,255,255,0.35)", fontSize:10, fontWeight:600 }}> / {GOAL_HOURS}h</span>
                       </span>
                       <span style={{ fontSize:10, color:"rgba(255,255,255,0.35)", fontWeight:600 }}>Flagged</span>
                     </div>
@@ -3977,8 +3977,10 @@ export default function ShopFlowTracker() {
                 </div>
               </div>
             )}
-            {(isAdvisor || !isWide) && <div style={{ flex:1 }}/>}
-            <div style={{ display:"flex", gap:8, ...(isWide ? {} : { overflowX:"auto", flexShrink:0, maxWidth:"calc(100vw - 150px)", WebkitOverflowScrolling:"touch", scrollbarWidth:"none", msOverflowStyle:"none", paddingBottom:2 }) }}>
+            {/* spacer — only when hours bar is absent (advisor on desktop, or manager/advisor on mobile) */}
+            {(isWide ? isAdvisor : (!isAdmin && !isTech)) && <div style={{ flex:1 }}/>}
+            {/* icons row — hidden on mobile for techs (they only need clock + hours) */}
+            {(isWide || !isTech) && <div style={{ display:"flex", gap:8, ...(isWide ? {} : { overflowX:"auto", flexShrink:0, maxWidth:"calc(100vw - 150px)", WebkitOverflowScrolling:"touch", scrollbarWidth:"none", msOverflowStyle:"none", paddingBottom:2 }) }}>
               {canSeeAll && (
                 <button onClick={() => setShowAnalytics(true)} title="Analytics" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                   <AnalyticsIcon />
@@ -4030,7 +4032,7 @@ export default function ShopFlowTracker() {
               <button onClick={() => setCurrentUser(null)} style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <LogoutIcon />
               </button>
-            </div>
+            </div>}
           </>
         )}
       </div>
