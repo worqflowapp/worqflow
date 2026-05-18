@@ -106,7 +106,7 @@ const DEFAULT_QUEUES = [
   { id:"q-pdi",  name:"PDIs",           subtitle:"Pre-Delivery Inspections", color:"#9333EA", icon:"🚗" },
   { id:"q-used", name:"Used Cars",      subtitle:"Secondary Priority",       color:"#16A34A", icon:"🏷️" },
 ];
-const STORAGE_KEY = "sft-v21";
+const STORAGE_KEY = "sft-v22";
 const GOAL_HOURS  = 40;
 // ─── Service Types ────────────────────────────────────────────────────────────
 const DEFAULT_SERVICE_TYPES = [
@@ -128,19 +128,14 @@ function freshState() {
   return {
     techs: DEFAULT_TECHS,
     queues: DEFAULT_QUEUES,
-    ros: SAMPLE_ROS,
-    nextNum: 1006,
-    grid: {
-      t1: { ondeck:["ro-1001"],  inprogress:["ro-87045"], completed:[],          delivered:[]          },
-      t2: { ondeck:["ro-1005"],  inprogress:[],            completed:[],          delivered:[]          },
-      t3: { ondeck:[],           inprogress:["ro-1003"],   completed:["ro-56003"],delivered:[]          },
-      t4: { ondeck:["ro-1002"],  inprogress:[],            completed:[],          delivered:[]          },
-    },
-    partsSlots: ["ro-55922"],
-    completedByTech: { "t3_ro-56003": true, t3: 1 },
+    ros: [],
+    nextNum: 1,
+    grid: {},
+    partsSlots: [],
+    completedByTech: {},
     activityLog: [],
     timeClockLog: [],
-    qSlots: { "q-main":[], "q-pdi":[], "q-used":["ro-1004"] },
+    qSlots: { "q-main":[], "q-pdi":[], "q-used":[] },
     timers: {},
     archived: [],
     serviceTypes: DEFAULT_SERVICE_TYPES,
@@ -3380,7 +3375,16 @@ function RequestAccessScreen({ deviceId, onRequested, onAdminOverride, onDisplay
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function ShopFlowTracker() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem('sft-session');
+      if (raw) {
+        const { user, loginDate } = JSON.parse(raw);
+        if (loginDate === new Date().toDateString()) return user;
+      }
+    } catch(e) {}
+    return null;
+  });
   const [deviceStatus, setDeviceStatus] = useState('checking');
   const deviceId = useRef(getDeviceId());
   const [state, setState]             = useState(loadState);
@@ -3407,6 +3411,10 @@ export default function ShopFlowTracker() {
   const isManager = currentUser && currentUser.role === "manager";
   const isAdvisor = currentUser && currentUser.role === "advisor";
   const isTech    = currentUser && currentUser.role === "tech";
+  function handleLogout() {
+    try { localStorage.removeItem('sft-session'); } catch(e) {}
+    handleLogout();
+  }
   const canSeeAll   = isAdmin || isManager || isAdvisor;
   const canCreateRO = isAdmin;
   const canSettings = isAdmin;
@@ -3783,6 +3791,7 @@ export default function ShopFlowTracker() {
       }, { merge: true });
     } catch(e) { /* non-critical */ }
     const displayUser = { id:'display', name:'Display Board', role:'display', pin: stateRef.current.displayPin || '9999' };
+    try { localStorage.setItem('sft-session', JSON.stringify({ user: displayUser, loginDate: new Date().toDateString() })); } catch(e) {}
     setDeviceStatus('approved');
     setCurrentUser(displayUser);
   }
@@ -3799,6 +3808,7 @@ export default function ShopFlowTracker() {
         userAgent: navigator.userAgent,
       }, { merge: true });
     } catch(e) { /* non-critical — still let them in */ }
+    try { localStorage.setItem('sft-session', JSON.stringify({ user: adminUser, loginDate: new Date().toDateString() })); } catch(e) {}
     setDeviceStatus('approved');
     setCurrentUser(adminUser);
   }
@@ -3810,6 +3820,7 @@ export default function ShopFlowTracker() {
     const displayUser = { id:"display", name:"Display Board", role:"display", pin: state.displayPin || "9999" };
     const loginUsers = [...nonTechUsers, ...dynamicTechs, displayUser];
     function handleLogin(user) {
+      try { localStorage.setItem('sft-session', JSON.stringify({ user, loginDate: new Date().toDateString() })); } catch(e) {}
       setCurrentUser(user);
       if (user.role === 'admin') {
         (async () => {
@@ -3855,7 +3866,7 @@ export default function ShopFlowTracker() {
             <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>This device has been denied access.<br/>Contact your admin for assistance.</div>
           </div>
           <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center', marginTop:8 }}>{deviceId.current}</div>
-          <button onClick={() => setCurrentUser(null)} style={{ marginTop:8, padding:'8px 20px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, color:'rgba(255,255,255,0.3)', fontSize:12, cursor:'pointer' }}>← Back to login</button>
+          <button onClick={() => handleLogout()} style={{ marginTop:8, padding:'8px 20px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:10, color:'rgba(255,255,255,0.3)', fontSize:12, cursor:'pointer' }}>← Back to login</button>
         </div>
       );
     }
@@ -3871,7 +3882,7 @@ export default function ShopFlowTracker() {
 
         {/* Zone 1 — Header: 7vh */}
         <div style={{ height:"7vh", flexShrink:0, background:"rgba(10,14,24,0.95)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"0.5px solid rgba(255,255,255,0.08)", display:"flex", alignItems:"center", gap:12, padding:"0 clamp(12px,1.5vw,24px)", overflow:"hidden" }}>
-          <div onClick={() => setCurrentUser(null)} style={{ flexShrink:0, display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} title="Tap to logout">
+          <div onClick={() => handleLogout()} style={{ flexShrink:0, display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} title="Tap to logout">
             <div style={{ filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))" }}><WFLogo size={32} radius={7} /></div>
             <div>
               <div style={{ color:TEXT, fontWeight:700, fontSize:"clamp(11px,1.3vw,17px)", letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif", whiteSpace:"nowrap" }}>
@@ -4063,7 +4074,7 @@ export default function ShopFlowTracker() {
         {isDisplay ? (
           // ── Display mode header: logo+title | hours bar | clock | dot ──
           <>
-            <div onClick={() => setCurrentUser(null)} style={{ flexShrink:0, display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} title="Tap to logout">
+            <div onClick={() => handleLogout()} style={{ flexShrink:0, display:"flex", alignItems:"center", gap:10, cursor:"pointer" }} title="Tap to logout">
               <div style={{ filter:"drop-shadow(0 2px 8px rgba(10,132,255,0.4))" }}>
                 <WFLogo size={34} radius={7} />
               </div>
@@ -4188,7 +4199,7 @@ export default function ShopFlowTracker() {
               <button onClick={() => setShowChangePin(true)} title="Change PIN" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <KeyIcon />
               </button>
-              <button onClick={() => setCurrentUser(null)} style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <button onClick={() => handleLogout()} style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <LogoutIcon />
               </button>
             </div>}
