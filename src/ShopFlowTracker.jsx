@@ -3278,8 +3278,17 @@ function AdminPinPad({ deviceId, onSuccess, onBack, backLabel }) {
   );
 }
 
+// ─── Display Bypass Button (shared) ──────────────────────────────────────────
+function DisplayBypassButton({ onDisplayBypass }) {
+  return (
+    <button onClick={onDisplayBypass} style={{ marginTop:8, background:'none', border:'none', color:'rgba(255,255,255,0.18)', fontSize:12, cursor:'pointer', padding:'8px 16px', display:'flex', alignItems:'center', gap:6 }}>
+      📺 Use as Display Board
+    </button>
+  );
+}
+
 // ─── Pending Screen ───────────────────────────────────────────────────────────
-function PendingScreen({ deviceId, onAdminOverride, onRecheck }) {
+function PendingScreen({ deviceId, onAdminOverride, onRecheck, onDisplayBypass }) {
   const [showAdminPin, setShowAdminPin] = useState(false);
   return (
     <div style={{ minHeight:'100vh', background:'#000', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', padding:'32px 24px', fontFamily:'-apple-system,sans-serif' }}>
@@ -3293,8 +3302,9 @@ function PendingScreen({ deviceId, onAdminOverride, onRecheck }) {
           </div>
           <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center', marginTop:8, marginBottom:20 }}>{deviceId}</div>
           <button onClick={onRecheck} style={{ padding:'10px 24px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, color:'rgba(255,255,255,0.4)', fontSize:13, cursor:'pointer' }}>Check Again</button>
-          <div style={{ width:'100%', maxWidth:280, borderTop:'1px solid rgba(255,255,255,0.06)', marginTop:32, paddingTop:24 }}>
-            <button onClick={() => setShowAdminPin(true)} style={{ width:'100%', background:'none', border:'none', color:'rgba(255,255,255,0.2)', fontSize:12, cursor:'pointer', padding:'8px 0', textAlign:'center' }}>Admin? Sign in here</button>
+          <div style={{ width:'100%', maxWidth:280, borderTop:'1px solid rgba(255,255,255,0.06)', marginTop:32, paddingTop:24, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+            <button onClick={() => setShowAdminPin(true)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.2)', fontSize:12, cursor:'pointer', padding:'8px 0' }}>Admin? Sign in here</button>
+            <DisplayBypassButton onDisplayBypass={onDisplayBypass} />
           </div>
         </>
       ) : (
@@ -3305,7 +3315,7 @@ function PendingScreen({ deviceId, onAdminOverride, onRecheck }) {
 }
 
 // ─── Request Access Screen ────────────────────────────────────────────────────
-function RequestAccessScreen({ deviceId, onRequested, onAdminOverride }) {
+function RequestAccessScreen({ deviceId, onRequested, onAdminOverride, onDisplayBypass }) {
   const [name, setName] = useState('');
   const [role, setRole] = useState('tech');
   const [loading, setLoading] = useState(false);
@@ -3356,7 +3366,10 @@ function RequestAccessScreen({ deviceId, onRequested, onAdminOverride }) {
             </button>
           </div>
           <div style={{ marginTop:24, fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center' }}>{deviceId}</div>
-          <button onClick={() => setShowAdminPin(true)} style={{ marginTop:32, background:'none', border:'none', color:'rgba(255,255,255,0.15)', fontSize:12, cursor:'pointer', padding:'8px 16px' }}>Admin? Sign in here</button>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, marginTop:32 }}>
+            <button onClick={() => setShowAdminPin(true)} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.15)', fontSize:12, cursor:'pointer', padding:'8px 16px' }}>Admin? Sign in here</button>
+            <DisplayBypassButton onDisplayBypass={onDisplayBypass} />
+          </div>
         </>
       ) : (
         <AdminPinPad deviceId={deviceId} onSuccess={onAdminOverride} onBack={() => setShowAdminPin(false)} backLabel="Back to request form" />
@@ -3761,6 +3774,19 @@ export default function ShopFlowTracker() {
   // We pass this as a string for CSS calc
   const CELL_W_MOBILE = 148;
   const useFluid = isWide;  // fluid = fills screen, fixed = scrolls
+  async function handleDisplayBypass(devId) {
+    // Display board never needs approval — auto-approve silently and log in
+    try {
+      await setDoc(doc(db, 'devices', devId), {
+        deviceId: devId, name: 'Display Board', role: 'display',
+        status: 'approved', approvedAt: Date.now(), userAgent: navigator.userAgent,
+      }, { merge: true });
+    } catch(e) { /* non-critical */ }
+    const displayUser = { id:'display', name:'Display Board', role:'display', pin: stateRef.current.displayPin || '9999' };
+    setDeviceStatus('approved');
+    setCurrentUser(displayUser);
+  }
+
   async function handleAdminDeviceOverride(adminUser, devId) {
     try {
       await setDoc(doc(db, 'devices', devId), {
@@ -3786,10 +3812,10 @@ export default function ShopFlowTracker() {
     );
   }
   if (deviceStatus === 'unregistered') {
-    return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} onAdminOverride={(user, devId) => handleAdminDeviceOverride(user, devId)} />;
+    return <RequestAccessScreen deviceId={deviceId.current} onRequested={() => setDeviceStatus('pending')} onAdminOverride={(user, devId) => handleAdminDeviceOverride(user, devId)} onDisplayBypass={() => handleDisplayBypass(deviceId.current)} />;
   }
   if (deviceStatus === 'pending') {
-    return <PendingScreen deviceId={deviceId.current} onAdminOverride={(user, devId) => handleAdminDeviceOverride(user, devId)} onRecheck={() => setDeviceStatus('checking')} />;
+    return <PendingScreen deviceId={deviceId.current} onAdminOverride={(user, devId) => handleAdminDeviceOverride(user, devId)} onRecheck={() => setDeviceStatus('checking')} onDisplayBypass={() => handleDisplayBypass(deviceId.current)} />;
   }
   if (deviceStatus === 'denied') {
     return (
@@ -3800,6 +3826,7 @@ export default function ShopFlowTracker() {
           <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)', lineHeight:1.7 }}>This device has been denied access.<br/>Contact your admin for assistance.</div>
         </div>
         <div style={{ fontSize:10, color:'rgba(255,255,255,0.1)', fontFamily:'monospace', textAlign:'center', marginTop:8 }}>{deviceId.current}</div>
+        <DisplayBypassButton onDisplayBypass={() => handleDisplayBypass(deviceId.current)} />
       </div>
     );
   }
