@@ -3809,7 +3809,7 @@ export default function ShopFlowTracker() {
         isRemote.current = true;
         const data = snap.data();
         const fresh = freshState();
-        const remote = {
+        setState({
           ...fresh,
           ...data,
           timers:          data.timers          || {},
@@ -3828,40 +3828,9 @@ export default function ShopFlowTracker() {
           timeClockLog:    data.timeClockLog     || [],
           ros:             data.ros             || fresh.ros,
           displayPin:      data.displayPin      || "9999",
-        };
-        // Merge: preserve any locally-created ROs not yet flushed to Firestore.
-        // Without this, a snapshot from another device arriving mid-session
-        // would overwrite in-memory ROs that haven't been saved yet.
-        setState(prev => {
-          const remoteIds = new Set((remote.ros || []).map(r => r.id));
-          const localOnly = (prev.ros || []).filter(r => !remoteIds.has(r.id));
-          if (localOnly.length === 0) return remote;
-          const localOnlyIds = new Set(localOnly.map(r => r.id));
-          // Re-add local-only ROs to their grid/qSlots positions
-          const mergedGrid = { ...remote.grid };
-          Object.entries(prev.grid || {}).forEach(([tid, cols]) => {
-            Object.entries(cols || {}).forEach(([cid, ids]) => {
-              const keep = (ids || []).filter(id => localOnlyIds.has(id));
-              if (keep.length) {
-                const base = mergedGrid[tid] || { ondeck:[], inprogress:[], completed:[], delivered:[] };
-                mergedGrid[tid] = { ...base, [cid]: [...(base[cid] || []), ...keep] };
-              }
-            });
-          });
-          const mergedQSlots = { ...remote.qSlots };
-          Object.entries(prev.qSlots || {}).forEach(([qid, ids]) => {
-            const keep = (ids || []).filter(id => localOnlyIds.has(id));
-            if (keep.length) mergedQSlots[qid] = [...(mergedQSlots[qid] || []), ...keep];
-          });
-          return { ...remote, ros: [...remote.ros, ...localOnly], grid: mergedGrid, qSlots: mergedQSlots };
         });
       } else {
-        // Only seed Firestore if local state has real data to avoid wiping with empty state
-        if ((stateRef.current.ros || []).length > 0 || Object.keys(stateRef.current.grid || {}).length > 0) {
-          setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
-        } else {
-          setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
-        }
+        setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
       }
     }, err => { setConnected(false); console.error('[ShopFlow] snapshot error', err); });
     return unsub;
@@ -4009,17 +3978,21 @@ export default function ShopFlowTracker() {
     upd(s => ({ ...s, ros: s.ros.map(r => r.id === f.id ? { ...r, ...f } : r) }));
   }
   function handleDeleteRO(roId) {
-    upd(s => { const ns = removeFromAll(s, roId); return { ...ns, ros:ns.ros.filter(r => r.id !== roId) }; });
+    const ns = removeFromAll(stateRef.current, roId);
+    const newState = { ...ns, ros: ns.ros.filter(r => r.id !== roId) };
+    setState(newState);
+    stateRef.current = newState;
     setDetailRO(null);
-    // Write to Firestore immediately — don't wait for the debounced save
-    setTimeout(async () => {
+    (async () => {
       try {
-        await setDoc(doc(db, 'shopstate', 'main'), stateRef.current);
-        console.log('[ShopFlow] Delete synced immediately');
+        isRemote.current = true;
+        await setDoc(doc(db, 'shopstate', 'main'), newState);
+        console.log('[ShopFlow] Delete synced:', roId);
       } catch(e) {
-        console.error('[ShopFlow] Delete sync failed', e);
+        isRemote.current = false;
+        console.error('[ShopFlow] Delete sync failed:', e);
       }
-    }, 150);
+    })();
   }
   function handleArchive(roId) {
     upd(s => {
@@ -4051,6 +4024,15 @@ export default function ShopFlowTracker() {
         ns.qSlots = { ...ns.qSlots, [qid]: [...(ns.qSlots[qid]||[]), roId] };
       }
       return ns;    });
+    setTimeout(async () => {
+      try {
+        isRemote.current = true;
+        await setDoc(doc(db, 'shopstate', 'main'), stateRef.current);
+        console.log('[ShopFlow] New RO synced:', roId);
+      } catch(e) {
+        console.error('[ShopFlow] New RO sync failed:', e);
+      }
+    }, 150);
     setShowAdd(false);
   }
   function handleSaveServiceTypes(types) {
