@@ -4266,7 +4266,7 @@ export default function ShopFlowTracker() {
         </div>
       )}
       {/* Header */}
-      <div style={{ background:"rgba(10,14,24,0.92)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"0.5px solid rgba(255,255,255,0.08)", borderTop:"0.5px solid rgba(255,255,255,0.06)", padding:isWide?"10px 24px":"9px 14px", display:"flex", alignItems:"center", gap:12, position:"sticky", top: isDisplay ? 0 : movingRO ? 44 : 0, zIndex:300, boxShadow:"0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05) inset" }}>
+      <div style={{ background:"rgba(10,14,24,0.92)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"0.5px solid rgba(255,255,255,0.08)", borderTop:"0.5px solid rgba(255,255,255,0.06)", padding:isWide?"10px 24px":"9px 14px", display:"flex", alignItems:"center", gap:12, position:"sticky", top: isDisplay ? 0 : movingRO ? 44 : 0, zIndex:300, boxShadow:"0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05) inset", overflowX:"auto", WebkitOverflowScrolling:"touch", flexWrap:"nowrap" }}>
         {isDisplay ? (
           // ── Display mode header: logo+title | hours bar | clock | dot ──
           <>
@@ -4346,7 +4346,7 @@ export default function ShopFlowTracker() {
               </div>
             )}
             {/* icons: admin on all screens, tech on desktop only; manager + advisor never */}
-            {(isAdmin || (isTech && isWide)) && <div style={{ display:"flex", gap:8, ...(!isWide && isAdmin ? { overflowX:"auto", flexShrink:0, maxWidth:"calc(100vw - 150px)", WebkitOverflowScrolling:"touch", scrollbarWidth:"none", msOverflowStyle:"none", paddingBottom:2 } : {}) }}>
+            {(isAdmin || (isTech && isWide)) && <div style={{ display:"flex", gap:8, minWidth:"max-content", ...(!isWide && isAdmin ? { overflowX:"auto", flexShrink:0, maxWidth:"calc(100vw - 150px)", WebkitOverflowScrolling:"touch", scrollbarWidth:"none", msOverflowStyle:"none", paddingBottom:2 } : {}) }}>
               {canSeeAll && (
                 <button onClick={() => setShowAnalytics(true)} title="Analytics" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                   <AnalyticsIcon />
@@ -4405,16 +4405,6 @@ export default function ShopFlowTracker() {
         )}
       </div>
       <div style={{ padding:"10px 0 60px", marginTop: isDisplay ? 0 : movingRO ? 44 : 0 }}>
-        {/* Technicians label */}
-        <div style={{ padding:"0 14px", marginBottom:6 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
-            <span style={{ fontSize:10, fontWeight:600, color:TEXT3, letterSpacing:"0.8px", textTransform:"uppercase", fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif" }}>
-              {(isAdmin || isDisplay) ? "Technicians" : currentUser.name}
-            </span>
-            <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
-          </div>
-        </div>
         {/* Grid — fluid on wide (fills screen), scrollable on mobile */}
         <div style={{ overflowX: useFluid ? "hidden" : "auto", WebkitOverflowScrolling:"touch", paddingBottom:4, paddingLeft:14, paddingRight:14, scrollSnapType: useFluid ? "none" : "x proximity" }}>
           <div style={{ display:"inline-flex", flexDirection:"column", width: useFluid ? "100%" : "auto" }}>
