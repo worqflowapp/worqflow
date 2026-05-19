@@ -3804,10 +3804,14 @@ export default function ShopFlowTracker() {
   useEffect(() => {
     const ref = doc(db, 'shopstate', 'main');
     const unsub = onSnapshot(ref, snap => {
+      console.log('[SNAPSHOT] Received snapshot on this device');
+      console.log('[SNAPSHOT] snap.exists():', snap.exists());
       setConnected(true);
       if (snap.exists()) {
-        isRemote.current = true;
         const data = snap.data();
+        console.log('[SNAPSHOT] incoming ros count:', data.ros?.length);
+        console.log('[SNAPSHOT] isRemote.current before set:', isRemote.current);
+        isRemote.current = true;
         const fresh = freshState();
         setState({
           ...fresh,
@@ -3829,7 +3833,9 @@ export default function ShopFlowTracker() {
           ros:             data.ros             || fresh.ros,
           displayPin:      data.displayPin      || "9999",
         });
+        console.log('[SNAPSHOT] setState called');
       } else {
+        console.log('[SNAPSHOT] Document does not exist, seeding');
         setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
       }
     }, err => { setConnected(false); console.error('[ShopFlow] snapshot error', err); });
@@ -3843,8 +3849,12 @@ export default function ShopFlowTracker() {
     const fromRemote = isRemote.current;
     isRemote.current = false;
     saveTimer.current = setTimeout(async () => {
+      console.log('[SAVE] Timer fired');
+      console.log('[SAVE] fromRemote:', fromRemote);
+      console.log('[SAVE] stateRef.current ros count:', stateRef.current.ros?.length);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current)); } catch {}
       if (!fromRemote) {
+        console.log('[SAVE] Writing to Firestore with ros count:', stateRef.current.ros?.length);
         try { await setDoc(doc(db, 'shopstate', 'main'), stateRef.current); }
         catch (e) { console.error('[ShopFlow] save failed', e); }
       }
@@ -3978,19 +3988,26 @@ export default function ShopFlowTracker() {
     upd(s => ({ ...s, ros: s.ros.map(r => r.id === f.id ? { ...r, ...f } : r) }));
   }
   function handleDeleteRO(roId) {
+    console.log('[DELETE] Starting delete for:', roId);
+    console.log('[DELETE] stateRef.current ros count BEFORE:', stateRef.current.ros?.length);
     const ns = removeFromAll(stateRef.current, roId);
     const newState = { ...ns, ros: ns.ros.filter(r => r.id !== roId) };
-    setState(newState);
+    console.log('[DELETE] newState ros count AFTER:', newState.ros?.length);
+    console.log('[DELETE] roId still in newState?', newState.ros?.some(r => r.id === roId));
     stateRef.current = newState;
+    setState(newState);
     setDetailRO(null);
     (async () => {
       try {
+        console.log('[DELETE] About to write to Firestore');
+        console.log('[DELETE] stateRef.current ros count at write time:', stateRef.current.ros?.length);
+        console.log('[DELETE] roId still in stateRef at write time?', stateRef.current.ros?.some(r => r.id === roId));
         isRemote.current = true;
-        await setDoc(doc(db, 'shopstate', 'main'), newState);
-        console.log('[ShopFlow] Delete synced:', roId);
+        await setDoc(doc(db, 'shopstate', 'main'), stateRef.current);
+        console.log('[DELETE] Firestore write SUCCESS');
       } catch(e) {
         isRemote.current = false;
-        console.error('[ShopFlow] Delete sync failed:', e);
+        console.error('[DELETE] Firestore write FAILED:', e);
       }
     })();
   }
