@@ -3843,9 +3843,9 @@ export default function ShopFlowTracker() {
     const fromRemote = isRemote.current;
     isRemote.current = false;
     saveTimer.current = setTimeout(async () => {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current)); } catch {}
       if (!fromRemote) {
-        try { await setDoc(doc(db, 'shopstate', 'main'), s); }
+        try { await setDoc(doc(db, 'shopstate', 'main'), stateRef.current); }
         catch (e) { console.error('[ShopFlow] save failed', e); }
       }
     }, 300);
