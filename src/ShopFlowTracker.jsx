@@ -4764,11 +4764,11 @@ export default function ShopFlowTracker() {
       )}
       {currentUser && currentUser.role !== 'display' && (
         <div style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0,
+          position: 'fixed', top: 0, left: 0, right: 0,
           background: 'rgba(0,0,0,0.9)', color: '#30D158',
           fontSize: 9, fontFamily: 'monospace',
           padding: '4px 8px', maxHeight: 120, overflowY: 'auto',
-          zIndex: 99999, borderTop: '1px solid #333',
+          zIndex: 99999, borderBottom: '1px solid #333',
         }}>
           {debugLog.map((line, i) => <div key={i}>{line}</div>)}
         </div>
