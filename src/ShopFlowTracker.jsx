@@ -4011,6 +4011,15 @@ export default function ShopFlowTracker() {
   function handleDeleteRO(roId) {
     upd(s => { const ns = removeFromAll(s, roId); return { ...ns, ros:ns.ros.filter(r => r.id !== roId) }; });
     setDetailRO(null);
+    // Write to Firestore immediately — don't wait for the debounced save
+    setTimeout(async () => {
+      try {
+        await setDoc(doc(db, 'shopstate', 'main'), stateRef.current);
+        console.log('[ShopFlow] Delete synced immediately');
+      } catch(e) {
+        console.error('[ShopFlow] Delete sync failed', e);
+      }
+    }, 150);
   }
   function handleArchive(roId) {
     upd(s => {
