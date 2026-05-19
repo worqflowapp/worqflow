@@ -3767,7 +3767,7 @@ export default function ShopFlowTracker() {
   const isTech    = currentUser && currentUser.role === "tech";
   function handleLogout() {
     try { localStorage.removeItem('sft-session'); } catch(e) {}
-    handleLogout();
+    setCurrentUser(null);
   }
   const canSeeAll   = isAdmin || isManager || isAdvisor;
   const canCreateRO = isAdmin;
@@ -3777,6 +3777,7 @@ export default function ShopFlowTracker() {
   const isRemote = useRef(false);
   const saveTimer = useRef(null);
   const stateRef = useRef(state);
+  const firestoreReady = useRef(false);
 
   // ── Device approval check ──
   useEffect(() => {
@@ -3807,6 +3808,7 @@ export default function ShopFlowTracker() {
       setConnected(true);
       if (snap.exists()) {
         const data = snap.data();
+        firestoreReady.current = true;
         isRemote.current = true;
         const fresh = freshState();
         const nextState = {
@@ -3831,6 +3833,7 @@ export default function ShopFlowTracker() {
         };
         setState(nextState);
       } else {
+        firestoreReady.current = true;
         setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
       }
     }, err => { setConnected(false); console.error('[ShopFlow] snapshot error', err); });
@@ -3845,7 +3848,7 @@ export default function ShopFlowTracker() {
     isRemote.current = false;
     saveTimer.current = setTimeout(async () => {
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current)); } catch {}
-      if (!fromRemote) {
+      if (!fromRemote && firestoreReady.current) {
         try { await setDoc(doc(db, 'shopstate', 'main'), stateRef.current); }
         catch (e) { console.error('[ShopFlow] save failed', e); }
       }
@@ -4026,9 +4029,7 @@ export default function ShopFlowTracker() {
       return ns;    });
     setTimeout(async () => {
       try {
-        isRemote.current = true;
         await setDoc(doc(db, 'shopstate', 'main'), stateRef.current);
-        console.log('[ShopFlow] New RO synced:', roId);
       } catch(e) {
         console.error('[ShopFlow] New RO sync failed:', e);
       }
