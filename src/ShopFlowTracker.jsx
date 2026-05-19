@@ -3734,7 +3734,7 @@ export default function ShopFlowTracker() {
       const raw = localStorage.getItem('sft-session');
       if (raw) {
         const { user, loginDate } = JSON.parse(raw);
-        if (loginDate === new Date().toDateString()) return user;
+        if (user) return user;
       }
     } catch(e) {}
     return null;
