@@ -148,11 +148,9 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const p = JSON.parse(raw);
-      console.log('[LOAD] Loading state from localStorage, ros count:', p.ros?.length, 'ids:', p.ros?.map(r => r.id));
       return { ...freshState(), ...p, techs: p.techs || DEFAULT_TECHS, queues: p.queues || DEFAULT_QUEUES, serviceTypes: p.serviceTypes || DEFAULT_SERVICE_TYPES, jobPresets: p.jobPresets || DEFAULT_JOB_PRESETS, partsSlots: p.partsSlots || [], completedByTech: p.completedByTech || {}, activityLog: p.activityLog || [], timeClockLog: p.timeClockLog || [] };
     }
   } catch(e) {}
-  console.log('[LOAD] No localStorage data, using freshState');
   return freshState();
 }
 function saveState(s) {
@@ -3745,11 +3743,6 @@ export default function ShopFlowTracker() {
   const deviceId = useRef(getDeviceId());
   const [state, setState]             = useState(loadState);
   const [connected, setConnected]     = useState(true);
-  const [debugLog, setDebugLog] = useState([]);
-  function addLog(msg) {
-    const ts = new Date().toLocaleTimeString();
-    setDebugLog(prev => [...prev.slice(-20), ts + ' ' + msg]);
-  }
   const [showAdd, setShowAdd]               = useState(false);
   const [showArchive, setShowArchive]       = useState(false);
   const [showHistory, setShowHistory]       = useState(false);
@@ -3811,15 +3804,9 @@ export default function ShopFlowTracker() {
   useEffect(() => {
     const ref = doc(db, 'shopstate', 'main');
     const unsub = onSnapshot(ref, snap => {
-      console.log('[SNAPSHOT] Received snapshot on this device');
-      addLog('[SNAP] received exists:' + snap.exists());
-      console.log('[SNAPSHOT] snap.exists():', snap.exists());
       setConnected(true);
       if (snap.exists()) {
         const data = snap.data();
-        console.log('[SNAPSHOT] incoming ros count:', data.ros?.length);
-        addLog('[SNAP] incoming ros:' + data.ros?.length + ' isRemote:' + isRemote.current);
-        console.log('[SNAPSHOT] isRemote.current before set:', isRemote.current);
         isRemote.current = true;
         const fresh = freshState();
         const nextState = {
@@ -3842,12 +3829,8 @@ export default function ShopFlowTracker() {
           ros:             data.ros             || fresh.ros,
           displayPin:      data.displayPin      || "9999",
         };
-        console.log('[SNAPSHOT] setState called with ros ids:', nextState.ros?.map(r => r.id));
-        addLog('[SNAP] setState ros ids:' + nextState.ros?.map(r => r.id.slice(-6)).join(','));
         setState(nextState);
       } else {
-        console.log('[SNAPSHOT] Document does not exist, seeding');
-        addLog('[SNAP] doc missing → seeding');
         setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
       }
     }, err => { setConnected(false); console.error('[ShopFlow] snapshot error', err); });
@@ -3861,14 +3844,8 @@ export default function ShopFlowTracker() {
     const fromRemote = isRemote.current;
     isRemote.current = false;
     saveTimer.current = setTimeout(async () => {
-      console.log('[SAVE] Timer fired');
-      addLog('[SAVE] fired fromRemote:' + fromRemote + ' ros:' + stateRef.current.ros?.length);
-      console.log('[SAVE] fromRemote:', fromRemote);
-      console.log('[SAVE] stateRef.current ros count:', stateRef.current.ros?.length);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current)); } catch {}
       if (!fromRemote) {
-        console.log('[SAVE] Writing to Firestore with ros count:', stateRef.current.ros?.length);
-        addLog('[SAVE] WRITING Firestore ros:' + stateRef.current.ros?.length);
         try { await setDoc(doc(db, 'shopstate', 'main'), stateRef.current); }
         catch (e) { console.error('[ShopFlow] save failed', e); }
       }
@@ -3876,8 +3853,6 @@ export default function ShopFlowTracker() {
   }, []);
 
   useEffect(() => {
-    console.log('[STATE] state changed — ros count:', state.ros?.length, 'ids:', state.ros?.map(r => r.id));
-    addLog('[STATE] ros:' + state.ros?.length + ' ids:' + state.ros?.map(r => r.id.slice(-6)).join(','));
     stateRef.current = state;
     scheduleSave(state);
   }, [state, scheduleSave]);
@@ -4004,30 +3979,18 @@ export default function ShopFlowTracker() {
     upd(s => ({ ...s, ros: s.ros.map(r => r.id === f.id ? { ...r, ...f } : r) }));
   }
   function handleDeleteRO(roId) {
-    console.log('[DELETE] Starting delete for:', roId);
-    addLog('[DEL] start id:' + roId.slice(-6) + ' ros:' + stateRef.current.ros?.length);
-    console.log('[DELETE] stateRef.current ros count BEFORE:', stateRef.current.ros?.length);
     const ns = removeFromAll(stateRef.current, roId);
     const newState = { ...ns, ros: ns.ros.filter(r => r.id !== roId) };
-    console.log('[DELETE] newState ros count AFTER:', newState.ros?.length);
-    addLog('[DEL] newState ros:' + newState.ros?.length + ' stillIn:' + newState.ros?.some(r => r.id === roId));
-    console.log('[DELETE] roId still in newState?', newState.ros?.some(r => r.id === roId));
     stateRef.current = newState;
     setState(newState);
     setDetailRO(null);
     (async () => {
       try {
-        console.log('[DELETE] About to write to Firestore');
-        addLog('[DEL] writing Firestore ros:' + stateRef.current.ros?.length);
-        console.log('[DELETE] stateRef.current ros count at write time:', stateRef.current.ros?.length);
-        console.log('[DELETE] roId still in stateRef at write time?', stateRef.current.ros?.some(r => r.id === roId));
         isRemote.current = true;
         await setDoc(doc(db, 'shopstate', 'main'), stateRef.current);
-        console.log('[DELETE] Firestore write SUCCESS');
-        addLog('[DEL] Firestore write SUCCESS');
       } catch(e) {
         isRemote.current = false;
-        console.error('[DELETE] Firestore write FAILED:', e);
+        console.error('[ShopFlow] Delete sync failed:', e);
       }
     })();
   }
@@ -4761,17 +4724,6 @@ export default function ShopFlowTracker() {
           currentUser2={currentUser}
           onAddNote={(roId, text, author) => { handleAddNote(roId, text, author); setDetailRO(d => ({ ...d, ro:{ ...d.ro, roNotes:[...(d.ro.roNotes||[]), {id:Date.now(), text, author, time:Date.now()}] } })); }}
         />
-      )}
-      {currentUser && currentUser.role !== 'display' && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0,
-          background: 'rgba(0,0,0,0.9)', color: '#30D158',
-          fontSize: 9, fontFamily: 'monospace',
-          padding: '4px 8px', maxHeight: 120, overflowY: 'auto',
-          zIndex: 99999, borderBottom: '1px solid #333',
-        }}>
-          {debugLog.map((line, i) => <div key={i}>{line}</div>)}
-        </div>
       )}
     </div>
   );
