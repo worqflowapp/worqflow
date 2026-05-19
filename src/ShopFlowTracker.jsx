@@ -1610,14 +1610,18 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
   );
 }
 // ─── Quick Add Modal ──────────────────────────────────────────────────────────
-function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes }) {
+function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
   const defaultRoNum = "RO-" + String(nextNum).padStart(4, "0");
   const [f, setF] = useState({
     roNum: defaultRoNum,
     year: "", make: "", model: "",
     serviceType: "st-main",
     waitStatus: "dropoff",
+    priority: "NORMAL",
+    hours: "",
+    jobs: "",
   });
+  const [showJobPicker, setShowJobPicker] = useState(false);
   const roNumRef = useRef(null);
   useEffect(() => { setTimeout(() => roNumRef.current?.select(), 80); }, []);
 
@@ -1628,7 +1632,7 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes }) {
     onAdd({
       ...f,
       color:"", plate:"", mileageIn:"", vin:"", customer:"", phone:"", email:"",
-      priority:"NORMAL", hours:"", jobs:"", parts:"", concern:"", cause:"", correction:"", notes:"", promiseTime:"",
+      parts:"", concern:"", cause:"", correction:"", notes:"", promiseTime:"",
       dest: "queue",
       assignQueue: queueMap[f.serviceType] || "q-main",
     });
@@ -1637,6 +1641,7 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes }) {
   const ready = f.roNum.trim().length > 0;
 
   return (
+    <>
     <Sheet title="Quick Add RO" subtitle="Add details later by tapping the card" onClose={onClose}>
       <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
@@ -1690,6 +1695,30 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes }) {
           </div>
         </div>
 
+        {/* Priority */}
+        <div>
+          <label style={labelStyle}>Priority</label>
+          <div style={{ display:"flex", gap:8 }}>
+            {["LOW","NORMAL","HIGH"].map(p => (
+              <button key={p} onClick={() => setF(prev => ({ ...prev, priority: p }))}
+                style={{ flex:1, padding:"12px 0", borderRadius:12, border:"2px solid "+(f.priority===p ? priorityBorder(p) : BORDER), background: f.priority===p ? priorityBorder(p)+"33" : "rgba(255,255,255,0.05)", color: f.priority===p ? priorityBorder(p) : "rgba(255,255,255,0.4)", fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"'Barlow',sans-serif", transition:"all 0.15s" }}>
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Flat Rate Hours */}
+        <div>
+          <label style={labelStyle}>Flat Rate Hours</label>
+          <input type="number" min="0" step="0.5" placeholder="e.g. 2.5" value={f.hours}
+            onChange={e => setF(p => ({ ...p, hours: e.target.value }))}
+            style={{ ...inputStyle, fontWeight:700 }} />
+        </div>
+
+        {/* Jobs */}
+        <JobFieldTrigger value={f.jobs} onOpen={() => setShowJobPicker(true)} />
+
         {/* Submit */}
         <button onClick={handleAdd} disabled={!ready}
           style={{ marginTop:2, padding:17, background: ready ? ACCENT : "rgba(255,255,255,0.07)", color: ready ? "#fff" : "rgba(255,255,255,0.2)", border:"none", borderRadius:14, fontFamily:"'Barlow',sans-serif", fontWeight:800, fontSize:17, cursor: ready ? "pointer" : "default", letterSpacing:"-0.2px", boxShadow: ready ? "0 4px 20px rgba(10,132,255,0.4)" : "none", transition:"all 0.2s" }}>
@@ -1697,6 +1726,10 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes }) {
         </button>
       </div>
     </Sheet>
+    {showJobPicker && (
+      <JobPicker value={f.jobs} onChange={v => setF(p => ({ ...p, jobs: v }))} presets={jobPresets || DEFAULT_JOB_PRESETS} onClose={() => setShowJobPicker(false)} />
+    )}
+    </>
   );
 }
 // ─── New RO Modal ─────────────────────────────────────────────────────────────
@@ -4689,7 +4722,7 @@ export default function ShopFlowTracker() {
         <ChangePinModal user={currentUser} onClose={() => setShowChangePin(false)} onSave={handleSavePin} />
       )}
       {showAdd && (
-        <QuickAddModal onAdd={handleAddRO} onClose={() => setShowAdd(false)} nextNum={state.nextNum} serviceTypes={state.serviceTypes} />
+        <QuickAddModal onAdd={handleAddRO} onClose={() => setShowAdd(false)} nextNum={state.nextNum} serviceTypes={state.serviceTypes} jobPresets={state.jobPresets} />
       )}
       {showArchive && (
         <ArchiveModal archived={state.archived||[]} onClose={() => setShowArchive(false)} onRestore={handleRestore} wide={isWide} />
