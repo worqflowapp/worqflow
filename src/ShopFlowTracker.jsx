@@ -148,9 +148,11 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const p = JSON.parse(raw);
+      console.log('[LOAD] Loading state from localStorage, ros count:', p.ros?.length, 'ids:', p.ros?.map(r => r.id));
       return { ...freshState(), ...p, techs: p.techs || DEFAULT_TECHS, queues: p.queues || DEFAULT_QUEUES, serviceTypes: p.serviceTypes || DEFAULT_SERVICE_TYPES, jobPresets: p.jobPresets || DEFAULT_JOB_PRESETS, partsSlots: p.partsSlots || [], completedByTech: p.completedByTech || {}, activityLog: p.activityLog || [], timeClockLog: p.timeClockLog || [] };
     }
   } catch(e) {}
+  console.log('[LOAD] No localStorage data, using freshState');
   return freshState();
 }
 function saveState(s) {
@@ -3813,7 +3815,7 @@ export default function ShopFlowTracker() {
         console.log('[SNAPSHOT] isRemote.current before set:', isRemote.current);
         isRemote.current = true;
         const fresh = freshState();
-        setState({
+        const nextState = {
           ...fresh,
           ...data,
           timers:          data.timers          || {},
@@ -3832,8 +3834,9 @@ export default function ShopFlowTracker() {
           timeClockLog:    data.timeClockLog     || [],
           ros:             data.ros             || fresh.ros,
           displayPin:      data.displayPin      || "9999",
-        });
-        console.log('[SNAPSHOT] setState called');
+        };
+        console.log('[SNAPSHOT] setState called with ros ids:', nextState.ros?.map(r => r.id));
+        setState(nextState);
       } else {
         console.log('[SNAPSHOT] Document does not exist, seeding');
         setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
@@ -3862,6 +3865,7 @@ export default function ShopFlowTracker() {
   }, []);
 
   useEffect(() => {
+    console.log('[STATE] state changed — ros count:', state.ros?.length, 'ids:', state.ros?.map(r => r.id));
     stateRef.current = state;
     scheduleSave(state);
   }, [state, scheduleSave]);
