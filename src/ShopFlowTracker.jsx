@@ -956,7 +956,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
   const startY   = useRef(0);
   const vehicle     = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
   const svcType     = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
-  const leftColor   = isMoving ? ACCENT : (svcType ? svcType.color : priorityBorder(ro.priority));
+  const leftColor   = isMoving ? ACCENT : (svcType ? svcType.color : ro.priority === "HIGH" ? DANGER : ro.priority === "LOW" ? "#94A3B8" : "#1D6BF3");
   const isWaiting   = ro.waitStatus === "waiting";
   const timerRunning = timer && timer.running;
   const elapsed     = timer
@@ -1028,23 +1028,16 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
         overflow: "hidden",
       }}
     >
-      {/* ROW 1 — RO# + badges — always shown */}
+      {/* ROW 1 — RO number + notes badge only — always same height */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4, flexShrink:0, overflow:"hidden" }}>
         <span style={{ fontWeight:700, fontSize:13, color:TEXT, fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
           {ro.roNum}
         </span>
-        <div style={{ display:"flex", gap:3, flexShrink:0, alignItems:"center" }}>
-          {ro.roNotes && ro.roNotes.length > 0 && (
-            <span style={{ background:"rgba(10,132,255,0.2)", color:ACCENT, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:5 }}>
-              💬{ro.roNotes.length}
-            </span>
-          )}
-          {ro.priority === "HIGH" && (
-            <span style={{ background:"rgba(255,69,58,0.15)", color:DANGER, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap" }}>
-              URGENT
-            </span>
-          )}
-        </div>
+        {ro.roNotes && ro.roNotes.length > 0 && (
+          <span style={{ background:"rgba(10,132,255,0.2)", color:ACCENT, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0 }}>
+            💬{ro.roNotes.length}
+          </span>
+        )}
       </div>
 
       {/* ROW 2 — vehicle + customer — always shown */}
@@ -1081,24 +1074,29 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
         </div>
       </div>
 
-      {/* ROW 4 — status + service type — always shown */}
+      {/* ROW 4 — status + service type + urgent — always shown */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, overflow:"hidden", gap:4 }}>
-        <div style={{ flexShrink:0 }}>
+        <div style={{ display:"flex", gap:3, alignItems:"center", flex:1, overflow:"hidden" }}>
           {ro.waitStatus === "waiting" ? (
-            <span style={{ background:"rgba(255,159,10,0.15)", color:WARN, fontSize:8, fontWeight:600, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap" }}>⏳ Waiting</span>
+            <span style={{ background:"rgba(255,159,10,0.15)", color:WARN, fontSize:8, fontWeight:600, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0 }}>⏳ Waiting</span>
           ) : ro.waitStatus === "dropoff" ? (
-            <span style={{ background:"rgba(255,255,255,0.07)", color:TEXT3, fontSize:8, fontWeight:500, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap" }}>🚗 Drop-off</span>
+            <span style={{ background:"rgba(255,255,255,0.07)", color:TEXT3, fontSize:8, fontWeight:500, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0 }}>🚗 Drop-off</span>
           ) : (
-            <span style={{ fontSize:8, color:"transparent" }}>—</span>
+            <span style={{ fontSize:8, color:"transparent", padding:"1px 4px" }}>—</span>
           )}
         </div>
-        {svcType ? (
-          <span style={{ background:svcType.color, color:"#fff", fontSize:8, fontWeight:600, padding:"1px 5px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0, maxWidth:70, overflow:"hidden", textOverflow:"ellipsis" }}>
-            {svcType.name}
-          </span>
-        ) : (
-          <span style={{ fontSize:8, color:"transparent" }}>—</span>
-        )}
+        <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
+          {ro.priority === "HIGH" && (
+            <span style={{ background:"rgba(255,69,58,0.15)", color:DANGER, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap" }}>!!</span>
+          )}
+          {svcType ? (
+            <span style={{ background:svcType.color, color:"#fff", fontSize:8, fontWeight:600, padding:"1px 5px", borderRadius:5, whiteSpace:"nowrap", maxWidth:65, overflow:"hidden", textOverflow:"ellipsis" }}>
+              {svcType.name}
+            </span>
+          ) : (
+            <span style={{ fontSize:8, color:"transparent", padding:"1px 5px" }}>—</span>
+          )}
+        </div>
       </div>
 
       {/* Moving indicator */}
