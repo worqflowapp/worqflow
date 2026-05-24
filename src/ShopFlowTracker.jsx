@@ -4200,6 +4200,23 @@ export default function ShopFlowTracker() {
   // We pass this as a string for CSS calc
   const CELL_W_MOBILE = 148;
   const useFluid = isWide;  // fluid = fills screen, fixed = scrolls
+
+  // Fixed row height so cells have a bounded height and cards can divide space equally
+  const HEADER_H    = 60;
+  const COL_HEADER_H = 36;
+  const BOTTOM_PAD  = 60;
+  const ROW_GAP     = 6;
+  const [rowHeight, setRowHeight] = useState(120);
+  useEffect(() => {
+    function calcRowHeight() {
+      const numTechs = visibleTechs.length || 4;
+      const available = window.innerHeight - HEADER_H - COL_HEADER_H - BOTTOM_PAD - (ROW_GAP * (numTechs - 1));
+      setRowHeight(Math.max(Math.floor(available / numTechs), 100));
+    }
+    calcRowHeight();
+    window.addEventListener('resize', calcRowHeight);
+    return () => window.removeEventListener('resize', calcRowHeight);
+  }, [visibleTechs.length]);
   async function handleDisplayBypass(devId) {
     // Display board never needs approval — auto-approve silently and log in
     try {
@@ -4473,7 +4490,7 @@ export default function ShopFlowTracker() {
             {/* Tech rows */}            {visibleTechs.map(tech => {
               const { count, hrs, cumulative } = techStats(tech.id);
               return (
-                <div key={tech.id} style={{ display:"flex", gap:GAP, marginBottom:GAP, alignItems:"stretch", width:"100%" }}>
+                <div key={tech.id} style={{ display:"flex", gap:GAP, marginBottom:GAP, alignItems:"stretch", width:"100%", height:rowHeight, minHeight:rowHeight, maxHeight:rowHeight, flexShrink:0, overflow:"hidden" }}>
                   {/* Tech card */}
                   <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0, background:TECH_BG, borderRadius:12, padding:"10px 10px", boxShadow:"0 1px 0 rgba(255,255,255,0.10) inset, 0 -1px 0 rgba(0,0,0,0.5) inset, 0 4px 16px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.6)", border:"0.5px solid rgba(255,255,255,0.08)", borderTop:"0.5px solid rgba(255,255,255,0.14)", display:"flex", flexDirection:"column", gap:6 }}>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
@@ -4572,6 +4589,8 @@ export default function ShopFlowTracker() {
                           alignItems: ids.length ? "stretch" : "center",
                           justifyContent: ids.length ? "flex-start" : "center",
                           alignSelf: "stretch",
+                          height: "100%",
+                          maxHeight: "100%",
                           minHeight: 82,
                           boxSizing: "border-box",
                           overflow: "hidden",
