@@ -1113,7 +1113,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
       </div>
 
       {/* ROW 7 — Status + Service type */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, minHeight:0, overflow:"hidden", gap:4 }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, minHeight:0, overflow:"hidden", gap:4, marginTop:"auto" }}>
         <div style={{ flexShrink:0 }}>
           {ro.waitStatus === "waiting" && (
             <span style={{ background:"rgba(255,159,10,0.15)", color:WARN, fontSize:8, fontWeight:600, padding:"1px 5px", borderRadius:6, whiteSpace:"nowrap" }}>⏳ Waiting</span>
@@ -1123,7 +1123,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
           )}
         </div>
         {svcType && (
-          <span style={{ background:svcType.color, color:"#fff", fontSize:8, fontWeight:600, padding:"1px 6px", borderRadius:6, whiteSpace:"nowrap", flexShrink:0, overflow:"hidden", textOverflow:"ellipsis", maxWidth:"60%" }}>
+          <span style={{ background:svcType.color, color:"#fff", fontSize:8, fontWeight:600, padding:"1px 5px", borderRadius:6, whiteSpace:"nowrap", flexShrink:0, overflow:"hidden", textOverflow:"ellipsis", maxWidth:70 }}>
             {svcType.name}
           </span>
         )}
@@ -4565,12 +4565,13 @@ export default function ShopFlowTracker() {
                           background: isTarget ? "rgba(10,132,255,0.10)" : CELL_BG,
                           border: "0.5px solid "+(isTarget?"#0A84FF":col.border),
                           borderRadius: 12,
-                          padding: ids.length ? "7px 7px 2px" : 0,
+                          padding: ids.length ? "6px 6px 4px" : 0,
                           display: "flex",
                           flexDirection: "column",
+                          gap: 4,
                           alignItems: ids.length ? "stretch" : "center",
                           justifyContent: ids.length ? "flex-start" : "center",
-                          height: "100%",
+                          alignSelf: "stretch",
                           minHeight: 82,
                           boxSizing: "border-box",
                           overflow: "hidden",
@@ -4591,17 +4592,16 @@ export default function ShopFlowTracker() {
                             </div>
                           )
                         ) : (
-                          ids.map((roId, idx) => {
+                          ids.map(roId => {
                             const ro = getRO(roId);
                             if (!ro) return null;
                             return (
                               <div
-                                key={roId}
+                                key={ro.id}
                                 style={{
                                   flex: 1,
                                   minHeight: 0,
                                   overflow: "hidden",
-                                  marginBottom: idx < ids.length - 1 ? 4 : 0,
                                 }}
                               >
                                 {renderCard(ro, col.id)}
