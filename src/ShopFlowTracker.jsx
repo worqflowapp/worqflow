@@ -1000,87 +1000,110 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
       onClick={handleClick}
       className="card-press"
       style={{
-        background: isMoving ? "rgba(10,132,255,0.10)" : CARD_BG,
-        borderRadius: 14,
-        padding: "12px 13px",
-        marginBottom: 7,
-        boxShadow: isMoving
-          ? "0 0 0 1.5px #0A84FF, 0 8px 32px rgba(10,132,255,0.25)"
-          : ro.priority === "HIGH"
-            ? "0 1px 0 "+CARD_TOP+" inset, 0 4px 20px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,69,58,0.15)"
-            : "0 1px 0 "+CARD_TOP+" inset, 0 4px 20px rgba(0,0,0,0.3)",
-        animation: isMoving ? "none" : "card-in 0.2s cubic-bezier(0.34,1.56,0.64,1)",
-        border: "0.5px solid " + (isMoving ? "rgba(10,132,255,0.4)" : CARD_BORDER),
-        borderLeft: "3px solid " + leftColor,
-        cursor: "pointer",
-        userSelect: "none",
+        height: "100%",
         width: "100%",
         boxSizing: "border-box",
-        transform: isMoving ? "scale(1.02)" : "scale(1)",
-        touchAction: "manipulation",
-        WebkitTouchCallout: "none",
+        background: isMoving ? "rgba(10,132,255,0.12)" : CARD_BG,
+        borderRadius: 14,
+        padding: "8px 10px",
+        boxShadow: isMoving
+          ? "0 0 0 1.5px #0A84FF, 0 8px 32px rgba(10,132,255,0.2)"
+          : ro.priority === "HIGH"
+            ? CARD_SHADOW
+            : CARD_SHADOW,
+        animation: isMoving ? "none"
+          : ro.priority === "HIGH"
+          ? "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1), urgent-glow 2.4s ease-in-out 0.3s infinite"
+          : "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)",
+        border: "1px solid " + CARD_BORDER,
+        borderLeft: "2.5px solid " + leftColor,
+        cursor: "pointer",
+        userSelect: "none",
         WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
+        touchAction: "manipulation",
+        transform: isMoving ? "scale(1.01)" : "scale(1)",
+        transition: "box-shadow 0.2s, transform 0.2s",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        overflow: "hidden",
       }}
     >
-      {/* Row 1 — RO# + priority badge only */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:3, gap:6 }}>
-        <span style={{ fontWeight:700, fontSize:14, color:TEXT, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display','Barlow',sans-serif", letterSpacing:"-0.5px", whiteSpace:"nowrap", flexShrink:0 }}>
+      {/* ROW 1 — RO# + badges */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4, flexShrink:0, minHeight:0 }}>
+        <span style={{ fontWeight:700, fontSize:13, color:TEXT, fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
           {ro.roNum}
         </span>
-        {ro.roNotes && ro.roNotes.length > 0 && (
-          <span style={{ background:"rgba(10,132,255,0.2)", color:ACCENT, fontSize:8, fontWeight:600, padding:"1px 5px", borderRadius:4, flexShrink:0 }}>
-            💬 {ro.roNotes.length}
-          </span>
-        )}
         <div style={{ display:"flex", alignItems:"center", gap:3, flexShrink:0 }}>
+          {ro.roNotes && ro.roNotes.length > 0 && (
+            <span style={{ background:"rgba(10,132,255,0.2)", color:ACCENT, fontSize:8, fontWeight:700, padding:"1px 5px", borderRadius:6 }}>
+              💬{ro.roNotes.length}
+            </span>
+          )}
           {ro.priority === "HIGH" && (
-            <span style={{ background:"rgba(255,69,58,0.15)", color:DANGER, fontSize:8, fontWeight:600, padding:"2px 7px", borderRadius:6, letterSpacing:"0.2px", flexShrink:0 }}>URGENT</span>          )}
+            <span style={{ background:"rgba(255,69,58,0.15)", color:DANGER, fontSize:8, fontWeight:700, padding:"1px 5px", borderRadius:6, whiteSpace:"nowrap" }}>
+              URGENT
+            </span>
+          )}
           {ro.priority === "LOW" && (
-            <span style={{ background:"rgba(99,99,102,0.3)", color:"rgba(255,255,255,0.45)", fontSize:8, fontWeight:500, padding:"2px 7px", borderRadius:6, flexShrink:0 }}>LOW</span>
+            <span style={{ background:"rgba(99,99,102,0.3)", color:"rgba(255,255,255,0.45)", fontSize:8, fontWeight:500, padding:"1px 5px", borderRadius:6, whiteSpace:"nowrap" }}>
+              LOW
+            </span>
           )}
         </div>
       </div>
-      {/* Promise time — only shows when set */}
+
+      {/* ROW 2 — Promise time (only if set) */}
       {ro.promiseTime && (() => {
         const now = Date.now();
         const promise = new Date(ro.promiseTime).getTime();
         const diff = promise - now;
         const overdue = diff < 0;
         const soon = diff > 0 && diff < 3600000;
-        const timeStr = new Date(ro.promiseTime).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+        const timeStr = new Date(ro.promiseTime).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
         return (
-          <div style={{ display:"flex", alignItems:"center", gap:3, marginBottom:3 }}>
-            <span style={{ background:overdue?"rgba(255,69,58,0.15)":soon?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", color:overdue?DANGER:soon?WARN:TEXT3, fontSize:8, fontWeight:600, padding:"2px 7px", borderRadius:5, display:"flex", alignItems:"center", gap:3 }}>
+          <div style={{ flexShrink:0, minHeight:0 }}>
+            <span style={{ background:overdue?"rgba(255,69,58,0.15)":soon?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.07)", color:overdue?DANGER:soon?WARN:TEXT2, fontSize:8, fontWeight:600, padding:"1px 5px", borderRadius:6, whiteSpace:"nowrap" }}>
               ⏰ {overdue?"OVERDUE — ":soon?"Due soon — ":""}{timeStr}
             </span>
           </div>
         );
       })()}
-      {/* Timer + flat rate hours row — always present */}
-      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
-        <span style={{ background:timerRunning?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", color:timerRunning?WARN:TEXT3, fontSize:8, fontWeight:500, padding:"2px 7px", borderRadius:6, display:"inline-flex", alignItems:"center", gap:3 }}>
-          <span style={{ width:4, height:4, borderRadius:"50%", background:timerRunning?WARN:"rgba(255,255,255,0.25)", display:"inline-block", animation:timerRunning?"pulse 1.8s ease-in-out infinite":"none" }}/>
+
+      {/* ROW 3 — Timer + hours */}
+      <div style={{ display:"flex", alignItems:"center", gap:4, flexShrink:0, minHeight:0, overflow:"hidden" }}>
+        <span style={{ background:timerRunning?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", color:timerRunning?WARN:TEXT3, fontSize:8, fontWeight:500, padding:"1px 5px", borderRadius:6, whiteSpace:"nowrap", flexShrink:0, display:"flex", alignItems:"center", gap:3 }}>
+          <span style={{ width:4, height:4, borderRadius:"50%", background:timerRunning?WARN:TEXT3, display:"inline-block", flexShrink:0, animation:timerRunning?"pulse 1.8s ease-in-out infinite":"none" }}/>
           {fmtTime(elapsed)}
         </span>
         {ro.hours && (
-          <span style={{ background:"rgba(48,209,88,0.12)", color:SUCCESS, fontSize:8, fontWeight:500, padding:"2px 7px", borderRadius:6 }}>
+          <span style={{ background:"rgba(48,209,88,0.12)", color:SUCCESS, fontSize:8, fontWeight:700, padding:"1px 5px", borderRadius:6, whiteSpace:"nowrap", flexShrink:0 }}>
             {String(ro.hours).replace(/h$/i,"")}h
           </span>
         )}
       </div>
-      {/* Row 2 — Vehicle */}
-      <div style={{ fontSize:11, fontWeight:400, color:"rgba(255,255,255,0.55)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom:3, lineHeight:"14px", letterSpacing:"0" }}>
-        {vehicle}
+
+      {/* ROW 4 — Vehicle */}
+      <div style={{ flexShrink:0, minHeight:0, overflow:"hidden" }}>
+        <div style={{ fontSize:11, fontWeight:400, color:"rgba(255,255,255,0.55)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+          {vehicle}
+        </div>
       </div>
-      {/* Row 3 — Customer */}
-      <div style={{ fontSize:10, fontWeight:400, color:"rgba(255,255,255,0.35)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom:5, lineHeight:"13px" }}>
-        {ro.customer || "No customer"}
+
+      {/* ROW 5 — Customer */}
+      <div style={{ flexShrink:0, minHeight:0, overflow:"hidden" }}>
+        <div style={{ fontSize:10, fontWeight:400, color:"rgba(255,255,255,0.35)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+          {ro.customer || "No customer"}
+        </div>
       </div>
-      {/* Row 4 — Job pills */}
-      <div style={{ display:"flex", alignItems:"center", gap:3, overflow:"hidden", height:18 }}>        {visibleJobs.map((j, i) => {
+
+      {/* ROW 6 — Job pills */}
+      <div style={{ display:"flex", alignItems:"center", gap:3, overflow:"hidden", flexShrink:0, minHeight:0 }}>
+        {visibleJobs.map((j, i) => {
           const ab = abbrevJob(j);
           return (
-            <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:8, fontWeight:500, padding:"2px 6px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0 }}>
+            <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:8, fontWeight:500, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>
               {ab.label}
             </span>
           );
@@ -1088,25 +1111,27 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
         {extraJobs > 0 && <span style={{ fontSize:8, color:TEXT3, flexShrink:0 }}>+{extraJobs}</span>}
         {allJobs.length === 0 && <span style={{ fontSize:8, color:"rgba(255,255,255,0.12)" }}>—</span>}
       </div>
-      {/* Row 5 — Status (left) + Service type (right) */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", height:18 }}>
-        <div>
+
+      {/* ROW 7 — Status + Service type */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, minHeight:0, overflow:"hidden", gap:4 }}>
+        <div style={{ flexShrink:0 }}>
           {ro.waitStatus === "waiting" && (
-            <span style={{ background:"rgba(255,159,10,0.15)", color:WARN, fontSize:8, fontWeight:500, padding:"2px 6px", borderRadius:5 }}>Wait</span>
+            <span style={{ background:"rgba(255,159,10,0.15)", color:WARN, fontSize:8, fontWeight:600, padding:"1px 5px", borderRadius:6, whiteSpace:"nowrap" }}>⏳ Waiting</span>
           )}
           {ro.waitStatus === "dropoff" && (
-            <span style={{ background:"rgba(255,255,255,0.07)", color:TEXT3, fontSize:8, fontWeight:400, padding:"2px 6px", borderRadius:5 }}>Drop-off</span>
+            <span style={{ background:"rgba(255,255,255,0.07)", color:TEXT3, fontSize:8, fontWeight:500, padding:"1px 5px", borderRadius:6, whiteSpace:"nowrap" }}>🚗 Drop-off</span>
           )}
         </div>
         {svcType && (
-          <span style={{ background:svcType.color, color:"#fff", fontSize:8, fontWeight:600, padding:"2px 6px", borderRadius:5, whiteSpace:"nowrap" }}>
+          <span style={{ background:svcType.color, color:"#fff", fontSize:8, fontWeight:600, padding:"1px 6px", borderRadius:6, whiteSpace:"nowrap", flexShrink:0, overflow:"hidden", textOverflow:"ellipsis", maxWidth:"60%" }}>
             {svcType.name}
           </span>
         )}
       </div>
-      {/* Moving indicator at bottom */}
+
+      {/* Moving indicator */}
       {isMoving && (
-        <div style={{ marginTop:6, fontSize:9, color:"#0A84FF", fontWeight:400, textAlign:"center", letterSpacing:"0.5px", textTransform:"uppercase" }}>
+        <div style={{ fontSize:9, color:"#0A84FF", fontWeight:400, textAlign:"center", flexShrink:0 }}>
           ● MOVING — tap a column to place
         </div>
       )}
@@ -4542,10 +4567,13 @@ export default function ShopFlowTracker() {
                           borderRadius: 12,
                           padding: ids.length ? "7px 7px 2px" : 0,
                           display: "flex",
-                          flexDirection: "column",                          alignItems: ids.length ? "stretch" : "center",
+                          flexDirection: "column",
+                          alignItems: ids.length ? "stretch" : "center",
                           justifyContent: ids.length ? "flex-start" : "center",
+                          height: "100%",
                           minHeight: 82,
                           boxSizing: "border-box",
+                          overflow: "hidden",
                           cursor: isTarget ? "pointer" : "default",
                           boxShadow: isTarget ? "0 0 0 1.5px #0A84FF, "+CELL_SHADOW : CELL_SHADOW,
                           backdropFilter: "blur(4px)",
@@ -4563,10 +4591,22 @@ export default function ShopFlowTracker() {
                             </div>
                           )
                         ) : (
-                          ids.map(roId => {
+                          ids.map((roId, idx) => {
                             const ro = getRO(roId);
                             if (!ro) return null;
-                            return renderCard(ro, col.id);
+                            return (
+                              <div
+                                key={roId}
+                                style={{
+                                  flex: 1,
+                                  minHeight: 0,
+                                  overflow: "hidden",
+                                  marginBottom: idx < ids.length - 1 ? 4 : 0,
+                                }}
+                              >
+                                {renderCard(ro, col.id)}
+                              </div>
+                            );
                           })
                         )}
                         {ids.length > 0 && isTarget && (
