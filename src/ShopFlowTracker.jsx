@@ -58,56 +58,106 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
     ".btn-press:active { transform: scale(0.94) !important; opacity: 0.8 !important; }",
     // ── Premium glass RO card ──
     `.sft-ro-card {
-       background: linear-gradient(180deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0) 40%,rgba(0,0,0,0.12) 100%),
-                   linear-gradient(180deg,#1A233D 0%,#131B30 60%,#0E1424 100%);
+       background:
+         linear-gradient(180deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0) 40%,rgba(0,0,0,0.12) 100%),
+         linear-gradient(180deg,#1A233D 0%,#131B30 60%,#0E1424 100%);
        border: 1px solid rgba(255,255,255,0.07);
-       box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset,
-                   0 -1px 0 rgba(0,0,0,0.35) inset,
-                   0 1px 3px rgba(0,0,0,0.32),
-                   0 6px 18px rgba(0,0,0,0.26),
-                   0 16px 38px rgba(0,0,0,0.20);
-       position: relative; overflow: hidden;
-       transition: transform 0.18s ease, box-shadow 0.18s ease;
+       box-shadow:
+         0 1px 0 rgba(255,255,255,0.06) inset,
+         0 -1px 0 rgba(0,0,0,0.35) inset,
+         0 1px 3px rgba(0,0,0,0.32),
+         0 6px 18px rgba(0,0,0,0.26),
+         0 16px 38px rgba(0,0,0,0.20);
+       position:relative; overflow:hidden;
+       transition:transform 0.18s ease, box-shadow 0.18s ease;
      }`,
+    // specular sheen on top edge
     `.sft-ro-card::after {
        content:''; position:absolute; top:0; left:10px; right:10px; height:1px;
        background:linear-gradient(90deg,transparent,rgba(255,255,255,0.18) 50%,transparent);
        pointer-events:none; z-index:2;
      }`,
+    // left status stripe with colored glow
     `.sft-ro-card::before {
        content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
        background:var(--card-accent,#4D7DFF);
        box-shadow:0 0 12px var(--card-accent-glow,rgba(77,125,255,0.5));
        z-index:2;
      }`,
-    `.sft-ro-card:hover:not(:active) { transform:translateY(-1px);
-       box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset,
-                   0 -1px 0 rgba(0,0,0,0.35) inset,
-                   0 4px 12px rgba(0,0,0,0.3), 0 14px 32px rgba(0,0,0,0.28);
+    `.sft-ro-card:hover:not(:active) { transform:translateY(-2px);
+       box-shadow:
+         0 1px 0 rgba(255,255,255,0.08) inset,
+         0 -1px 0 rgba(0,0,0,0.35) inset,
+         0 4px 12px rgba(0,0,0,0.3),
+         0 14px 32px rgba(0,0,0,0.28),
+         0 0 0 1px rgba(255,255,255,0.05);
      }`,
-    // ── RO plate ──
+    // completed card — green border + inner glow
+    `.sft-ro-card.col-completed {
+       border-color:rgba(0,230,118,0.3);
+       box-shadow:
+         0 0 0 1px rgba(0,230,118,0.10) inset,
+         0 1px 3px rgba(0,0,0,0.32),
+         0 6px 18px rgba(0,0,0,0.26);
+     }`,
+    // ── RO plate — crosshatch texture ──
     `.sft-ro-plate {
-       flex-shrink:0; width:54px; display:flex; flex-direction:column;
-       align-items:center; justify-content:center; gap:3px;
-       background:linear-gradient(135deg,rgba(255,255,255,0.022) 0%,rgba(0,0,0,0.14) 100%);
+       flex-shrink:0; width:58px; display:flex; flex-direction:column;
+       align-items:center; justify-content:center; gap:2px;
+       background:linear-gradient(135deg,rgba(255,255,255,0.022) 0%,rgba(0,0,0,0.16) 100%);
        border-right:1px solid rgba(255,255,255,0.05);
-       padding: 0 3px 0 9px;
+       padding:0 4px 0 10px; position:relative; overflow:hidden;
+     }`,
+    // crosshatch diagonal stripe texture
+    `.sft-ro-plate::before {
+       content:''; position:absolute; inset:0;
+       background-image:repeating-linear-gradient(
+         135deg, transparent 0, transparent 6px,
+         rgba(255,255,255,0.018) 6px, rgba(255,255,255,0.018) 7px);
+       pointer-events:none;
      }`,
     `.sft-ro-plate .py {
        font-family:'Geist Mono','Courier New',monospace;
-       font-size:17px; font-weight:600; letter-spacing:-0.04em; line-height:1;
+       font-size:18px; font-weight:700; letter-spacing:-0.04em; line-height:1; position:relative; z-index:1;
      }`,
     `.sft-ro-plate .pm {
-       font-size:7.5px; font-weight:600; letter-spacing:0.1em;
+       font-size:8px; font-weight:700; letter-spacing:0.12em;
        text-transform:uppercase; color:#6B7591; line-height:1.2;
-       max-width:46px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center;
+       max-width:48px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center;
+       position:relative; z-index:1;
      }`,
-    // plate year color by column
-    `.sft-ro-card.col-ondeck    .sft-ro-plate .py { color:#C8D6F4; }`,
+    // plate year tint by column status
+    `.sft-ro-card.col-ondeck     .sft-ro-plate .py { color:#C8D6F4; }`,
     `.sft-ro-card.col-inprogress .sft-ro-plate .py { color:#FFD18A; }`,
     `.sft-ro-card.col-completed  .sft-ro-plate .py { color:#B8F5D3; }`,
     `.sft-ro-card.col-delivered  .sft-ro-plate .py { color:#9BAAB8; }`,
     `.sft-ro-card.col-waiting    .sft-ro-plate .py { color:#DFC0FF; }`,
+    // ── Progress bar at card bottom ──
+    `.sft-ro-bar {
+       position:absolute; left:0; right:0; bottom:0; height:3px;
+       background:rgba(255,255,255,0.05); overflow:hidden; pointer-events:none;
+     }`,
+    `.sft-ro-bar > span {
+       display:block; height:100%;
+       border-radius:0 999px 999px 0;
+       transition:width 600ms ease;
+     }`,
+    `.sft-ro-bar.bar-ondeck   > span { background:rgba(77,125,255,0.4); width:15%; }`,
+    `.sft-ro-bar.bar-inprogress > span { background:linear-gradient(90deg,#FF9F2E,#FFD18A); box-shadow:0 0 10px rgba(255,159,46,0.6); width:55%; }`,
+    `.sft-ro-bar.bar-completed  > span { background:#00E676; box-shadow:0 0 10px rgba(0,230,118,0.7); width:100%; }`,
+    `.sft-ro-bar.bar-delivered  > span { background:rgba(107,117,145,0.5); width:100%; }`,
+    `.sft-ro-bar.bar-waiting    > span { background:rgba(191,90,242,0.5); width:40%; }`,
+    // ── Urgent corner flag ──
+    `.sft-ro-card.is-urgent .sft-ro-urgent-flag {
+       display:block !important;
+     }`,
+    `.sft-ro-urgent-flag {
+       display:none; position:absolute; top:0; right:0;
+       font-size:8px; font-weight:800; letter-spacing:0.14em;
+       padding:2px 8px; border-radius:0 var(--r-sm) 0 6px;
+       background:#FF3D4E; color:white; text-transform:uppercase;
+       box-shadow:0 0 12px rgba(255,61,78,0.5); z-index:3;
+     }`,
     // moving state
     `.sft-ro-card.is-moving {
        background:rgba(77,125,255,0.12) !important;
@@ -115,8 +165,13 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
        box-shadow:0 0 0 1.5px #4D7DFF,0 8px 32px rgba(77,125,255,0.25) !important;
        transform:scale(1.01) !important;
      }`,
-    // urgent pulse override
+    // urgent pulse
     `.sft-ro-card.is-urgent { animation:card-in 0.22s cubic-bezier(0.34,1.56,0.64,1),urgent-glow 2.4s ease-in-out 0.3s infinite !important; }`,
+    // ── dept badge colors ──
+    `.sft-dept { font-size:8.5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:2px 6px; border-radius:4px; white-space:nowrap; flex-shrink:0; }`,
+    `.sft-dept.main  { background:rgba(255,122,138,0.14); color:#FF7A8A; }`,
+    `.sft-dept.pdi   { background:rgba(181,124,255,0.14); color:#B57CFF; }`,
+    `.sft-dept.used  { background:rgba(0,230,118,0.10); color:#00E676; }`,
   ].join(" ");
   document.head.appendChild(s);
 }
@@ -1071,7 +1126,10 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
     if (isMoving) { onMove(); return; }
     onTap();
   }
-  // CSS class-based card — pseudo-elements handle left stripe + top sheen
+  // dept key for CSS badge class
+  const deptKey = ro.serviceType === "st-pdi" ? "pdi" : ro.serviceType === "st-used" ? "used" : "main";
+
+  // CSS class-based card — pseudo-elements handle left stripe + top sheen + crosshatch plate
   const cardClass = [
     "sft-ro-card card-press",
     colId ? `col-${colId}` : "",
@@ -1103,15 +1161,15 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
         touchAction: "manipulation",
-        animation: isMoving ? "none"
-          : ro.priority === "HIGH"
-          ? "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)"
-          : "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)",
+        animation: "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)",
         display: "flex",
         overflow: "hidden",
       }}
     >
-      {/* ── Left plate: year / make ── */}
+      {/* ── URGENT corner flag ── */}
+      <span className="sft-ro-urgent-flag">URGENT</span>
+
+      {/* ── Left plate: year/make with crosshatch texture (CSS ::before) ── */}
       {!compact && (
         <div className="sft-ro-plate">
           <span className="py">{ro.year || "—"}</span>
@@ -1120,81 +1178,97 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
       )}
 
       {/* ── Right content ── */}
-      <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"space-between", padding:"6px 8px 5px", overflow:"hidden", minWidth:0 }}>
-
-        {/* ROW 1 — RO number + notes badge */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4, flexShrink:0, overflow:"hidden" }}>
-          <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:12, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
+      {compact ? (
+        /* ── COMPACT: single row — RO# centered + vehicle faded right ── */
+        <div style={{ flex:1, display:"flex", alignItems:"center", padding:"0 10px 0 12px", gap:6, overflow:"hidden", minWidth:0 }}>
+          <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:10, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flexShrink:0 }}>
             {ro.roNum}
           </span>
-          <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
-            {ro.priority === "HIGH" && (
-              <span style={{ background:"rgba(255,61,78,0.18)", color:DANGER, fontSize:7.5, fontWeight:800, padding:"1px 4px", borderRadius:4, letterSpacing:"0.04em" }}>!!</span>
-            )}
-            {ro.roNotes && ro.roNotes.length > 0 && (
-              <span style={{ background:"rgba(77,125,255,0.2)", color:ACCENT, fontSize:7.5, fontWeight:700, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap" }}>
-                💬{ro.roNotes.length}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* ROW 2 — vehicle + customer */}
-        <div style={{ flexShrink:0, overflow:"hidden", display:"flex", flexDirection:"column", gap:1 }}>
-          <div style={{ fontSize:11, fontWeight:500, color:TEXT2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.3 }}>
-            {compact ? vehicle : (ro.model || ro.make || "No vehicle")}
-          </div>
-          <div style={{ fontSize:10, fontWeight:400, color:TEXT3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.3 }}>
-            {ro.customer || "—"}
-          </div>
-        </div>
-
-        {/* ROW 3 — timer + hours + jobs */}
-        <div style={{ display:"flex", alignItems:"center", gap:3, flexShrink:0, overflow:"hidden" }}>
-          <span style={{ background:timerRunning?"rgba(255,159,46,0.14)":"rgba(255,255,255,0.06)", color:timerRunning?WARN:TEXT3, fontSize:8, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0, display:"flex", alignItems:"center", gap:2 }}>
-            <span style={{ width:4, height:4, borderRadius:"50%", background:timerRunning?WARN:TEXT3, display:"inline-block", flexShrink:0, animation:timerRunning?"pulse 1.8s ease-in-out infinite":"none" }}/>
-            {fmtTime(elapsed)}
+          <span style={{ fontSize:9, color:TEXT3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1, letterSpacing:"-0.01em" }}>
+            {ro.make ? `${ro.make}${ro.model ? " "+ro.model : ""}` : ""}
           </span>
           {ro.hours && (
-            <span style={{ background:"rgba(0,230,118,0.12)", color:SUCCESS, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>
+            <span style={{ fontFamily:"'Geist Mono',monospace", fontSize:8.5, fontWeight:700, color:SUCCESS, whiteSpace:"nowrap", flexShrink:0 }}>
               {String(ro.hours).replace(/h$/i,"")}h
             </span>
           )}
-          <div style={{ display:"flex", gap:2, flex:1, overflow:"hidden", alignItems:"center" }}>
-            {visibleJobs.map((j, i) => {
-              const ab = abbrevJob(j);
-              return (
-                <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:7.5, fontWeight:600, padding:"1px 3px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>
-                  {ab.label}
-                </span>
-              );
-            })}
-            {extraJobs > 0 && <span style={{ fontSize:8, color:TEXT3, flexShrink:0 }}>+{extraJobs}</span>}
-          </div>
-        </div>
-
-        {/* ROW 4 — wait status + service type badge */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, overflow:"hidden", gap:4 }}>
-          <div style={{ display:"flex", gap:3, alignItems:"center", flex:1, overflow:"hidden" }}>
-            {ro.waitStatus === "waiting" ? (
-              <span style={{ background:"rgba(255,159,46,0.14)", color:WARN, fontSize:7.5, fontWeight:600, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>⏳ Waiting</span>
-            ) : ro.waitStatus === "dropoff" ? (
-              <span style={{ background:"rgba(255,255,255,0.06)", color:TEXT3, fontSize:7.5, fontWeight:500, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>🚗 Drop-off</span>
-            ) : null}
-          </div>
-          {svcType && (
-            <span style={{ background:svcType.color+"22", color:svcType.color, border:"1px solid "+svcType.color+"44", fontSize:7.5, fontWeight:600, padding:"1px 5px", borderRadius:4, whiteSpace:"nowrap", maxWidth:65, overflow:"hidden", textOverflow:"ellipsis", flexShrink:0 }}>
-              {svcType.name}
-            </span>
+          {timerRunning && (
+            <span style={{ width:4, height:4, borderRadius:"50%", background:WARN, flexShrink:0, animation:"pulse 1.8s ease-in-out infinite" }}/>
           )}
         </div>
+      ) : (
+        /* ── FULL: four rows ── */
+        <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"space-between", padding:"10px 12px 12px 14px", overflow:"hidden", minWidth:0 }}>
 
-        {/* Moving indicator */}
-        {isMoving && (
-          <div style={{ fontSize:9, color:ACCENT, textAlign:"center", flexShrink:0, letterSpacing:"0.3px" }}>
-            ● MOVING — tap column to place
+          {/* ROW 1 — RO number + dept badge */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6, flexShrink:0, overflow:"hidden" }}>
+            <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:13.5, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
+              {ro.roNum}
+            </span>
+            <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
+              {ro.roNotes && ro.roNotes.length > 0 && (
+                <span style={{ background:"rgba(77,125,255,0.18)", color:ACCENT, fontSize:8, fontWeight:700, padding:"1px 5px", borderRadius:4, whiteSpace:"nowrap" }}>
+                  💬{ro.roNotes.length}
+                </span>
+              )}
+              <span className={`sft-dept ${deptKey}`}>{svcType ? svcType.name : "Main Shop"}</span>
+            </div>
           </div>
-        )}
+
+          {/* ROW 2 — vehicle name */}
+          <div style={{ marginTop:4, flexShrink:0, overflow:"hidden" }}>
+            <div style={{ fontSize:13, fontWeight:600, color:TEXT, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.2, letterSpacing:"-0.01em" }}>
+              {ro.model ? `${ro.make} ${ro.model}` : (ro.make || "No vehicle")}
+            </div>
+            <div style={{ fontSize:11, fontWeight:400, color:TEXT3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.3, marginTop:2 }}>
+              {ro.customer || "—"}
+            </div>
+          </div>
+
+          {/* ROW 3 — service jobs */}
+          <div style={{ display:"flex", gap:3, flexShrink:0, overflow:"hidden", alignItems:"center", marginTop:5 }}>
+            <div style={{ display:"flex", gap:3, flex:1, overflow:"hidden", alignItems:"center" }}>
+              {visibleJobs.map((j, i) => {
+                const ab = abbrevJob(j);
+                return (
+                  <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:9, fontWeight:600, padding:"2px 5px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0, letterSpacing:"-0.01em" }}>
+                    {ab.label}
+                  </span>
+                );
+              })}
+              {extraJobs > 0 && <span style={{ fontSize:9, color:TEXT3, flexShrink:0 }}>+{extraJobs}</span>}
+            </div>
+            {ro.hours && (
+              <span style={{ background:"rgba(0,230,118,0.12)", color:SUCCESS, fontSize:9, fontWeight:700, padding:"2px 5px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0, fontFamily:"'Geist Mono',monospace", letterSpacing:"-0.02em" }}>
+                {String(ro.hours).replace(/h$/i,"")}h
+              </span>
+            )}
+          </div>
+
+          {/* ROW 4 — timer + wait status */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, overflow:"hidden", gap:4, marginTop:"auto", paddingTop:6 }}>
+            <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontSize:11, letterSpacing:"-0.015em", color:timerRunning?WARN:TEXT3, display:"flex", alignItems:"center", gap:5, whiteSpace:"nowrap", fontWeight:timerRunning?600:400 }}>
+              <span style={{ width:5, height:5, borderRadius:"50%", background:timerRunning?WARN:TEXT3, display:"inline-block", flexShrink:0, animation:timerRunning?"pulse 1.8s ease-in-out infinite":"none" }}/>
+              {fmtTime(elapsed)}
+            </span>
+            <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
+              {ro.waitStatus === "waiting" && (
+                <span style={{ background:"rgba(255,159,46,0.14)", color:WARN, fontSize:8.5, fontWeight:600, padding:"2px 6px", borderRadius:4, whiteSpace:"nowrap" }}>⏳ Parts</span>
+              )}
+              {ro.waitStatus === "dropoff" && (
+                <span style={{ background:"rgba(107,117,145,0.12)", color:TEXT3, fontSize:8.5, fontWeight:500, padding:"2px 6px", borderRadius:4, whiteSpace:"nowrap" }}>Drop-off</span>
+              )}
+              {isMoving && (
+                <span style={{ fontSize:9, color:ACCENT, letterSpacing:"0.2px" }}>● Move here</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Glowing progress bar at card bottom ── */}
+      <div className={`sft-ro-bar bar-${colId || "ondeck"}`}>
+        <span/>
       </div>
     </div>
   );
