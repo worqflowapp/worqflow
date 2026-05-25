@@ -156,6 +156,9 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
      }`,
     // urgent pulse on card border
     `.sft-ro-card.is-urgent { animation:card-in 0.22s cubic-bezier(0.34,1.56,0.64,1),urgent-glow 2.4s ease-in-out 0.3s infinite !important; }`,
+    // delivered urgent: red left stripe + glowing border, no text indicator needed
+    `.sft-ro-card.col-delivered.is-urgent { border-color:rgba(255,61,78,0.45) !important; box-shadow:0 0 0 1px rgba(255,61,78,0.12) inset, 0 0 10px rgba(255,61,78,0.25), 0 1px 3px rgba(0,0,0,0.32) !important; animation:none !important; }`,
+    `.sft-ro-card.col-delivered.is-urgent::before { background:#FF3D4E !important; box-shadow:0 0 10px rgba(255,61,78,0.7) !important; }`,
     // ── dept badge colors ──
     `.sft-dept { font-size:7.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 5px; border-radius:3px; white-space:nowrap; flex-shrink:0; }`,
     `.sft-dept.main  { background:rgba(255,122,138,0.14); color:#FF7A8A; }`,
@@ -1159,11 +1162,8 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
     >
       {/* ── Card content ── */}
       {compact ? (
-        /* ── COMPACT: single row — RO# + vehicle + hours ── */
+        /* ── COMPACT: single row — RO# + vehicle + hours (urgent shown via border glow only) ── */
         <div style={{ flex:1, display:"flex", alignItems:"center", padding:"0 10px 0 14px", gap:6, overflow:"hidden", minWidth:0 }}>
-          {ro.priority === "HIGH" && (
-            <span className="sft-urgent-badge">!</span>
-          )}
           <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:10, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", flexShrink:0 }}>
             {ro.roNum}
           </span>
@@ -1194,10 +1194,10 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
                   💬{ro.roNotes.length}
                 </span>
               )}
-              {ro.priority === "HIGH" && (
-                <span className="sft-urgent-badge">URGENT</span>
-              )}
-              <span className={`sft-dept ${deptKey}`}>{svcType ? svcType.name : "Main Shop"}</span>
+              {ro.priority === "HIGH"
+                ? <span className="sft-urgent-badge">URGENT</span>
+                : <span className={`sft-dept ${deptKey}`}>{svcType ? svcType.name : "Main Shop"}</span>
+              }
             </div>
           </div>
 
