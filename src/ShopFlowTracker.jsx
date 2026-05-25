@@ -1169,19 +1169,11 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
       {/* ── URGENT corner flag ── */}
       <span className="sft-ro-urgent-flag">URGENT</span>
 
-      {/* ── Left plate: year/make with crosshatch texture (CSS ::before) ── */}
-      {!compact && (
-        <div className="sft-ro-plate">
-          <span className="py">{ro.year || "—"}</span>
-          <span className="pm">{ro.make || "Vehicle"}</span>
-        </div>
-      )}
-
-      {/* ── Right content ── */}
+      {/* ── Card content ── */}
       {compact ? (
-        /* ── COMPACT: single row — RO# centered + vehicle faded right ── */
-        <div style={{ flex:1, display:"flex", alignItems:"center", padding:"0 10px 0 12px", gap:6, overflow:"hidden", minWidth:0 }}>
-          <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:10, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flexShrink:0 }}>
+        /* ── COMPACT: single row — RO# + vehicle + hours ── */
+        <div style={{ flex:1, display:"flex", alignItems:"center", padding:"0 10px 0 14px", gap:6, overflow:"hidden", minWidth:0 }}>
+          <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:10, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", flexShrink:0 }}>
             {ro.roNum}
           </span>
           <span style={{ fontSize:9, color:TEXT3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1, letterSpacing:"-0.01em" }}>
@@ -1197,17 +1189,17 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
           )}
         </div>
       ) : (
-        /* ── FULL: four rows ── */
-        <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"space-between", padding:"10px 12px 12px 14px", overflow:"hidden", minWidth:0 }}>
+        /* ── FULL: 4 rows, no plate ── */
+        <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"space-between", padding:"9px 11px 8px 14px", overflow:"hidden", minWidth:0 }}>
 
-          {/* ROW 1 — RO number + dept badge */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6, flexShrink:0, overflow:"hidden" }}>
-            <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:13.5, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
+          {/* ROW 1 — RO number + badges */}
+          <div style={{ display:"flex", alignItems:"center", gap:5, flexShrink:0, overflow:"hidden" }}>
+            <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:12, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", flexShrink:0 }}>
               {ro.roNum}
             </span>
-            <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
+            <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0, marginLeft:"auto" }}>
               {ro.roNotes && ro.roNotes.length > 0 && (
-                <span style={{ background:"rgba(77,125,255,0.18)", color:ACCENT, fontSize:8, fontWeight:700, padding:"1px 5px", borderRadius:4, whiteSpace:"nowrap" }}>
+                <span style={{ background:"rgba(77,125,255,0.18)", color:ACCENT, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap" }}>
                   💬{ro.roNotes.length}
                 </span>
               )}
@@ -1215,28 +1207,30 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
             </div>
           </div>
 
-          {/* ROW 2 — vehicle name */}
-          <div style={{ marginTop:4, flexShrink:0, overflow:"hidden" }}>
-            <div style={{ fontSize:13, fontWeight:600, color:TEXT, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.2, letterSpacing:"-0.01em" }}>
-              {ro.model ? `${ro.make} ${ro.model}` : (ro.make || "No vehicle")}
+          {/* ROW 2 — year + make + model */}
+          <div style={{ marginTop:3, flexShrink:0, overflow:"hidden" }}>
+            <div style={{ fontSize:12.5, fontWeight:600, color:TEXT, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.25, letterSpacing:"-0.01em" }}>
+              {[ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle"}
             </div>
-            <div style={{ fontSize:11, fontWeight:400, color:TEXT3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.3, marginTop:2 }}>
-              {ro.customer || "—"}
-            </div>
+            {ro.customer && (
+              <div style={{ fontSize:10.5, fontWeight:400, color:TEXT3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.3, marginTop:1 }}>
+                {ro.customer}
+              </div>
+            )}
           </div>
 
-          {/* ROW 3 — service jobs */}
-          <div style={{ display:"flex", gap:3, flexShrink:0, overflow:"hidden", alignItems:"center", marginTop:5 }}>
-            <div style={{ display:"flex", gap:3, flex:1, overflow:"hidden", alignItems:"center" }}>
+          {/* ROW 3 — job pills + hours */}
+          <div style={{ display:"flex", gap:3, flexShrink:0, overflow:"hidden", alignItems:"center", marginTop:4 }}>
+            <div style={{ display:"flex", gap:3, flex:1, overflow:"hidden", alignItems:"center", minWidth:0 }}>
               {visibleJobs.map((j, i) => {
                 const ab = abbrevJob(j);
                 return (
-                  <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:9, fontWeight:600, padding:"2px 5px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0, letterSpacing:"-0.01em" }}>
+                  <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:8.5, fontWeight:600, padding:"2px 5px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0, letterSpacing:"-0.01em" }}>
                     {ab.label}
                   </span>
                 );
               })}
-              {extraJobs > 0 && <span style={{ fontSize:9, color:TEXT3, flexShrink:0 }}>+{extraJobs}</span>}
+              {extraJobs > 0 && <span style={{ fontSize:8.5, color:TEXT3, flexShrink:0 }}>+{extraJobs}</span>}
             </div>
             {ro.hours && (
               <span style={{ background:"rgba(0,230,118,0.12)", color:SUCCESS, fontSize:9, fontWeight:700, padding:"2px 5px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0, fontFamily:"'Geist Mono',monospace", letterSpacing:"-0.02em" }}>
@@ -1245,18 +1239,18 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
             )}
           </div>
 
-          {/* ROW 4 — timer + wait status */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, overflow:"hidden", gap:4, marginTop:"auto", paddingTop:6 }}>
-            <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontSize:11, letterSpacing:"-0.015em", color:timerRunning?WARN:TEXT3, display:"flex", alignItems:"center", gap:5, whiteSpace:"nowrap", fontWeight:timerRunning?600:400 }}>
+          {/* ROW 4 — timer + status */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, gap:4, marginTop:4 }}>
+            <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontSize:10, letterSpacing:"-0.01em", color:timerRunning?WARN:TEXT3, display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap", fontWeight:timerRunning?600:400 }}>
               <span style={{ width:5, height:5, borderRadius:"50%", background:timerRunning?WARN:TEXT3, display:"inline-block", flexShrink:0, animation:timerRunning?"pulse 1.8s ease-in-out infinite":"none" }}/>
               {fmtTime(elapsed)}
             </span>
             <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
               {ro.waitStatus === "waiting" && (
-                <span style={{ background:"rgba(255,159,46,0.14)", color:WARN, fontSize:8.5, fontWeight:600, padding:"2px 6px", borderRadius:4, whiteSpace:"nowrap" }}>⏳ Parts</span>
+                <span style={{ background:"rgba(255,159,46,0.14)", color:WARN, fontSize:8, fontWeight:600, padding:"2px 5px", borderRadius:4, whiteSpace:"nowrap" }}>⏳ Parts</span>
               )}
               {ro.waitStatus === "dropoff" && (
-                <span style={{ background:"rgba(107,117,145,0.12)", color:TEXT3, fontSize:8.5, fontWeight:500, padding:"2px 6px", borderRadius:4, whiteSpace:"nowrap" }}>Drop-off</span>
+                <span style={{ background:"rgba(107,117,145,0.12)", color:TEXT3, fontSize:8, fontWeight:500, padding:"2px 5px", borderRadius:4, whiteSpace:"nowrap" }}>Drop-off</span>
               )}
               {isMoving && (
                 <span style={{ fontSize:9, color:ACCENT, letterSpacing:"0.2px" }}>● Move here</span>
