@@ -1432,9 +1432,15 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
             
  You can update mileage out, cause, correction and flat rate hours
           </div>
-          <div>
-            <label style={labelStyle}>Mileage Out</label>
-            <input type="number" placeholder="e.g. 45010" value={f.mileageOut||""} onChange={e => setF(p=>({...p, mileageOut:e.target.value}))} style={inputStyle}/>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <div>
+              <label style={labelStyle}>Mileage In</label>
+              <input type="number" placeholder="e.g. 45000" value={f.mileageIn||""} onChange={e => setF(p=>({...p, mileageIn:e.target.value}))} style={inputStyle}/>
+            </div>
+            <div>
+              <label style={labelStyle}>Mileage Out</label>
+              <input type="number" placeholder="e.g. 45010" value={f.mileageOut||""} onChange={e => setF(p=>({...p, mileageOut:e.target.value}))} style={inputStyle}/>
+            </div>
           </div>
           <div>
             <label style={labelStyle}>Flat Rate Hours</label>            <input type="number" min="0" step="0.5" placeholder="e.g. 2.5" value={String(f.hours||"").replace(/h$/i,"")} onChange={e => setF(p=>({...p, hours:e.target.value}))} style={{ ...inputStyle, fontWeight:700 }}/>
@@ -1585,14 +1591,19 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
             </div>
           )}
           <div style={{ display:"flex", gap:6, marginTop:6 }}>
-            <div style={{ flex:1, background:BG, borderRadius:10, padding:"10px 12px" }}>
-              <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:3 }}>Mileage In</div>
-              <div style={{ fontSize:15, fontWeight:700, color:TEXT }}>{ro.mileageIn ? ro.mileageIn+" mi" : "—"}</div>
-            </div>
-            <div style={{ flex:1, background:BG, borderRadius:10, padding:"10px 12px" }}>
-              <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:3 }}>Mileage Out</div>
-              <div style={{ fontSize:15, fontWeight:700, color:TEXT }}>{ro.mileageOut ? ro.mileageOut+" mi" : "—"}</div>
-            </div>
+            {[["mileageIn","Mileage In"],["mileageOut","Mileage Out"]].map(([key,label]) => (
+              <div key={key} style={{ flex:1, background:BG, borderRadius:10, padding:"8px 12px" }}>
+                <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:4 }}>{label}</div>
+                <input
+                  type="number"
+                  placeholder="—"
+                  value={f[key]||""}
+                  onChange={e => setF(p => ({...p, [key]:e.target.value}))}
+                  onBlur={() => onSave({...f})}
+                  style={{ width:"100%", background:"transparent", border:"none", outline:"none", fontSize:15, fontWeight:700, color:TEXT, fontFamily:"inherit", padding:0 }}
+                />
+              </div>
+            ))}
           </div>
         </div>
         {/* ── CUSTOMER INFO ── */}
