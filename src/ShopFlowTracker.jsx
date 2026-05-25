@@ -154,11 +154,9 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
        box-shadow:0 0 0 1.5px #4D7DFF,0 8px 32px rgba(77,125,255,0.25) !important;
        transform:scale(1.01) !important;
      }`,
-    // urgent pulse on card border
-    `.sft-ro-card.is-urgent { animation:card-in 0.22s cubic-bezier(0.34,1.56,0.64,1),urgent-glow 2.4s ease-in-out 0.3s infinite !important; }`,
-    // delivered urgent: red left stripe + glowing border, no text indicator needed
-    `.sft-ro-card.col-delivered.is-urgent { border-color:rgba(255,61,78,0.45) !important; box-shadow:0 0 0 1px rgba(255,61,78,0.12) inset, 0 0 10px rgba(255,61,78,0.25), 0 1px 3px rgba(0,0,0,0.32) !important; animation:none !important; }`,
-    `.sft-ro-card.col-delivered.is-urgent::before { background:#FF3D4E !important; box-shadow:0 0 10px rgba(255,61,78,0.7) !important; }`,
+    // urgent: red glow border + red left stripe on ALL urgent cards
+    `.sft-ro-card.is-urgent { border-color:rgba(255,61,78,0.5) !important; box-shadow:0 0 0 1px rgba(255,61,78,0.12) inset, 0 0 14px rgba(255,61,78,0.28), 0 2px 8px rgba(0,0,0,0.3) !important; animation:card-in 0.22s cubic-bezier(0.34,1.56,0.64,1), urgent-glow 2.6s ease-in-out 0.3s infinite !important; }`,
+    `.sft-ro-card.is-urgent::before { background:#FF3D4E !important; box-shadow:0 0 12px rgba(255,61,78,0.7) !important; }`,
     // ── dept badge colors ──
     `.sft-dept { font-size:7.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 5px; border-radius:3px; white-space:nowrap; flex-shrink:0; }`,
     `.sft-dept.main  { background:rgba(255,122,138,0.14); color:#FF7A8A; }`,
@@ -1194,10 +1192,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
                   💬{ro.roNotes.length}
                 </span>
               )}
-              {ro.priority === "HIGH"
-                ? <span className="sft-urgent-badge">URGENT</span>
-                : <span className={`sft-dept ${deptKey}`}>{svcType ? svcType.name : "Main Shop"}</span>
-              }
+              <span className={`sft-dept ${deptKey}`}>{svcType ? svcType.name : "Main Shop"}</span>
             </div>
           </div>
 
@@ -1241,10 +1236,10 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
             </span>
             <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
               {ro.waitStatus === "waiting" && (
-                <span style={{ background:"rgba(255,159,46,0.14)", color:WARN, fontSize:8, fontWeight:600, padding:"2px 5px", borderRadius:4, whiteSpace:"nowrap" }}>⏳ Parts</span>
+                <span style={{ fontSize:13, lineHeight:1 }} title="Waiting on Parts">⏳</span>
               )}
               {ro.waitStatus === "dropoff" && (
-                <span style={{ background:"rgba(107,117,145,0.12)", color:TEXT3, fontSize:8, fontWeight:500, padding:"2px 5px", borderRadius:4, whiteSpace:"nowrap" }}>Drop-off</span>
+                <span style={{ fontSize:13, lineHeight:1 }} title="Drop-off">🚗</span>
               )}
               {isMoving && (
                 <span style={{ fontSize:9, color:ACCENT, letterSpacing:"0.2px" }}>● Move here</span>
