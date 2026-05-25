@@ -13,30 +13,42 @@ import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from './firebase';
 // ─── Global styles injected once ─────────────────────────────────────────────
-// Load Space Grotesk font
+// Load Geist + Geist Mono fonts (premium feel)
 if (typeof document !== "undefined" && !document.getElementById("sft-font")) {
   const l = document.createElement("link");
   l.id = "sft-font";
   l.rel = "stylesheet";
-  l.href = "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap";
+  l.href = "https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600;700&display=swap";
   document.head.appendChild(l);
 }
 if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
   const s = document.createElement("style");
   s.id = "sft-styles";
   s.textContent = [
+    // ── Design tokens ──
+    `:root{--bg-0:#0B1220;--bg-1:#0F1729;--bg-2:#141C33;--bg-3:#1B2440;--bg-card:#131B30;--bg-card-hi:#1A233D;
+     --border:#28324D;--border-soft:#1B2440;--border-strong:#3A4666;
+     --text:#FFFFFF;--text-2:#A8B4CC;--text-3:#6B7591;--text-4:#4B5570;
+     --c-ondeck:#4D7DFF;--c-ondeck-soft:rgba(77,125,255,0.12);--c-ondeck-glow:rgba(77,125,255,0.4);
+     --c-progress:#FF9F2E;--c-progress-soft:rgba(255,159,46,0.12);--c-progress-glow:rgba(255,159,46,0.4);
+     --c-complete:#00E676;--c-complete-soft:rgba(0,230,118,0.12);--c-complete-glow:rgba(0,230,118,0.45);
+     --c-urgent:#FF3D4E;--c-parts:#BF5AF2;--r:14px;--r-sm:10px;}`,
+    // ── Animations ──
     "@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }",
     "@keyframes fade-in { from{opacity:0;transform:translateY(8px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }",
     "@keyframes slide-up { from{transform:translateY(48px);opacity:0} to{transform:translateY(0);opacity:1} }",
     "@keyframes card-in { from{opacity:0;transform:translateY(12px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }",
-    "@keyframes urgent-glow { 0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,0)} 50%{box-shadow:0 0 14px 3px rgba(255,69,58,0.35)} }",
+    "@keyframes urgent-glow { 0%,100%{box-shadow:0 0 0 0 rgba(255,61,78,0)} 50%{box-shadow:0 0 16px 4px rgba(255,61,78,0.4)} }",
     "@keyframes shimmer { from{background-position:-200px 0} to{background-position:200px 0} }",
     "@keyframes snap-in { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:scale(1)} }",
     "@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)} 40%{transform:translateX(9px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }",
+    // ── Base ──
     "* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }",
     "input, select, textarea { color-scheme: dark; }",
     "::-webkit-scrollbar { width: 0px; height: 0px; }",
-    ".card-press { transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease, background 0.15s ease; }",
+    "body { font-family: 'Geist', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }",
+    // ── Interaction classes ──
+    ".card-press { transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.15s ease; }",
     ".card-press:active { transform: scale(0.96) !important; }",
     ".col-snap { scroll-snap-type: x mandatory; }",
     ".col-snap-item { scroll-snap-align: start; }",
@@ -44,31 +56,92 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
     ".pad-btn:active { transform: scale(0.88) !important; background: rgba(255,255,255,0.18) !important; }",
     ".btn-press { transition: transform 0.12s cubic-bezier(0.34,1.56,0.64,1), opacity 0.12s ease; }",
     ".btn-press:active { transform: scale(0.94) !important; opacity: 0.8 !important; }",
+    // ── Premium glass RO card ──
+    `.sft-ro-card {
+       background: linear-gradient(180deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0) 40%,rgba(0,0,0,0.12) 100%),
+                   linear-gradient(180deg,#1A233D 0%,#131B30 60%,#0E1424 100%);
+       border: 1px solid rgba(255,255,255,0.07);
+       box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset,
+                   0 -1px 0 rgba(0,0,0,0.35) inset,
+                   0 1px 3px rgba(0,0,0,0.32),
+                   0 6px 18px rgba(0,0,0,0.26),
+                   0 16px 38px rgba(0,0,0,0.20);
+       position: relative; overflow: hidden;
+       transition: transform 0.18s ease, box-shadow 0.18s ease;
+     }`,
+    `.sft-ro-card::after {
+       content:''; position:absolute; top:0; left:10px; right:10px; height:1px;
+       background:linear-gradient(90deg,transparent,rgba(255,255,255,0.18) 50%,transparent);
+       pointer-events:none; z-index:2;
+     }`,
+    `.sft-ro-card::before {
+       content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+       background:var(--card-accent,#4D7DFF);
+       box-shadow:0 0 12px var(--card-accent-glow,rgba(77,125,255,0.5));
+       z-index:2;
+     }`,
+    `.sft-ro-card:hover:not(:active) { transform:translateY(-1px);
+       box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset,
+                   0 -1px 0 rgba(0,0,0,0.35) inset,
+                   0 4px 12px rgba(0,0,0,0.3), 0 14px 32px rgba(0,0,0,0.28);
+     }`,
+    // ── RO plate ──
+    `.sft-ro-plate {
+       flex-shrink:0; width:54px; display:flex; flex-direction:column;
+       align-items:center; justify-content:center; gap:3px;
+       background:linear-gradient(135deg,rgba(255,255,255,0.022) 0%,rgba(0,0,0,0.14) 100%);
+       border-right:1px solid rgba(255,255,255,0.05);
+       padding: 0 3px 0 9px;
+     }`,
+    `.sft-ro-plate .py {
+       font-family:'Geist Mono','Courier New',monospace;
+       font-size:17px; font-weight:600; letter-spacing:-0.04em; line-height:1;
+     }`,
+    `.sft-ro-plate .pm {
+       font-size:7.5px; font-weight:600; letter-spacing:0.1em;
+       text-transform:uppercase; color:#6B7591; line-height:1.2;
+       max-width:46px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center;
+     }`,
+    // plate year color by column
+    `.sft-ro-card.col-ondeck    .sft-ro-plate .py { color:#C8D6F4; }`,
+    `.sft-ro-card.col-inprogress .sft-ro-plate .py { color:#FFD18A; }`,
+    `.sft-ro-card.col-completed  .sft-ro-plate .py { color:#B8F5D3; }`,
+    `.sft-ro-card.col-delivered  .sft-ro-plate .py { color:#9BAAB8; }`,
+    `.sft-ro-card.col-waiting    .sft-ro-plate .py { color:#DFC0FF; }`,
+    // moving state
+    `.sft-ro-card.is-moving {
+       background:rgba(77,125,255,0.12) !important;
+       border:1px solid rgba(77,125,255,0.4) !important;
+       box-shadow:0 0 0 1.5px #4D7DFF,0 8px 32px rgba(77,125,255,0.25) !important;
+       transform:scale(1.01) !important;
+     }`,
+    // urgent pulse override
+    `.sft-ro-card.is-urgent { animation:card-in 0.22s cubic-bezier(0.34,1.56,0.64,1),urgent-glow 2.4s ease-in-out 0.3s infinite !important; }`,
   ].join(" ");
   document.head.appendChild(s);
 }
-// ─── Theme — Apple iOS Dark ──────────────────────────────────────────────────
-const BG         = "#000000";                    // pure OLED black
+// ─── Theme — Worqflow Premium (blue-black, glass) ────────────────────────────
+const BG         = "#0B1220";                    // deep blue-black
 const SURFACE    = "rgba(255,255,255,0.05)";     // frosted glass
 const SURFACE2   = "rgba(255,255,255,0.09)";     // elevated glass
-const BORDER     = "rgba(255,255,255,0.08)";     // barely visible border
-const BORDER2    = "rgba(255,255,255,0.14)";     // slightly brighter
-const TEXT       = "#FFFFFF";                    // pure white — Apple uses this
-const TEXT2      = "rgba(255,255,255,0.7)";      // secondary — 70% white
-const TEXT3      = "rgba(255,255,255,0.4)";      // tertiary — 40% white
-const ACCENT     = "#0A84FF";                    // Apple's exact iOS blue
-const ACCENT2    = "rgba(10,132,255,0.15)";      // blue tint
-const SUCCESS    = "#30D158";                    // Apple green
-const WARN       = "#FF9F0A";                    // Apple amber
-const DANGER     = "#FF453A";                    // Apple red
-const CARD_BG    = "rgba(28,32,48,0.95)";        // card — elevated dark slate
-const CARD_TOP   = "rgba(255,255,255,0.13)";     // top highlight — light catching edge
-const CARD_BORDER= "rgba(255,255,255,0.07)";     // card edge subtle
-const CARD_SHADOW= "0 1px 0 rgba(255,255,255,0.10) inset, 0 -1px 0 rgba(0,0,0,0.4) inset, 0 4px 6px rgba(0,0,0,0.4), 0 12px 32px rgba(0,0,0,0.5)";  // 3D raised card
-const CELL_BG    = "rgba(8,10,18,0.7)";          // cell well — recessed/inset look
-const CELL_SHADOW= "inset 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 3px rgba(0,0,0,0.6)"; // inset tray
-const TECH_BG    = "rgba(22,26,42,0.98)";        // tech card — slightly elevated
-const SHEET_BG   = "#13161F";                    // sheet background
+const BORDER     = "#28324D";                    // cool dark border
+const BORDER2    = "#3A4666";                    // slightly brighter
+const TEXT       = "#FFFFFF";
+const TEXT2      = "#A8B4CC";                    // cool mid-grey
+const TEXT3      = "#6B7591";                    // dim cool grey
+const ACCENT     = "#4D7DFF";                    // Worqflow blue
+const ACCENT2    = "rgba(77,125,255,0.15)";      // blue tint
+const SUCCESS    = "#00E676";                    // vivid green
+const WARN       = "#FF9F2E";                    // warm amber
+const DANGER     = "#FF3D4E";                    // vivid red
+const CARD_BG    = "#131B30";                    // card surface
+const CARD_TOP   = "rgba(255,255,255,0.06)";     // specular top edge
+const CARD_BORDER= "rgba(255,255,255,0.07)";     // card edge
+const CARD_SHADOW= "0 1px 0 rgba(255,255,255,0.06) inset, 0 -1px 0 rgba(0,0,0,0.35) inset, 0 1px 3px rgba(0,0,0,0.32), 0 6px 18px rgba(0,0,0,0.26)";
+const CELL_BG    = "rgba(11,18,32,0.7)";         // cell well — recessed
+const CELL_SHADOW= "inset 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 3px rgba(0,0,0,0.6)";
+const TECH_BG    = "#141C33";                    // tech card surface
+const SHEET_BG   = "#0F1729";                    // sheet background
 const INPUT_BG   = "rgba(255,255,255,0.06)";     // input field
 // Legacy aliases — keep these so nothing breaks
 const SUB     = "rgba(255,255,255,0.5)";
@@ -76,10 +149,10 @@ const MUTED   = "rgba(255,255,255,0.28)";
 // Animations injected via useEffect below
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const COLS = [
-  { id:"ondeck",     label:"On Deck",     color:"#0A84FF", bg:"rgba(10,132,255,0.07)",  border:"rgba(10,132,255,0.2)"  },
-  { id:"inprogress", label:"In Progress", color:"#FF9F0A", bg:"rgba(255,159,10,0.07)",  border:"rgba(255,159,10,0.2)"  },
-  { id:"completed",  label:"Completed / QC", color:"#30D158", bg:"rgba(48,209,88,0.07)", border:"rgba(48,209,88,0.2)"  },
-  { id:"delivered",  label:"Delivered",   color:"#636366", bg:"rgba(99,99,102,0.07)",   border:"rgba(99,99,102,0.2)"   },
+  { id:"ondeck",     label:"On Deck",     color:"#4D7DFF", bg:"rgba(77,125,255,0.07)",  border:"rgba(77,125,255,0.22)" },
+  { id:"inprogress", label:"In Progress", color:"#FF9F2E", bg:"rgba(255,159,46,0.07)",  border:"rgba(255,159,46,0.22)" },
+  { id:"completed",  label:"Completed / QC", color:"#00E676", bg:"rgba(0,230,118,0.07)", border:"rgba(0,230,118,0.25)" },
+  { id:"delivered",  label:"Delivered",   color:"#6B7591", bg:"rgba(107,117,145,0.07)", border:"rgba(107,117,145,0.2)" },
 ];
 const PARTS_COL = { id:"waiting", color:"#BF5AF2", bg:"rgba(191,90,242,0.07)", border:"rgba(191,90,242,0.2)" };
 const USERS = [
@@ -947,8 +1020,16 @@ function DisplayScreen({ state, onLogout }) {
   );
 }
 
-// ─── RO Card — long press to move, tap to open ───────────────────────────────
-const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove }) {
+// ─── VISUAL: ROCard ── glass card with year/make plate on left ───────────────
+// Column accent colors for left stripe + plate
+const COL_ACCENT = {
+  ondeck:     { color:"#4D7DFF", glow:"rgba(77,125,255,0.5)"  },
+  inprogress: { color:"#FF9F2E", glow:"rgba(255,159,46,0.5)"  },
+  completed:  { color:"#00E676", glow:"rgba(0,230,118,0.55)"  },
+  delivered:  { color:"#6B7591", glow:"rgba(107,117,145,0.4)" },
+  waiting:    { color:"#BF5AF2", glow:"rgba(191,90,242,0.5)"  },
+};
+const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, serviceTypes, canMove, colId, compact }) {
   const holdRef    = useRef(null);
   const didHold  = useRef(false);
   const pressing = useRef(false);
@@ -956,7 +1037,10 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
   const startY   = useRef(0);
   const vehicle     = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
   const svcType     = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
-  const leftColor   = isMoving ? ACCENT : (svcType ? svcType.color : ro.priority === "HIGH" ? DANGER : ro.priority === "LOW" ? "#94A3B8" : "#1D6BF3");
+  const accentKey   = isMoving ? "ondeck" : (colId || "ondeck");
+  const accent      = COL_ACCENT[accentKey] || COL_ACCENT.ondeck;
+  const leftColor   = accent.color;
+  const leftGlow    = accent.glow;
   const isWaiting   = ro.waitStatus === "waiting";
   const timerRunning = timer && timer.running;
   const elapsed     = timer
@@ -987,6 +1071,14 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
     if (isMoving) { onMove(); return; }
     onTap();
   }
+  // CSS class-based card — pseudo-elements handle left stripe + top sheen
+  const cardClass = [
+    "sft-ro-card card-press",
+    colId ? `col-${colId}` : "",
+    isMoving ? "is-moving" : "",
+    ro.priority === "HIGH" ? "is-urgent" : "",
+  ].filter(Boolean).join(" ");
+
   return (
     <div
       onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); startHold(e.clientX, e.clientY); }}
@@ -998,113 +1090,112 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
       onPointerCancel={cancelHold}
       onContextMenu={e => e.preventDefault()}
       onClick={handleClick}
-      className="card-press"
+      className={cardClass}
       style={{
+        "--card-accent": leftColor,
+        "--card-accent-glow": leftGlow,
         height: "100%",
         width: "100%",
         boxSizing: "border-box",
-        background: isMoving ? "rgba(10,132,255,0.12)" : CARD_BG,
         borderRadius: 14,
-        padding: "6px 8px",
-        boxShadow: isMoving
-          ? "0 0 0 1.5px #0A84FF, 0 8px 32px rgba(10,132,255,0.2)"
-          : CARD_SHADOW,
-        animation: isMoving ? "none"
-          : ro.priority === "HIGH"
-          ? "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1), urgent-glow 2.4s ease-in-out 0.3s infinite"
-          : "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)",
-        border: "1px solid " + CARD_BORDER,
-        borderLeft: "2.5px solid " + leftColor,
         cursor: "pointer",
         userSelect: "none",
         WebkitUserSelect: "none",
         WebkitTouchCallout: "none",
         touchAction: "manipulation",
-        transform: isMoving ? "scale(1.01)" : "scale(1)",
-        transition: "box-shadow 0.2s, transform 0.2s",
+        animation: isMoving ? "none"
+          : ro.priority === "HIGH"
+          ? "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)"
+          : "card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)",
         display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
         overflow: "hidden",
       }}
     >
-      {/* ROW 1 — RO number + notes badge only — always same height */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4, flexShrink:0, overflow:"hidden" }}>
-        <span style={{ fontWeight:700, fontSize:13, color:TEXT, fontFamily:"-apple-system,BlinkMacSystemFont,sans-serif", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
-          {ro.roNum}
-        </span>
-        {ro.roNotes && ro.roNotes.length > 0 && (
-          <span style={{ background:"rgba(10,132,255,0.2)", color:ACCENT, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0 }}>
-            💬{ro.roNotes.length}
-          </span>
-        )}
-      </div>
-
-      {/* ROW 2 — vehicle + customer — always shown */}
-      <div style={{ flexShrink:0, overflow:"hidden", display:"flex", flexDirection:"column", gap:1 }}>
-        <div style={{ fontSize:11, fontWeight:500, color:"rgba(255,255,255,0.6)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.3 }}>
-          {vehicle || "No vehicle"}
-        </div>
-        <div style={{ fontSize:10, fontWeight:400, color:"rgba(255,255,255,0.35)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.3 }}>
-          {ro.customer || "—"}
-        </div>
-      </div>
-
-      {/* ROW 3 — timer + hours + jobs — always shown */}
-      <div style={{ display:"flex", alignItems:"center", gap:3, flexShrink:0, overflow:"hidden" }}>
-        <span style={{ background:timerRunning?"rgba(255,159,10,0.15)":"rgba(255,255,255,0.06)", color:timerRunning?WARN:TEXT3, fontSize:8, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0, display:"flex", alignItems:"center", gap:2 }}>
-          <span style={{ width:4, height:4, borderRadius:"50%", background:timerRunning?WARN:TEXT3, display:"inline-block", flexShrink:0, animation:timerRunning?"pulse 1.8s ease-in-out infinite":"none" }}/>
-          {fmtTime(elapsed)}
-        </span>
-        {ro.hours && (
-          <span style={{ background:"rgba(48,209,88,0.12)", color:SUCCESS, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0 }}>
-            {String(ro.hours).replace(/h$/i,"")}h
-          </span>
-        )}
-        <div style={{ display:"flex", gap:2, flex:1, overflow:"hidden", alignItems:"center" }}>
-          {visibleJobs.map((j, i) => {
-            const ab = abbrevJob(j);
-            return (
-              <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:8, fontWeight:500, padding:"1px 3px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>
-                {ab.label}
-              </span>
-            );
-          })}
-          {extraJobs > 0 && <span style={{ fontSize:8, color:TEXT3, flexShrink:0 }}>+{extraJobs}</span>}
-        </div>
-      </div>
-
-      {/* ROW 4 — status + service type + urgent — always shown */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, overflow:"hidden", gap:4 }}>
-        <div style={{ display:"flex", gap:3, alignItems:"center", flex:1, overflow:"hidden" }}>
-          {ro.waitStatus === "waiting" ? (
-            <span style={{ background:"rgba(255,159,10,0.15)", color:WARN, fontSize:8, fontWeight:600, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0 }}>⏳ Waiting</span>
-          ) : ro.waitStatus === "dropoff" ? (
-            <span style={{ background:"rgba(255,255,255,0.07)", color:TEXT3, fontSize:8, fontWeight:500, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap", flexShrink:0 }}>🚗 Drop-off</span>
-          ) : (
-            <span style={{ fontSize:8, color:"transparent", padding:"1px 4px" }}>—</span>
-          )}
-        </div>
-        <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
-          {ro.priority === "HIGH" && (
-            <span style={{ background:"rgba(255,69,58,0.15)", color:DANGER, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:5, whiteSpace:"nowrap" }}>!!</span>
-          )}
-          {svcType ? (
-            <span style={{ background:svcType.color, color:"#fff", fontSize:8, fontWeight:600, padding:"1px 5px", borderRadius:5, whiteSpace:"nowrap", maxWidth:65, overflow:"hidden", textOverflow:"ellipsis" }}>
-              {svcType.name}
-            </span>
-          ) : (
-            <span style={{ fontSize:8, color:"transparent", padding:"1px 5px" }}>—</span>
-          )}
-        </div>
-      </div>
-
-      {/* Moving indicator */}
-      {isMoving && (
-        <div style={{ fontSize:9, color:"#0A84FF", textAlign:"center", flexShrink:0 }}>
-          ● MOVING — tap column to place
+      {/* ── Left plate: year / make ── */}
+      {!compact && (
+        <div className="sft-ro-plate">
+          <span className="py">{ro.year || "—"}</span>
+          <span className="pm">{ro.make || "Vehicle"}</span>
         </div>
       )}
+
+      {/* ── Right content ── */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"space-between", padding:"6px 8px 5px", overflow:"hidden", minWidth:0 }}>
+
+        {/* ROW 1 — RO number + notes badge */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:4, flexShrink:0, overflow:"hidden" }}>
+          <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:12, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1 }}>
+            {ro.roNum}
+          </span>
+          <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
+            {ro.priority === "HIGH" && (
+              <span style={{ background:"rgba(255,61,78,0.18)", color:DANGER, fontSize:7.5, fontWeight:800, padding:"1px 4px", borderRadius:4, letterSpacing:"0.04em" }}>!!</span>
+            )}
+            {ro.roNotes && ro.roNotes.length > 0 && (
+              <span style={{ background:"rgba(77,125,255,0.2)", color:ACCENT, fontSize:7.5, fontWeight:700, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap" }}>
+                💬{ro.roNotes.length}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ROW 2 — vehicle + customer */}
+        <div style={{ flexShrink:0, overflow:"hidden", display:"flex", flexDirection:"column", gap:1 }}>
+          <div style={{ fontSize:11, fontWeight:500, color:TEXT2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.3 }}>
+            {compact ? vehicle : (ro.model || ro.make || "No vehicle")}
+          </div>
+          <div style={{ fontSize:10, fontWeight:400, color:TEXT3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", lineHeight:1.3 }}>
+            {ro.customer || "—"}
+          </div>
+        </div>
+
+        {/* ROW 3 — timer + hours + jobs */}
+        <div style={{ display:"flex", alignItems:"center", gap:3, flexShrink:0, overflow:"hidden" }}>
+          <span style={{ background:timerRunning?"rgba(255,159,46,0.14)":"rgba(255,255,255,0.06)", color:timerRunning?WARN:TEXT3, fontSize:8, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0, display:"flex", alignItems:"center", gap:2 }}>
+            <span style={{ width:4, height:4, borderRadius:"50%", background:timerRunning?WARN:TEXT3, display:"inline-block", flexShrink:0, animation:timerRunning?"pulse 1.8s ease-in-out infinite":"none" }}/>
+            {fmtTime(elapsed)}
+          </span>
+          {ro.hours && (
+            <span style={{ background:"rgba(0,230,118,0.12)", color:SUCCESS, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>
+              {String(ro.hours).replace(/h$/i,"")}h
+            </span>
+          )}
+          <div style={{ display:"flex", gap:2, flex:1, overflow:"hidden", alignItems:"center" }}>
+            {visibleJobs.map((j, i) => {
+              const ab = abbrevJob(j);
+              return (
+                <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:7.5, fontWeight:600, padding:"1px 3px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>
+                  {ab.label}
+                </span>
+              );
+            })}
+            {extraJobs > 0 && <span style={{ fontSize:8, color:TEXT3, flexShrink:0 }}>+{extraJobs}</span>}
+          </div>
+        </div>
+
+        {/* ROW 4 — wait status + service type badge */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, overflow:"hidden", gap:4 }}>
+          <div style={{ display:"flex", gap:3, alignItems:"center", flex:1, overflow:"hidden" }}>
+            {ro.waitStatus === "waiting" ? (
+              <span style={{ background:"rgba(255,159,46,0.14)", color:WARN, fontSize:7.5, fontWeight:600, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>⏳ Waiting</span>
+            ) : ro.waitStatus === "dropoff" ? (
+              <span style={{ background:"rgba(255,255,255,0.06)", color:TEXT3, fontSize:7.5, fontWeight:500, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap", flexShrink:0 }}>🚗 Drop-off</span>
+            ) : null}
+          </div>
+          {svcType && (
+            <span style={{ background:svcType.color+"22", color:svcType.color, border:"1px solid "+svcType.color+"44", fontSize:7.5, fontWeight:600, padding:"1px 5px", borderRadius:4, whiteSpace:"nowrap", maxWidth:65, overflow:"hidden", textOverflow:"ellipsis", flexShrink:0 }}>
+              {svcType.name}
+            </span>
+          )}
+        </div>
+
+        {/* Moving indicator */}
+        {isMoving && (
+          <div style={{ fontSize:9, color:ACCENT, textAlign:"center", flexShrink:0, letterSpacing:"0.3px" }}>
+            ● MOVING — tap column to place
+          </div>
+        )}
+      </div>
     </div>
   );
 });
@@ -4145,7 +4236,7 @@ export default function ShopFlowTracker() {
     const cumulative = (state.completedByTech || {})[techId] || 0;
     return { count:all.length, hrs, cumulative };
   }
-  function renderCard(ro, colId) {
+  function renderCard(ro, colId, opts = {}) {
     return (
       <ROCard
         key={ro.id}
@@ -4156,6 +4247,8 @@ export default function ShopFlowTracker() {
         isMoving={isDisplay ? false : (movingRO && movingRO.id === ro.id)}
         serviceTypes={state.serviceTypes}
         canMove={isDisplay ? false : canMove}
+        colId={colId}
+        compact={opts.compact || false}
       />
     );
   }
@@ -4288,7 +4381,9 @@ export default function ShopFlowTracker() {
 
   return (
     <div
-      style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text','Barlow',sans-serif", background:"radial-gradient(ellipse at 50% 0%, #0A0F1F 0%, #000000 55%)", minHeight:"100vh", maxWidth:"100vw", overflow:"hidden", color:TEXT }}
+      style={{ fontFamily:"'Geist',system-ui,sans-serif", WebkitFontSmoothing:"antialiased",
+               background:"radial-gradient(900px 500px at 95% 0%, rgba(255,159,46,0.04), transparent 60%), radial-gradient(800px 500px at 0% 0%, rgba(0,230,118,0.022), transparent 60%), #0B1220",
+               minHeight:"100vh", maxWidth:"100vw", overflow:"hidden", color:TEXT }}
     >
       {/* Moving banner */}
       {!isDisplay && movingRO && (
@@ -4303,7 +4398,7 @@ export default function ShopFlowTracker() {
         </div>
       )}
       {/* Header */}
-      <div style={{ background:"rgba(10,14,24,0.92)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"0.5px solid rgba(255,255,255,0.08)", borderTop:"0.5px solid rgba(255,255,255,0.06)", padding:isWide?"10px 24px":"9px 14px", display:"flex", alignItems:"center", gap:12, position:"sticky", top: isDisplay ? 0 : movingRO ? 44 : 0, zIndex:300, boxShadow:"0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05) inset", overflowX:"auto", WebkitOverflowScrolling:"touch", flexWrap:"nowrap" }}>
+      <div style={{ background:"rgba(11,18,32,0.94)", backdropFilter:"blur(40px)", WebkitBackdropFilter:"blur(40px)", borderBottom:"1px solid #1B2440", padding:isWide?"10px 24px":"9px 14px", display:"flex", alignItems:"center", gap:12, position:"sticky", top: isDisplay ? 0 : movingRO ? 44 : 0, zIndex:300, boxShadow:"0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04) inset", overflowX:"auto", WebkitOverflowScrolling:"touch", flexWrap:"nowrap" }}>
         {isDisplay ? (
           // ── Display mode header: logo+title | hours bar | clock | dot ──
           <>
@@ -4359,7 +4454,7 @@ export default function ShopFlowTracker() {
               <WFLogo size={34} radius={7} />
             </div>
             <div style={{ flexShrink:0 }}>
-              <div style={{ color:TEXT, fontWeight:700, fontSize:isWide?15:14, letterSpacing:"-0.3px", fontFamily:"'Space Grotesk',-apple-system,sans-serif" }}><span style={{color:TEXT}}>Worq</span><span style={{background:"linear-gradient(135deg,#60B3FF,#0A84FF)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>flow</span></div>
+              <div style={{ color:TEXT, fontWeight:700, fontSize:isWide?15:14, letterSpacing:"-0.02em", fontFamily:"'Geist',system-ui,sans-serif" }}><span style={{color:TEXT}}>Worq</span><span style={{background:"linear-gradient(135deg,#7AA8FF,#4D7DFF)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>flow</span></div>
               <div style={{ color:TEXT3, fontSize:10, marginTop:1, letterSpacing:"0.1px" }}>{currentUser.name}</div>
             </div>
             <LiveClock />
@@ -4415,7 +4510,7 @@ export default function ShopFlowTracker() {
                 </>
               )}
               {canCreateRO && (
-                <button onClick={() => setShowAdd(true)} style={{ height:34, padding:"0 16px", borderRadius:20, border:"none", background:ACCENT, color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif", fontWeight:600, fontSize:13, letterSpacing:"-0.1px", boxShadow:"0 4px 16px rgba(10,132,255,0.45)" }}>
+                <button onClick={() => setShowAdd(true)} style={{ height:34, padding:"0 16px", borderRadius:20, border:"none", background:"linear-gradient(135deg,#5A8AFF,#4D7DFF)", color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", gap:6, fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:13, letterSpacing:"-0.01em", boxShadow:"0 4px 16px rgba(77,125,255,0.45)" }}>
                   <PlusIcon /> Add RO
                 </button>
               )}
@@ -4449,28 +4544,32 @@ export default function ShopFlowTracker() {
             <div style={{ display:"flex", gap:GAP, marginBottom:6 }}>
               {/* Spacer matching tech col width */}
               <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0 }} />
-              {COLS.map(col => (
-                <div key={col.id} style={{ flex: useFluid ? 1 : "none", width: useFluid ? "auto" : CELL_W_MOBILE, minWidth: useFluid ? 0 : CELL_W_MOBILE, display:"flex", justifyContent:"center" }}>
-                  <div style={{ background:"rgba(255,255,255,0.04)", color:col.color, padding:"5px 12px", fontSize:isWide?11:10, fontWeight:700, letterSpacing:"0.6px", whiteSpace:"nowrap", textTransform:"uppercase", borderRadius:"8px 8px 0 0", borderTop:"0.5px solid rgba(255,255,255,0.12)", borderLeft:"0.5px solid rgba(255,255,255,0.07)", borderRight:"0.5px solid rgba(255,255,255,0.07)", boxShadow:"0 -2px 8px rgba(0,0,0,0.3)", borderBottom:"2px solid "+col.color }}>
-                    {col.label}
+              {COLS.map(col => {
+                const colCount = state.techs.reduce((sum, t) => sum + ((state.grid[t.id]?.[col.id]||[]).length), 0);
+                return (
+                  <div key={col.id} style={{ flex: useFluid ? 1 : "none", width: useFluid ? "auto" : CELL_W_MOBILE, minWidth: useFluid ? 0 : CELL_W_MOBILE, display:"flex", justifyContent:"center" }}>
+                    <div style={{ background:"#141C33", color:col.color, padding:"5px 12px", fontSize:isWide?11:10, fontWeight:700, letterSpacing:"0.5px", whiteSpace:"nowrap", textTransform:"uppercase", borderRadius:"8px 8px 0 0", border:"1px solid #1B2440", borderBottom:"2px solid "+col.color, boxShadow:"0 -2px 12px rgba(0,0,0,0.3)", display:"flex", alignItems:"center", gap:6 }}>
+                      <span>{col.label}</span>
+                      {colCount > 0 && <span style={{ background:col.color+"22", color:col.color, fontSize:9, fontWeight:700, padding:"1px 6px", borderRadius:20, letterSpacing:"0.05em" }}>{colCount}</span>}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             {/* Tech rows */}            {visibleTechs.map(tech => {
               const { count, hrs, cumulative } = techStats(tech.id);
               return (
                 <div key={tech.id} style={{ display:"flex", gap:GAP, marginBottom:GAP, alignItems:"stretch", width:"100%", height:rowHeight, minHeight:rowHeight, maxHeight:rowHeight, flexShrink:0, overflow:"hidden" }}>
                   {/* Tech card */}
-                  <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0, background:TECH_BG, borderRadius:12, padding:"10px 10px", boxShadow:"0 1px 0 rgba(255,255,255,0.10) inset, 0 -1px 0 rgba(0,0,0,0.5) inset, 0 4px 16px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.6)", border:"0.5px solid rgba(255,255,255,0.08)", borderTop:"0.5px solid rgba(255,255,255,0.14)", display:"flex", flexDirection:"column", gap:6 }}>
+                  <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0, background:"linear-gradient(180deg,#1A233D 0%,#141C33 100%)", borderRadius:12, padding:"10px 10px", boxShadow:"0 1px 0 rgba(255,255,255,0.06) inset, 0 -1px 0 rgba(0,0,0,0.4) inset, 0 4px 16px rgba(0,0,0,0.4)", border:"1px solid #28324D", borderTop:"1px solid #2E3A56", display:"flex", flexDirection:"column", gap:6 }}>
                   <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                    <div style={{ width:30, height:30, borderRadius:"50%", background:"linear-gradient(135deg,#1D6BF3,#0EA5E9)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:11, flexShrink:0 }}>
+                    <div style={{ width:30, height:30, borderRadius:"50%", background:"linear-gradient(135deg,#4D7DFF,#1D6BF3)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:11, flexShrink:0, boxShadow:"0 2px 8px rgba(77,125,255,0.35)" }}>
                       {initials(tech.name)}
                     </div>
                     <div style={{ minWidth:0 }}>
-                      <div style={{ fontWeight:500, fontSize:11, color:TEXT2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.1px" }}>{tech.name}</div>
-                      <div style={{ fontSize:10, color:TEXT3, marginTop:2, display:"flex", gap:5, letterSpacing:"0.1px", alignItems:"center" }}>
-                        {!isAdvisor && <span style={{ color:SUCCESS, fontWeight:500, letterSpacing:"0.1px" }}>{hrs.toFixed(1)}h</span>}
+                      <div style={{ fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:11, color:TEXT, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", letterSpacing:"-0.01em" }}>{tech.name}</div>
+                      <div style={{ fontSize:10, color:TEXT3, marginTop:2, display:"flex", gap:5, letterSpacing:"0.05px", alignItems:"center" }}>
+                        {!isAdvisor && <span style={{ color:SUCCESS, fontWeight:600 }}>{hrs.toFixed(1)}h</span>}
                         <span style={{ color:TEXT3 }}>{cumulative}</span>
                         {isAdmin && isClockedIn(tech.id) && (
                           <span style={{ width:5, height:5, borderRadius:"50%", background:SUCCESS, display:"inline-block", animation:"pulse 1.5s ease-in-out infinite" }}/>
@@ -4549,8 +4648,8 @@ export default function ShopFlowTracker() {
                           width: useFluid ? "auto" : CELL_W_MOBILE,
                           minWidth: useFluid ? 0 : CELL_W_MOBILE,
                           flexShrink: useFluid ? 1 : 0,
-                          background: isTarget ? "rgba(10,132,255,0.10)" : CELL_BG,
-                          border: "0.5px solid "+(isTarget?"#0A84FF":col.border),
+                          background: isTarget ? "rgba(77,125,255,0.10)" : CELL_BG,
+                          border: "1px solid "+(isTarget?ACCENT:col.border),
                           borderRadius: 12,
                           padding: ids.length ? "6px 6px 4px" : 0,
                           display: "flex",
@@ -4565,7 +4664,7 @@ export default function ShopFlowTracker() {
                           boxSizing: "border-box",
                           overflow: "hidden",
                           cursor: isTarget ? "pointer" : "default",
-                          boxShadow: isTarget ? "0 0 0 1.5px #0A84FF, "+CELL_SHADOW : CELL_SHADOW,
+                          boxShadow: isTarget ? "0 0 0 1.5px "+ACCENT+", "+CELL_SHADOW : CELL_SHADOW,
                           backdropFilter: "blur(4px)",
                           WebkitBackdropFilter: "blur(4px)",
                         }}
@@ -4593,7 +4692,7 @@ export default function ShopFlowTracker() {
                                   overflow: "hidden",
                                 }}
                               >
-                                {renderCard(ro, col.id)}
+                                {renderCard(ro, col.id, { compact: ids.length > 1 })}
                               </div>
                             );
                           })
