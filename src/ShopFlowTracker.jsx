@@ -38,7 +38,7 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
     "@keyframes fade-in { from{opacity:0;transform:translateY(8px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }",
     "@keyframes slide-up { from{transform:translateY(48px);opacity:0} to{transform:translateY(0);opacity:1} }",
     "@keyframes card-in { from{opacity:0;transform:translateY(12px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }",
-    "@keyframes urgent-glow { 0%,100%{box-shadow:0 0 0 1px rgba(255,61,78,0.2) inset,0 0 10px rgba(255,61,78,0.25),0 0 22px rgba(255,61,78,0.1),0 2px 8px rgba(0,0,0,0.4)} 50%{box-shadow:0 0 0 1px rgba(255,61,78,0.4) inset,0 0 22px rgba(255,61,78,0.65),0 0 44px rgba(255,61,78,0.28),0 0 70px rgba(255,61,78,0.1),0 2px 12px rgba(0,0,0,0.5)} }",
+    "@keyframes urgent-glow { 0%,100%{box-shadow:0 0 0 1px rgba(255,61,78,0.15) inset,0 0 6px rgba(255,61,78,0.2),0 2px 8px rgba(0,0,0,0.4)} 50%{box-shadow:0 0 0 1px rgba(255,61,78,0.5) inset,0 0 28px rgba(255,61,78,0.85),0 0 55px rgba(255,61,78,0.45),0 0 90px rgba(255,61,78,0.18),0 2px 12px rgba(0,0,0,0.5)} }",
     "@keyframes shimmer { from{background-position:-200px 0} to{background-position:200px 0} }",
     "@keyframes snap-in { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:scale(1)} }",
     "@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)} 40%{transform:translateX(9px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }",
@@ -155,7 +155,7 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
        transform:scale(1.01) !important;
      }`,
     // urgent: red glow border + red left stripe on ALL urgent cards
-    `.sft-ro-card.is-urgent { border-color:rgba(255,61,78,0.55) !important; background:rgba(255,61,78,0.035) !important; animation:card-in 0.22s cubic-bezier(0.34,1.56,0.64,1), urgent-glow 2.8s ease-in-out 0.3s infinite !important; }`,
+    `.sft-ro-card.is-urgent { border-color:rgba(255,61,78,0.55) !important; background:rgba(255,61,78,0.035) !important; animation:card-in 0.22s cubic-bezier(0.34,1.56,0.64,1), urgent-glow 1.2s ease-in-out 0.3s infinite !important; }`,
     `.sft-ro-card.is-urgent::before { background:linear-gradient(to bottom,#FF6B7A,#FF3D4E,#CC0010) !important; box-shadow:0 0 14px rgba(255,61,78,0.9),0 0 28px rgba(255,61,78,0.5) !important; }`,
     // ── dept badge colors ──
     `.sft-dept { font-size:7.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 5px; border-radius:3px; white-space:nowrap; flex-shrink:0; }`,
