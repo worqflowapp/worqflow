@@ -1166,7 +1166,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
             {ro.roNum}
           </span>
           <span style={{ fontSize:9, color:TEXT3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", flex:1, letterSpacing:"-0.01em" }}>
-            {ro.make ? `${ro.make}${ro.model ? " "+ro.model : ""}` : ""}
+            {[ro.year, ro.make, ro.model].filter(Boolean).join(" ")}
           </span>
           {ro.hours && (
             <span style={{ fontFamily:"'Geist Mono',monospace", fontSize:8.5, fontWeight:700, color:SUCCESS, whiteSpace:"nowrap", flexShrink:0 }}>
