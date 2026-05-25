@@ -147,17 +147,6 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
     `.sft-ro-bar.bar-completed  > span { background:#00E676; box-shadow:0 0 10px rgba(0,230,118,0.7); width:100%; }`,
     `.sft-ro-bar.bar-delivered  > span { background:rgba(107,117,145,0.5); width:100%; }`,
     `.sft-ro-bar.bar-waiting    > span { background:rgba(191,90,242,0.5); width:40%; }`,
-    // ── Urgent corner flag ──
-    `.sft-ro-card.is-urgent .sft-ro-urgent-flag {
-       display:block !important;
-     }`,
-    `.sft-ro-urgent-flag {
-       display:none; position:absolute; top:0; right:0;
-       font-size:8px; font-weight:800; letter-spacing:0.14em;
-       padding:2px 8px; border-radius:0 var(--r-sm) 0 6px;
-       background:#FF3D4E; color:white; text-transform:uppercase;
-       box-shadow:0 0 12px rgba(255,61,78,0.5); z-index:3;
-     }`,
     // moving state
     `.sft-ro-card.is-moving {
        background:rgba(77,125,255,0.12) !important;
@@ -165,13 +154,15 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
        box-shadow:0 0 0 1.5px #4D7DFF,0 8px 32px rgba(77,125,255,0.25) !important;
        transform:scale(1.01) !important;
      }`,
-    // urgent pulse
+    // urgent pulse on card border
     `.sft-ro-card.is-urgent { animation:card-in 0.22s cubic-bezier(0.34,1.56,0.64,1),urgent-glow 2.4s ease-in-out 0.3s infinite !important; }`,
     // ── dept badge colors ──
-    `.sft-dept { font-size:8.5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; padding:2px 6px; border-radius:4px; white-space:nowrap; flex-shrink:0; }`,
+    `.sft-dept { font-size:7.5px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:1px 5px; border-radius:3px; white-space:nowrap; flex-shrink:0; }`,
     `.sft-dept.main  { background:rgba(255,122,138,0.14); color:#FF7A8A; }`,
     `.sft-dept.pdi   { background:rgba(181,124,255,0.14); color:#B57CFF; }`,
     `.sft-dept.used  { background:rgba(0,230,118,0.10); color:#00E676; }`,
+    // ── urgent inline badge ──
+    `.sft-urgent-badge { font-size:7.5px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; padding:1px 5px; border-radius:3px; background:#FF3D4E; color:#fff; white-space:nowrap; flex-shrink:0; box-shadow:0 0 8px rgba(255,61,78,0.45); }`,
   ].join(" ");
   document.head.appendChild(s);
 }
@@ -1166,13 +1157,13 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
         overflow: "hidden",
       }}
     >
-      {/* ── URGENT corner flag ── */}
-      <span className="sft-ro-urgent-flag">URGENT</span>
-
       {/* ── Card content ── */}
       {compact ? (
         /* ── COMPACT: single row — RO# + vehicle + hours ── */
         <div style={{ flex:1, display:"flex", alignItems:"center", padding:"0 10px 0 14px", gap:6, overflow:"hidden", minWidth:0 }}>
+          {ro.priority === "HIGH" && (
+            <span className="sft-urgent-badge">!</span>
+          )}
           <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:10, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", flexShrink:0 }}>
             {ro.roNum}
           </span>
@@ -1192,16 +1183,19 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
         /* ── FULL: 4 rows, no plate ── */
         <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"space-between", padding:"9px 11px 8px 14px", overflow:"hidden", minWidth:0 }}>
 
-          {/* ROW 1 — RO number + badges */}
-          <div style={{ display:"flex", alignItems:"center", gap:5, flexShrink:0, overflow:"hidden" }}>
+          {/* ROW 1 — RO number + urgent + dept badge */}
+          <div style={{ display:"flex", alignItems:"center", gap:4, flexShrink:0, overflow:"hidden" }}>
             <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:700, fontSize:12, color:TEXT, letterSpacing:"-0.02em", whiteSpace:"nowrap", flexShrink:0 }}>
               {ro.roNum}
             </span>
             <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0, marginLeft:"auto" }}>
               {ro.roNotes && ro.roNotes.length > 0 && (
-                <span style={{ background:"rgba(77,125,255,0.18)", color:ACCENT, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:4, whiteSpace:"nowrap" }}>
+                <span style={{ background:"rgba(77,125,255,0.18)", color:ACCENT, fontSize:8, fontWeight:700, padding:"1px 4px", borderRadius:3, whiteSpace:"nowrap" }}>
                   💬{ro.roNotes.length}
                 </span>
+              )}
+              {ro.priority === "HIGH" && (
+                <span className="sft-urgent-badge">URGENT</span>
               )}
               <span className={`sft-dept ${deptKey}`}>{svcType ? svcType.name : "Main Shop"}</span>
             </div>
