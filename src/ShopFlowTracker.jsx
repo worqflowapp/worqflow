@@ -1257,7 +1257,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
   );
 });
 // ─── Sheet (bottom modal) ─────────────────────────────────────────────────────
-function Sheet({ title, subtitle, onClose, children, wide }) {
+function Sheet({ title, subtitle, titleRight, onClose, children, wide }) {
   return (
     <div
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
@@ -1269,9 +1269,12 @@ function Sheet({ title, subtitle, onClose, children, wide }) {
             <div style={{ fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif", fontWeight:700, fontSize:17, color:TEXT, letterSpacing:"-0.3px" }}>{title}</div>
             {subtitle && <div style={{ fontSize:12, color:"rgba(255,255,255,0.35)", marginTop:2 }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={{ background:BG, border:"none", borderRadius:10, width:32, height:32, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:SUB }}>
-            <XIcon />
-          </button>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            {titleRight}
+            <button onClick={onClose} style={{ background:BG, border:"none", borderRadius:10, width:32, height:32, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:SUB }}>
+              <XIcon />
+            </button>
+          </div>
         </div>
         <div style={{ padding:"16px 20px 36px" }}>{children}</div>
       </div>
@@ -1417,7 +1420,7 @@ function NoteThread({ ro, currentUser2, onAddNote }) {
 function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, onHoursChange, wide, isAdmin, isTech, colId, serviceTypes, jobPresets, currentUser2, onAddNote }) {
   const [editing, setEditing] = useState(false);
   const [showJobPickerEdit, setShowJobPickerEdit] = useState(false);
-  const [f, setF] = useState({ ...ro, serviceType: ro.serviceType||"st-main" });
+  const [f, setF] = useState({ ...ro, serviceType: ro.serviceType||"st-main", tag: ro.tag||"" });
   const jobPresetsForEdit = jobPresets || DEFAULT_JOB_PRESETS;
   const elapsed = timer ? (timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000) : timer.elapsed) : 0;
   const jobs = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
@@ -1493,9 +1496,10 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
           <div style={{ display:"grid", gridTemplateColumns:"72px 1fr 1fr", gap:8 }}>
             {inp("year","Year")} {inp("make","Make")} {inp("model","Model")}
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
             <div><label style={labelStyle}>Color</label>{inp("color","e.g. White")}</div>
             <div><label style={labelStyle}>License Plate</label>{inp("plate","e.g. ABC1234")}</div>
+            <div><label style={labelStyle}>Tag</label>{inp("tag","e.g. 4521")}</div>
           </div>
           <div><label style={labelStyle}>VIN</label>{inp("vin","Vehicle Identification Number")}</div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
@@ -1564,7 +1568,21 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
     );
   }
   return (
-    <Sheet title={ro.roNum} subtitle={[ro.year,ro.make,ro.model].filter(Boolean).join(" ")} onClose={onClose} wide={wide}>
+    <Sheet title={ro.roNum} subtitle={[ro.year,ro.make,ro.model].filter(Boolean).join(" ")} onClose={onClose} wide={wide}
+      titleRight={
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end" }}>
+          <div style={{ fontSize:8, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:2 }}>Tag</div>
+          <input
+            type="text"
+            placeholder="—"
+            value={f.tag||""}
+            onChange={e => setF(p => ({...p, tag:e.target.value}))}
+            onBlur={() => onSave({...f})}
+            style={{ background:"rgba(255,255,255,0.07)", border:"0.5px solid rgba(255,255,255,0.12)", borderRadius:8, padding:"4px 8px", fontSize:13, fontWeight:700, color:TEXT, fontFamily:"'Geist Mono',monospace", width:80, textAlign:"center", outline:"none" }}
+          />
+        </div>
+      }
+    >
       <div>
         {/* ── SERVICE TYPE BADGE ── */}
         {(() => {
@@ -1889,7 +1907,7 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
 // ─── New RO Modal ─────────────────────────────────────────────────────────────
 function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes, jobPresets }) {
   const defaultRoNum = "RO-" + String(nextNum).padStart(4,"0");
-  const [f, setF] = useState({ roNum:defaultRoNum, serviceType:"st-main", year:"", make:"", model:"", color:"", plate:"", mileageIn:"", vin:"", customer:"", phone:"", email:"", waitStatus:"none", priority:"NORMAL", hours:"", jobs:"", parts:"", concern:"", cause:"", correction:"", notes:"", promiseTime:"", dest:"queue", assignQueue:"q-main", assignTech:"", assignCol:"ondeck" });
+  const [f, setF] = useState({ roNum:defaultRoNum, serviceType:"st-main", year:"", make:"", model:"", color:"", plate:"", tag:"", mileageIn:"", vin:"", customer:"", phone:"", email:"", waitStatus:"none", priority:"NORMAL", hours:"", jobs:"", parts:"", concern:"", cause:"", correction:"", notes:"", promiseTime:"", dest:"queue", assignQueue:"q-main", assignTech:"", assignCol:"ondeck" });
   const [showJobPicker, setShowJobPicker] = useState(false);
   function handleAdd() {
     const roId = "ro-" + Date.now();
@@ -1929,8 +1947,10 @@ function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes
           <input placeholder="Make"  value={f.make}  onChange={e => setF(p => ({...p, make:e.target.value}))}  style={inputStyle} />
           <input placeholder="Model" value={f.model} onChange={e => setF(p => ({...p, model:e.target.value}))} style={inputStyle} />
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>          <div><label style={labelStyle}>Color</label><input placeholder="e.g. White" value={f.color} onChange={e => setF(p => ({...p, color:e.target.value}))} style={inputStyle}/></div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+          <div><label style={labelStyle}>Color</label><input placeholder="e.g. White" value={f.color} onChange={e => setF(p => ({...p, color:e.target.value}))} style={inputStyle}/></div>
           <div><label style={labelStyle}>Plate #</label><input placeholder="ABC1234" value={f.plate} onChange={e => setF(p => ({...p, plate:e.target.value}))} style={inputStyle}/></div>
+          <div><label style={labelStyle}>Tag</label><input placeholder="e.g. 4521" value={f.tag} onChange={e => setF(p => ({...p, tag:e.target.value}))} style={inputStyle}/></div>
         </div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
           <div><label style={labelStyle}>Mileage In</label><input type="number" placeholder="e.g. 45000" value={f.mileageIn} onChange={e => setF(p => ({...p, mileageIn:e.target.value}))} style={inputStyle}/></div>
@@ -4203,7 +4223,7 @@ export default function ShopFlowTracker() {
   }
   function handleAddRO(f) {
     const roId = "ro-" + Date.now();
-    const ro = { id:roId, roNum:f.roNum||"RO-"+String(state.nextNum).padStart(4,"0"), serviceType:f.serviceType||"st-main", promiseTime:f.promiseTime||"", roNotes:[], year:f.year, make:f.make, model:f.model, color:f.color||"", vin:f.vin||"", plate:f.plate||"", mileageIn:f.mileageIn||"", mileageOut:"", customer:f.customer, phone:f.phone||"", email:f.email||"", waitStatus:f.waitStatus||"dropoff", priority:f.priority, hours:f.hours, jobs:f.jobs, parts:f.parts||"", concern:f.concern||"", cause:f.cause||"", correction:f.correction||"", notes:f.notes };
+    const ro = { id:roId, roNum:f.roNum||"RO-"+String(state.nextNum).padStart(4,"0"), serviceType:f.serviceType||"st-main", promiseTime:f.promiseTime||"", roNotes:[], year:f.year, make:f.make, model:f.model, color:f.color||"", vin:f.vin||"", plate:f.plate||"", tag:f.tag||"", mileageIn:f.mileageIn||"", mileageOut:"", customer:f.customer, phone:f.phone||"", email:f.email||"", waitStatus:f.waitStatus||"dropoff", priority:f.priority, hours:f.hours, jobs:f.jobs, parts:f.parts||"", concern:f.concern||"", cause:f.cause||"", correction:f.correction||"", notes:f.notes };
     upd(s => {
       const ns = { ...s, ros:[...s.ros, ro], nextNum:s.nextNum+1, timers:{ ...s.timers, [roId]:{ running:false, elapsed:0, startedAt:null } } };
       if (f.dest === "tech" && f.assignTech) {
