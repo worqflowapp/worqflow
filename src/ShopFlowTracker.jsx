@@ -728,112 +728,86 @@ function abbrevJob(j) {
 }
 // ─── Display Mode ────────────────────────────────────────────────────────────
 
-function DisplayCard({ ro, timer, serviceTypes }) {
+function DisplayCard({ ro, timer, serviceTypes, compact }) {
   const svcType = serviceTypes?.find(s => s.id === ro.serviceType);
-  const leftColor = svcType?.color || (ro.priority === 'HIGH' ? '#FF453A' : '#1D6BF3');
+  const isUrgent = ro.priority === 'HIGH';
+  const leftColor = isUrgent ? '#FF3D4E' : (svcType?.color || '#1D6BF3');
   const vehicle = [ro.year, ro.make, ro.model].filter(Boolean).join(' ');
   const jobs = ro.jobs ? ro.jobs.split(',').map(j => j.trim()).filter(Boolean) : [];
   const elapsed = timer
-    ? timer.running
-      ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000)
-      : timer.elapsed
+    ? timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000) : timer.elapsed
     : 0;
 
-  return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-around',
-      boxSizing: 'border-box',
-      background: 'rgba(28,32,48,0.95)',
-      borderRadius: 8,
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderLeft: '3px solid ' + leftColor,
-      padding: '4px 6px',
-      overflow: 'hidden',
-      animation: ro.priority === 'HIGH' ? 'urgent-glow 2.4s ease-in-out infinite' : 'none',
-    }}>
+  const base = {
+    width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden',
+    borderRadius: 7,
+    borderLeft: '3px solid ' + leftColor,
+    border: '0.5px solid rgba(255,255,255,0.07)',
+    borderLeftWidth: 3, borderLeftStyle: 'solid', borderLeftColor: leftColor,
+    background: isUrgent
+      ? 'linear-gradient(135deg,rgba(255,61,78,0.10),rgba(20,24,40,0.96))'
+      : 'linear-gradient(135deg,rgba(26,30,50,0.97),rgba(14,17,32,0.97))',
+    animation: isUrgent ? 'urgent-glow 1.2s ease-in-out infinite' : 'none',
+  };
 
-      {/* ROW 1 — RO# + service type */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, overflow: 'hidden', flexShrink: 0 }}>
-        <span style={{ fontSize: 10, fontWeight: 800, color: '#FFFFFF', whiteSpace: 'nowrap', letterSpacing: '-0.2px', lineHeight: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+  if (compact) {
+    return (
+      <div style={{ ...base, display:'flex', alignItems:'center', padding:'0 7px 0 9px', gap:6 }}>
+        <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontWeight:800, fontSize:9.5, color:'#fff', whiteSpace:'nowrap', flexShrink:0, letterSpacing:'-0.02em' }}>
           {ro.roNum}
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-          {ro.priority === 'HIGH' && (
-            <span style={{ fontSize: 5, fontWeight: 700, color: '#FF453A', background: 'rgba(255,69,58,0.15)', padding: '1px 4px', borderRadius: 3, lineHeight: 1.4 }}>
-              URGENT
-            </span>
-          )}
-          {svcType && (
-            <span style={{ fontSize: 6, fontWeight: 600, color: svcType.color, display: 'flex', alignItems: 'center', gap: 2, lineHeight: 1 }}>
-              <span style={{ width: 4, height: 4, borderRadius: '50%', background: svcType.color, display: 'inline-block', flexShrink: 0 }}/>
-              {svcType.name}
-            </span>
-          )}
-        </div>
+        <span style={{ fontSize:9, color:'rgba(255,255,255,0.6)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', letterSpacing:'-0.01em' }}>
+          {vehicle}
+        </span>
+        {ro.hours && (
+          <span style={{ fontFamily:"'Geist Mono',monospace", fontSize:9, fontWeight:700, color:'#30D158', whiteSpace:'nowrap', flexShrink:0 }}>
+            {String(ro.hours).replace(/h$/i,'')}h
+          </span>
+        )}
+        {timer?.running && (
+          <span style={{ width:5, height:5, borderRadius:'50%', background:'#FF9F0A', flexShrink:0, animation:'pulse 1.8s ease-in-out infinite' }}/>
+        )}
       </div>
+    );
+  }
 
-      {/* ROW 2 — Vehicle */}
-      <div style={{ overflow: 'hidden', flexShrink: 0 }}>
-        <span style={{
-          fontSize: 9, fontWeight: 600,
-          color: vehicle ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.2)',
-          whiteSpace: 'nowrap', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis',
-          lineHeight: 1.2, fontStyle: vehicle ? 'normal' : 'italic',
-        }}>
+  return (
+    <div style={{ ...base, display:'flex', flexDirection:'column', justifyContent:'space-between', padding:'5px 7px 5px 9px' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:4, flexShrink:0 }}>
+        <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontSize:11, fontWeight:800, color:'#fff', whiteSpace:'nowrap', letterSpacing:'-0.02em', lineHeight:1 }}>
+          {ro.roNum}
+        </span>
+        {svcType && (
+          <span style={{ fontSize:7, fontWeight:700, color:svcType.color, background:svcType.color+'22', padding:'1px 5px', borderRadius:3, lineHeight:1.5, whiteSpace:'nowrap', flexShrink:0 }}>
+            {svcType.name}
+          </span>
+        )}
+      </div>
+      <div style={{ overflow:'hidden', flexShrink:0 }}>
+        <span style={{ fontSize:10, fontWeight:600, color:vehicle?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.2)', whiteSpace:'nowrap', display:'block', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.2, letterSpacing:'-0.01em' }}>
           {vehicle || 'No vehicle'}
         </span>
+        {ro.customer && (
+          <span style={{ fontSize:8, color:'rgba(255,255,255,0.38)', whiteSpace:'nowrap', display:'block', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.3 }}>
+            {ro.customer}
+          </span>
+        )}
       </div>
-
-      {/* ROW 3 — Customer */}
-      <div style={{ overflow: 'hidden', flexShrink: 0 }}>
-        <span style={{
-          fontSize: 8, fontWeight: 400,
-          color: ro.customer ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.12)',
-          whiteSpace: 'nowrap', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2,
-        }}>
-          {ro.customer || '—'}
-        </span>
-      </div>
-
-      {/* ROW 4 — Jobs + Timer + Hours */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 3, overflow: 'hidden', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: 2, flex: 1, overflow: 'hidden', alignItems: 'center', minWidth: 0 }}>
-          {jobs.length === 0 ? (
-            <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.15)', fontStyle: 'italic' }}>No jobs</span>
-          ) : (
-            <>
-              {jobs.slice(0, 3).map((j, i) => {
-                const ab = abbrevJob(j);
-                return (
-                  <span key={i} style={{ background: ab.bg, color: ab.color, fontSize: 6, fontWeight: 700, padding: '1px 3px', borderRadius: 2, whiteSpace: 'nowrap', flexShrink: 0, lineHeight: 1.4 }}>
-                    {ab.label}
-                  </span>
-                );
-              })}
-              {jobs.length > 3 && (
-                <span style={{ fontSize: 6, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>+{jobs.length - 3}</span>
-              )}
-            </>
-          )}
+      <div style={{ display:'flex', alignItems:'center', gap:3, flexShrink:0, overflow:'hidden' }}>
+        <div style={{ display:'flex', gap:2, flex:1, overflow:'hidden', alignItems:'center', minWidth:0 }}>
+          {jobs.slice(0,3).map((j,i) => {
+            const ab = abbrevJob(j);
+            return <span key={i} style={{ background:ab.bg, color:ab.color, fontSize:7, fontWeight:700, padding:'1px 4px', borderRadius:3, whiteSpace:'nowrap', flexShrink:0, lineHeight:1.4 }}>{ab.label}</span>;
+          })}
+          {jobs.length > 3 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)', flexShrink:0 }}>+{jobs.length-3}</span>}
         </div>
-        <span style={{
-          fontSize: 6, color: timer?.running ? '#FF9F0A' : 'rgba(255,255,255,0.3)',
-          background: timer?.running ? 'rgba(255,159,10,0.12)' : 'rgba(255,255,255,0.05)',
-          padding: '1px 3px', borderRadius: 3, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: 'monospace', lineHeight: 1.4,
-        }}>
-          {fmtTime(elapsed)}
-        </span>
-        <span style={{
-          fontSize: 6, fontWeight: 700,
-          color: ro.hours ? '#30D158' : 'rgba(255,255,255,0.12)',
-          background: ro.hours ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.03)',
-          padding: '1px 3px', borderRadius: 3, whiteSpace: 'nowrap', flexShrink: 0, lineHeight: 1.4,
-        }}>
-          {ro.hours ? String(ro.hours).replace(/h$/i, '') + 'h' : '—h'}
+        {timer?.running && (
+          <span style={{ fontSize:7, color:'#FF9F0A', background:'rgba(255,159,10,0.12)', padding:'1px 4px', borderRadius:3, whiteSpace:'nowrap', flexShrink:0, fontFamily:'monospace', lineHeight:1.4 }}>
+            {fmtTime(elapsed)}
+          </span>
+        )}
+        <span style={{ fontFamily:"'Geist Mono',monospace", fontSize:8, fontWeight:700, color:ro.hours?'#30D158':'rgba(255,255,255,0.15)', background:ro.hours?'rgba(48,209,88,0.12)':'transparent', padding:'1px 4px', borderRadius:3, whiteSpace:'nowrap', flexShrink:0, lineHeight:1.4 }}>
+          {ro.hours ? String(ro.hours).replace(/h$/i,'')+'h' : '—'}
         </span>
       </div>
     </div>
@@ -844,155 +818,166 @@ function DisplayScreen({ state, onLogout }) {
   const techs = state.techs || [];
   const serviceTypes = state.serviceTypes || [];
 
-  function getRO(id) {
-    return (state.ros || []).find(r => r.id === id);
-  }
+  function getRO(id) { return (state.ros || []).find(r => r.id === id); }
 
   const flagged = totalFlaggedHours(state);
   const progress = Math.min(flagged / GOAL_HOURS, 1);
   const revenue = Math.round(flagged * 125).toLocaleString('en-US');
+  const totalActive = techs.reduce((s, t) => {
+    const ids = COLS.flatMap(c => (state.grid[t.id] || {})[c.id] || []);
+    return s + ids.length;
+  }, 0);
 
   const techGridRows = techs.map(() => '1fr').join(' ');
+  const pct = Math.round(progress * 100);
 
   return (
     <div style={{
-      width: '100vw',
-      height: '100vh',
-      maxWidth: '100vw',
-      maxHeight: '100vh',
-      background: '#000000',
-      display: 'grid',
-      gridTemplateRows: '44px 26px 1fr 80px 80px',
-      overflow: 'hidden',
-      fontFamily: '-apple-system,BlinkMacSystemFont,sans-serif',
-      boxSizing: 'border-box',
+      width:'100vw', height:'100vh', maxWidth:'100vw', maxHeight:'100vh',
+      background:'linear-gradient(160deg,#03060f 0%,#06091a 55%,#030610 100%)',
+      display:'grid',
+      gridTemplateRows:'54px 30px 1fr 88px 88px',
+      overflow:'hidden',
+      fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif",
+      boxSizing:'border-box',
     }}>
 
-      {/* ── ZONE 1: HEADER 44px ── */}
+      {/* ── ZONE 1: HEADER ── */}
       <div style={{
-        height: 44,
-        minHeight: 44,
-        maxHeight: 44,
-        flexShrink: 0,
-        background: 'rgba(10,14,24,0.98)',
-        borderBottom: '0.5px solid rgba(255,255,255,0.07)',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 14px',
-        gap: 0,
-        boxSizing: 'border-box',
-        overflow: 'hidden',
+        display:'flex', alignItems:'center', padding:'0 16px',
+        background:'rgba(6,9,20,0.97)',
+        borderBottom:'1px solid rgba(255,255,255,0.055)',
+        boxShadow:'0 1px 0 rgba(255,255,255,0.03), 0 4px 32px rgba(0,0,0,0.6)',
+        boxSizing:'border-box', overflow:'hidden', gap:0,
       }}>
-
-        {/* LEFT — Logo + Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0, cursor: 'pointer' }} onClick={onLogout}>
-          <WFLogo size={24} radius={5} />
+        {/* LEFT */}
+        <div style={{ display:'flex', alignItems:'center', gap:9, flexShrink:0, cursor:'pointer' }} onClick={onLogout}>
+          <WFLogo size={28} radius={7} />
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
-              Service Department
+            <div style={{ fontSize:13, fontWeight:700, color:'#fff', letterSpacing:'-0.3px', lineHeight:1.2 }}>Worqflow</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.22)', letterSpacing:'0.3px', lineHeight:1 }}>SERVICE BOARD</div>
+          </div>
+          <div style={{ width:'1px', height:26, background:'rgba(255,255,255,0.08)', margin:'0 6px' }}/>
+          <div style={{ display:'flex', gap:12 }}>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:16, fontWeight:800, color:'#fff', letterSpacing:'-0.5px', lineHeight:1 }}>{techs.length}</div>
+              <div style={{ fontSize:7.5, color:'rgba(255,255,255,0.3)', letterSpacing:'0.4px', textTransform:'uppercase' }}>Techs</div>
             </div>
-            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.18)', lineHeight: 1 }}>
-              tap to logout
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontSize:16, fontWeight:800, color:'#fff', letterSpacing:'-0.5px', lineHeight:1 }}>{totalActive}</div>
+              <div style={{ fontSize:7.5, color:'rgba(255,255,255,0.3)', letterSpacing:'0.4px', textTransform:'uppercase' }}>Active ROs</div>
             </div>
           </div>
         </div>
 
-        {/* CENTER — Hours tracker */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <span style={{ fontSize: 20, fontWeight: 800, color: '#30D158', letterSpacing: '-0.5px', lineHeight: 1, flexShrink: 0 }}>
-            {flagged.toFixed(1)}
-          </span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>/ {GOAL_HOURS}h goal</span>
-              <span style={{ fontSize: 8, fontWeight: 700, color: '#30D158', whiteSpace: 'nowrap' }}>${revenue}</span>
-            </div>
-            <div style={{ width: 140, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' }}>
-              <div style={{ width: (progress * 100) + '%', height: '100%', background: 'linear-gradient(90deg,#30D158,#0A84FF)', borderRadius: 2 }}/>
-            </div>
+        {/* CENTER */}
+        <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:5 }}>
+          <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+            <span style={{ fontSize:28, fontWeight:900, color:'#30D158', letterSpacing:'-1px', lineHeight:1, fontVariantNumeric:'tabular-nums' }}>
+              {flagged.toFixed(1)}
+            </span>
+            <span style={{ fontSize:13, color:'rgba(255,255,255,0.35)', fontWeight:500 }}>/ {GOAL_HOURS}h goal</span>
+            <span style={{ fontSize:14, fontWeight:800, color:'#30D158', letterSpacing:'-0.3px' }}>${revenue}</span>
+            <span style={{ fontSize:11, fontWeight:700, color:pct>=100?'#30D158':'rgba(255,255,255,0.4)', background:pct>=100?'rgba(48,209,88,0.15)':'rgba(255,255,255,0.07)', padding:'2px 8px', borderRadius:20, letterSpacing:'-0.1px' }}>{pct}%</span>
+          </div>
+          <div style={{ width:220, height:4, background:'rgba(255,255,255,0.07)', borderRadius:4, overflow:'hidden' }}>
+            <div style={{ width:(progress*100)+'%', height:'100%', background:'linear-gradient(90deg,#1D6BF3,#30D158)', borderRadius:4, transition:'width 1s ease', boxShadow:'0 0 8px rgba(48,209,88,0.5)' }}/>
           </div>
         </div>
 
-        {/* RIGHT — Clock + dot */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
-          <LiveClock />
-          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#30D158', boxShadow: '0 0 6px #30D158' }}/>
+        {/* RIGHT */}
+        <div style={{ display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
+          <div style={{ textAlign:'right' }}>
+            <LiveClock />
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.25)', letterSpacing:'0.2px' }}>
+              {new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}
+            </div>
+          </div>
+          <div style={{ width:9, height:9, borderRadius:'50%', background:'#30D158', boxShadow:'0 0 0 3px rgba(48,209,88,0.2), 0 0 12px rgba(48,209,88,0.7)' }}/>
         </div>
       </div>
 
-      {/* ── ZONE 2: COLUMN HEADERS 26px ── */}
-      <div style={{ gridRow: 2, display: 'flex', alignItems: 'center', padding: '0 6px', gap: 4, boxSizing: 'border-box' }}>
-        <div style={{ width: 80, minWidth: 80, flexShrink: 0 }}/>
-        {COLS.map(col => (
-          <div key={col.id} style={{ flex: 1, textAlign: 'center', fontSize: 10, fontWeight: 700, color: col.color, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-            {col.label}
-          </div>
-        ))}
+      {/* ── ZONE 2: COLUMN HEADERS ── */}
+      <div style={{ display:'flex', alignItems:'center', padding:'0 8px', gap:4, boxSizing:'border-box', background:'rgba(4,7,16,0.6)' }}>
+        <div style={{ width:92, minWidth:92, flexShrink:0 }}/>
+        {COLS.map(col => {
+          const count = techs.reduce((s,t) => s + ((state.grid[t.id]||{})[col.id]||[]).length, 0);
+          return (
+            <div key={col.id} style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <div style={{ height:2, width:18, borderRadius:2, background:col.color, opacity:0.7 }}/>
+              <span style={{ fontSize:10, fontWeight:700, color:col.color, letterSpacing:'0.6px', textTransform:'uppercase', opacity:0.85 }}>{col.label}</span>
+              <span style={{ fontSize:9, fontWeight:700, color:col.color, background:col.color+'22', padding:'1px 6px', borderRadius:10, lineHeight:1.5 }}>{count}</span>
+            </div>
+          );
+        })}
       </div>
 
-      {/* ── ZONE 3: KANBAN GRID (1fr) ── */}
+      {/* ── ZONE 3: KANBAN GRID ── */}
       <div style={{
-        gridRow: 3,
-        display: 'grid',
-        gridTemplateRows: techGridRows,
-        gap: 3,
-        padding: '2px 6px',
-        overflow: 'hidden',
-        boxSizing: 'border-box',
-        minHeight: 0,
+        display:'grid', gridTemplateRows:techGridRows, gap:3,
+        padding:'3px 8px', overflow:'hidden', boxSizing:'border-box', minHeight:0,
       }}>
         {techs.map(tech => {
-          const allIds = COLS.flatMap(c => (state.grid[tech.id] || {})[c.id] || []);
-          const techHrs = allIds.reduce((s, id) => {
+          const allIds = COLS.flatMap(c => (state.grid[tech.id]||{})[c.id]||[]);
+          const techHrs = allIds.reduce((s,id) => {
             const ro = getRO(id);
-            return s + (parseFloat(String(ro?.hours || '0').replace(/[^0-9.]/g, '')) || 0);
+            return s + (parseFloat(String(ro?.hours||'0').replace(/[^0-9.]/g,''))||0);
           }, 0);
+          const activeCount = ((state.grid[tech.id]||{}).ondeck||[]).length + ((state.grid[tech.id]||{}).inprogress||[]).length;
 
           return (
-            <div key={tech.id} style={{ display: 'flex', gap: 4, minHeight: 0, overflow: 'hidden' }}>
+            <div key={tech.id} style={{ display:'flex', gap:4, minHeight:0, overflow:'hidden' }}>
               {/* Tech card */}
-              <div style={{ width: 80, minWidth: 80, flexShrink: 0, background: 'rgba(22,26,42,0.98)', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '4px', boxSizing: 'border-box', overflow: 'hidden' }}>
-                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg,#1D6BF3,#0A84FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+              <div style={{
+                width:92, minWidth:92, flexShrink:0,
+                background:'linear-gradient(160deg,rgba(22,27,50,0.98),rgba(12,16,32,0.98))',
+                border:'0.5px solid rgba(255,255,255,0.07)',
+                borderRadius:10,
+                display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                gap:3, padding:'5px 4px', boxSizing:'border-box', overflow:'hidden',
+              }}>
+                <div style={{ width:28, height:28, borderRadius:'50%', background:'linear-gradient(135deg,#1D6BF3,#0A84FF)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800, color:'#fff', flexShrink:0, boxShadow:'0 2px 10px rgba(10,132,255,0.4)' }}>
                   {initials(tech.name)}
                 </div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.85)', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', padding: '0 3px', boxSizing: 'border-box', lineHeight: 1.2 }}>
+                <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.9)', textAlign:'center', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', width:'100%', padding:'0 4px', boxSizing:'border-box', lineHeight:1.2, letterSpacing:'-0.2px' }}>
                   {tech.name}
                 </div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: techHrs > 0 ? '#30D158' : 'rgba(255,255,255,0.2)', background: techHrs > 0 ? 'rgba(48,209,88,0.12)' : 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: 4, whiteSpace: 'nowrap', lineHeight: 1.4 }}>
-                  {techHrs > 0 ? techHrs.toFixed(1) + 'h' : '0h'}
+                <div style={{ display:'flex', gap:3, alignItems:'center' }}>
+                  <span style={{ fontSize:10, fontWeight:800, color:techHrs>0?'#30D158':'rgba(255,255,255,0.18)', fontVariantNumeric:'tabular-nums', letterSpacing:'-0.3px' }}>
+                    {techHrs>0?techHrs.toFixed(1)+'h':'0h'}
+                  </span>
+                  {activeCount>0 && (
+                    <span style={{ fontSize:8, color:'rgba(255,159,46,0.9)', background:'rgba(255,159,46,0.12)', padding:'0 4px', borderRadius:6, lineHeight:1.5 }}>{activeCount}</span>
+                  )}
                 </div>
               </div>
 
-              {/* 4 Kanban cells */}
+              {/* Kanban cells */}
               {COLS.map(col => {
-                const ids = (state.grid[tech.id] || {})[col.id] || [];
+                const ids = (state.grid[tech.id]||{})[col.id]||[];
+                const compact = ids.length >= 3;
                 return (
                   <div key={col.id} style={{
-                    flex: 1,
-                    minWidth: 0,
-                    minHeight: 0,
-                    background: 'rgba(8,10,18,0.7)',
-                    border: '0.5px solid ' + col.border,
-                    borderRadius: 10,
-                    padding: 5,
-                    display: 'grid',
-                    gridTemplateRows: ids.length === 0 ? '1fr' : ids.map(() => '1fr').join(' '),
-                    gap: 4,
-                    overflow: 'hidden',
-                    boxSizing: 'border-box',
+                    flex:1, minWidth:0, minHeight:0,
+                    background:'rgba(8,10,20,0.65)',
+                    border:'0.5px solid '+col.border,
+                    borderTop:'1px solid '+col.color+'33',
+                    borderRadius:9,
+                    padding: compact ? '3px' : '4px',
+                    display:'grid',
+                    gridTemplateRows: ids.length===0 ? '1fr' : ids.map(()=>'1fr').join(' '),
+                    gap: compact ? 2 : 3,
+                    overflow:'hidden', boxSizing:'border-box',
                   }}>
-                    {ids.length === 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                        <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)' }}/>
-                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.1)' }}>Empty</span>
+                    {ids.length===0 ? (
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <div style={{ width:16, height:16, borderRadius:'50%', border:'1px solid rgba(255,255,255,0.05)' }}/>
                       </div>
                     ) : (
                       ids.map(roId => {
                         const ro = getRO(roId);
                         if (!ro) return null;
-                        return (
-                          <DisplayCard key={ro.id} ro={ro} timer={state.timers[ro.id]} serviceTypes={serviceTypes} />
-                        );
+                        return <DisplayCard key={ro.id} ro={ro} timer={state.timers[ro.id]} serviceTypes={serviceTypes} compact={compact} />;
                       })
                     )}
                   </div>
@@ -1003,27 +988,25 @@ function DisplayScreen({ state, onLogout }) {
         })}
       </div>
 
-      {/* ── ZONE 4: WAITING ON PARTS 80px ── */}
+      {/* ── ZONE 4: WAITING ON PARTS ── */}
       {(() => {
         const partIds = state.partsSlots || [];
         return (
-          <div style={{ gridRow: 4, margin: '0 6px', background: 'rgba(14,18,30,0.97)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-            <div style={{ height: 28, flexShrink: 0, background: 'linear-gradient(135deg,rgba(191,90,242,0.35),rgba(191,90,242,0.15))', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8 }}>
-              <span style={{ fontSize: 13 }}>🔧</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#E5B8FF' }}>Waiting on Parts</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#E5B8FF', background: 'rgba(191,90,242,0.3)', padding: '1px 8px', borderRadius: 10 }}>{partIds.length}</span>
+          <div style={{ margin:'0 8px', background:'rgba(10,12,24,0.96)', border:'0.5px solid rgba(191,90,242,0.2)', borderTop:'1px solid rgba(191,90,242,0.35)', borderRadius:10, overflow:'hidden', display:'flex', flexDirection:'column', boxSizing:'border-box' }}>
+            <div style={{ height:24, flexShrink:0, display:'flex', alignItems:'center', padding:'0 10px', gap:7, background:'linear-gradient(90deg,rgba(191,90,242,0.2),rgba(191,90,242,0.06))' }}>
+              <span style={{ fontSize:11 }}>⏳</span>
+              <span style={{ fontSize:11, fontWeight:700, color:'#D8A8FF', letterSpacing:'-0.1px' }}>Waiting on Parts</span>
+              <span style={{ fontSize:9, fontWeight:800, color:'#D8A8FF', background:'rgba(191,90,242,0.25)', padding:'1px 7px', borderRadius:9, lineHeight:1.5 }}>{partIds.length}</span>
             </div>
-            <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 6, padding: '5px 8px', overflowX: 'auto', overflowY: 'hidden', alignItems: 'stretch', boxSizing: 'border-box' }}>
-              {partIds.length === 0 ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>
-                  No tickets waiting on parts
-                </div>
+            <div style={{ flex:1, minHeight:0, display:'flex', gap:5, padding:'4px 6px', overflowX:'auto', overflowY:'hidden', alignItems:'stretch', boxSizing:'border-box' }}>
+              {partIds.length===0 ? (
+                <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, color:'rgba(255,255,255,0.15)', fontStyle:'italic' }}>No tickets waiting</div>
               ) : (
                 partIds.map(roId => {
                   const ro = getRO(roId);
                   if (!ro) return null;
                   return (
-                    <div key={ro.id} style={{ width: partIds.length === 1 ? '100%' : 200, flexShrink: 0, height: '100%' }}>
+                    <div key={ro.id} style={{ width:partIds.length===1?'100%':190, flexShrink:0, height:'100%' }}>
                       <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={serviceTypes} />
                     </div>
                   );
@@ -1034,25 +1017,26 @@ function DisplayScreen({ state, onLogout }) {
         );
       })()}
 
-      {/* ── ZONE 5: STAGING QUEUES 80px ── */}
-      <div style={{ gridRow: 5, display: 'flex', gap: 4, padding: '3px 6px 4px', boxSizing: 'border-box', overflow: 'hidden' }}>
-        {(state.queues || []).map(queue => {
-          const ids = state.qSlots[queue.id] || [];
+      {/* ── ZONE 5: STAGING QUEUES ── */}
+      <div style={{ display:'flex', gap:4, padding:'3px 8px 5px', boxSizing:'border-box', overflow:'hidden' }}>
+        {(state.queues||[]).map(queue => {
+          const ids = state.qSlots[queue.id]||[];
           return (
-            <div key={queue.id} style={{ flex: 1, minWidth: 0, background: 'rgba(14,18,30,0.97)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ height: 20, flexShrink: 0, background: 'linear-gradient(135deg,' + queue.color + 'DD,' + queue.color + '88)', display: 'flex', alignItems: 'center', padding: '0 8px', gap: 6 }}>
-                <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{queue.name}</span>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.25)', padding: '1px 6px', borderRadius: 8, flexShrink: 0 }}>{ids.length}</span>
+            <div key={queue.id} style={{ flex:1, minWidth:0, background:'rgba(10,12,24,0.96)', border:'0.5px solid '+queue.color+'33', borderTop:'1px solid '+queue.color+'55', borderRadius:10, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+              <div style={{ height:22, flexShrink:0, display:'flex', alignItems:'center', padding:'0 8px', gap:6, background:'linear-gradient(90deg,'+queue.color+'28,'+queue.color+'0A)' }}>
+                <span style={{ fontSize:11 }}>{queue.icon}</span>
+                <span style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.85)', flex:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', letterSpacing:'-0.1px' }}>{queue.name}</span>
+                <span style={{ fontSize:9, fontWeight:800, color:queue.color, background:queue.color+'25', padding:'1px 7px', borderRadius:9, flexShrink:0, lineHeight:1.5 }}>{ids.length}</span>
               </div>
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 4, padding: '3px 4px', overflowX: 'auto', overflowY: 'hidden', alignItems: 'stretch', boxSizing: 'border-box' }}>
-                {ids.length === 0 ? (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>No tickets</div>
+              <div style={{ flex:1, minHeight:0, display:'flex', gap:4, padding:'3px 5px', overflowX:'auto', overflowY:'hidden', alignItems:'stretch', boxSizing:'border-box' }}>
+                {ids.length===0 ? (
+                  <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color:'rgba(255,255,255,0.15)', fontStyle:'italic' }}>Empty</div>
                 ) : (
                   ids.map(roId => {
                     const ro = getRO(roId);
                     if (!ro) return null;
                     return (
-                      <div key={ro.id} style={{ width: ids.length === 1 ? '100%' : 200, flexShrink: 0, height: '100%' }}>
+                      <div key={ro.id} style={{ width:ids.length===1?'100%':185, flexShrink:0, height:'100%' }}>
                         <DisplayCard ro={ro} timer={state.timers[ro.id]} serviceTypes={serviceTypes} />
                       </div>
                     );
