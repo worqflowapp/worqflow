@@ -39,6 +39,7 @@ if (typeof document !== "undefined" && !document.getElementById("sft-styles")) {
     "@keyframes slide-up { from{transform:translateY(48px);opacity:0} to{transform:translateY(0);opacity:1} }",
     "@keyframes card-in { from{opacity:0;transform:translateY(12px) scale(0.95)} to{opacity:1;transform:translateY(0) scale(1)} }",
     "@keyframes urgent-glow { 0%,100%{box-shadow:0 0 0 1px rgba(255,61,78,0.15) inset,0 0 6px rgba(255,61,78,0.2),0 2px 8px rgba(0,0,0,0.4)} 50%{box-shadow:0 0 0 1px rgba(255,61,78,0.5) inset,0 0 28px rgba(255,61,78,0.85),0 0 55px rgba(255,61,78,0.45),0 0 90px rgba(255,61,78,0.18),0 2px 12px rgba(0,0,0,0.5)} }",
+    "@keyframes display-urgent { 0%,100%{box-shadow:0 0 0 1px rgba(255,61,78,0.2) inset;border-left-color:rgba(255,61,78,0.5);background:linear-gradient(135deg,rgba(255,61,78,0.06),rgba(14,17,32,0.97))} 50%{box-shadow:0 0 0 2px rgba(255,61,78,0.55) inset;border-left-color:#FF3D4E;background:linear-gradient(135deg,rgba(255,61,78,0.18),rgba(14,17,32,0.97))} }",
     "@keyframes shimmer { from{background-position:-200px 0} to{background-position:200px 0} }",
     "@keyframes snap-in { from{opacity:0;transform:scale(0.94)} to{opacity:1;transform:scale(1)} }",
     "@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)} 40%{transform:translateX(9px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }",
@@ -747,7 +748,7 @@ function DisplayCard({ ro, timer, serviceTypes, compact }) {
     background: isUrgent
       ? 'linear-gradient(135deg,rgba(255,61,78,0.10),rgba(20,24,40,0.96))'
       : 'linear-gradient(135deg,rgba(26,30,50,0.97),rgba(14,17,32,0.97))',
-    animation: isUrgent ? 'urgent-glow 1.2s ease-in-out infinite' : 'none',
+    animation: isUrgent ? 'display-urgent 1.2s ease-in-out infinite' : 'none',
   };
 
   if (compact) {
