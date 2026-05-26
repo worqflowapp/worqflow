@@ -1568,7 +1568,17 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
     );
   }
   return (
-    <Sheet title={ro.roNum} subtitle={[ro.year,ro.make,ro.model].filter(Boolean).join(" ")} onClose={onClose} wide={wide}
+    <Sheet
+      title={
+        <input
+          type="text"
+          value={f.roNum||""}
+          onChange={e => setF(p => ({...p, roNum: e.target.value.toUpperCase()}))}
+          onBlur={() => onSave({...f})}
+          style={{ background:"transparent", border:"none", outline:"none", fontFamily:"-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif", fontWeight:700, fontSize:17, color:TEXT, letterSpacing:"-0.3px", padding:0, width:"100%", cursor:"text" }}
+        />
+      }
+      subtitle={[ro.year,ro.make,ro.model].filter(Boolean).join(" ")} onClose={onClose} wide={wide}
       titleRight={
         <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end" }}>
           <div style={{ fontSize:8, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:2 }}>Tag</div>
@@ -1787,6 +1797,7 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
   const [f, setF] = useState({
     roNum: defaultRoNum,
     year: "", make: "", model: "",
+    tag: "",
     serviceType: "st-main",
     waitStatus: "dropoff",
     priority: "NORMAL",
@@ -1837,6 +1848,12 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
             <input placeholder="Make" value={f.make} onChange={e => setF(p => ({ ...p, make: e.target.value }))} style={inputStyle} />
             <input placeholder="Model" value={f.model} onChange={e => setF(p => ({ ...p, model: e.target.value }))} style={inputStyle} />
           </div>
+        </div>
+
+        {/* Tag */}
+        <div>
+          <label style={labelStyle}>Tag</label>
+          <input placeholder="e.g. 4521" value={f.tag} onChange={e => setF(p => ({ ...p, tag: e.target.value }))} style={inputStyle} />
         </div>
 
         {/* Service Type */}
