@@ -4042,8 +4042,16 @@ export default function ShopFlowTracker() {
         };
         setState(nextState);
       } else {
+        // Only seed if local state has real data — never overwrite Firestore with an empty/fresh state
         firestoreReady.current = true;
-        setDoc(ref, stateRef.current).catch(e => console.error('[ShopFlow] seed failed', e));
+        const cur = stateRef.current;
+        const hasRealData = (cur.ros && cur.ros.length > 0) ||
+          Object.values(cur.grid || {}).some(cols => Object.values(cols).some(ids => ids.length > 0));
+        if (hasRealData) {
+          setDoc(ref, cur).catch(e => console.error('[ShopFlow] seed failed', e));
+        } else {
+          console.warn('[ShopFlow] Firestore doc missing but local state is empty — skipping seed to prevent data wipe');
+        }
       }
     }, err => { setConnected(false); console.error('[ShopFlow] snapshot error', err); });
     return unsub;
@@ -4052,13 +4060,17 @@ export default function ShopFlowTracker() {
   // ── Debounced save ──
   const scheduleSave = useCallback((s) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    // Capture and reset remote flag immediately so user changes after a snapshot are never skipped
     const fromRemote = isRemote.current;
     isRemote.current = false;
     saveTimer.current = setTimeout(async () => {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stateRef.current)); } catch {}
+      const cur = stateRef.current;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cur)); } catch {}
       if (!fromRemote && firestoreReady.current) {
-        try { await setDoc(doc(db, 'shopstate', 'main'), stateRef.current); }
+        // Never write empty/default state to Firestore — guards against wipe on new-device load races
+        const hasRealData = (cur.ros && cur.ros.length > 0) ||
+          Object.values(cur.grid || {}).some(cols => Object.values(cols).some(ids => ids.length > 0));
+        if (!hasRealData) return;
+        try { await setDoc(doc(db, 'shopstate', 'main'), cur); }
         catch (e) { console.error('[ShopFlow] save failed', e); }
       }
     }, 300);
