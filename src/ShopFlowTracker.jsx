@@ -4226,6 +4226,22 @@ export default function ShopFlowTracker() {
     });
     setDetailRO(null);
   }
+  function handleArchiveAllDelivered() {
+    const deliveredIds = state.techs.flatMap(t => (state.grid[t.id]?.delivered || []));
+    if (deliveredIds.length === 0) return;
+    if (!window.confirm(`Archive all ${deliveredIds.length} delivered ticket${deliveredIds.length > 1 ? 's' : ''}?`)) return;
+    const now = Date.now();
+    upd(s => {
+      let ns = { ...s };
+      const newArchived = [...(ns.archived || [])];
+      for (const roId of deliveredIds) {
+        const ro = (ns.ros || []).find(r => r.id === roId);
+        if (ro) newArchived.push({ ro, archivedAt: now });
+        ns = removeFromAll(ns, roId);
+      }
+      return { ...ns, ros: ns.ros.filter(r => !deliveredIds.includes(r.id)), archived: newArchived };
+    });
+  }
   function handleRestore(entry) {
     upd(s => ({
       ...s,
@@ -4653,6 +4669,12 @@ export default function ShopFlowTracker() {
                     <div style={{ background:"#141C33", color:col.color, padding:"5px 12px", fontSize:isWide?11:10, fontWeight:700, letterSpacing:"0.5px", whiteSpace:"nowrap", textTransform:"uppercase", borderRadius:"8px 8px 0 0", border:"1px solid #1B2440", borderBottom:"2px solid "+col.color, boxShadow:"0 -2px 12px rgba(0,0,0,0.3)", display:"flex", alignItems:"center", gap:6 }}>
                       <span>{col.label}</span>
                       {colCount > 0 && <span style={{ background:col.color+"22", color:col.color, fontSize:9, fontWeight:700, padding:"1px 6px", borderRadius:20, letterSpacing:"0.05em" }}>{colCount}</span>}
+                      {col.id === "delivered" && colCount > 0 && (isAdmin || isManager) && (
+                        <button onClick={e => { e.stopPropagation(); handleArchiveAllDelivered(); }}
+                          style={{ marginLeft:4, padding:"2px 7px", fontSize:8, fontWeight:700, color:"#30D158", background:"rgba(48,209,88,0.12)", border:"1px solid rgba(48,209,88,0.3)", borderRadius:6, cursor:"pointer", fontFamily:"inherit", letterSpacing:"0.05em", textTransform:"uppercase", whiteSpace:"nowrap" }}>
+                          Archive All
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
