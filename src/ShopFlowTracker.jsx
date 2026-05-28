@@ -1625,21 +1625,30 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
         {/* ── CUSTOMER INFO ── */}
         <div style={{ marginBottom:18 }}>
           <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Customer</div>
-          <div style={{ display:"flex", alignItems:"baseline", gap:8, marginBottom:6 }}>
-            <span style={{ fontSize:9, fontWeight:700, color:MUTED, textTransform:"uppercase", letterSpacing:"0.5px", flexShrink:0 }}>Advisor</span>
-            <span style={{ fontSize:13, fontWeight:700, color: ro.advisor ? TEXT2 : "rgba(255,255,255,0.2)" }}>{ro.advisor || "—"}</span>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
+            <div style={{ background:BG, borderRadius:10, padding:"8px 12px" }}>
+              <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:4 }}>Customer</div>
+              <input type="text" placeholder="—" value={f.customer||""} onChange={e => setF(p => ({...p, customer:e.target.value}))} onBlur={() => onSave({...f})}
+                style={{ width:"100%", background:"transparent", border:"none", outline:"none", fontSize:14, fontWeight:700, color:TEXT, fontFamily:"inherit", padding:0 }}
+              />
+            </div>
+            <div style={{ background:BG, borderRadius:10, padding:"8px 12px" }}>
+              <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.6px", marginBottom:4 }}>Advisor</div>
+              <input type="text" placeholder="—" value={f.advisor||""} onChange={e => setF(p => ({...p, advisor:e.target.value}))} onBlur={() => onSave({...f})}
+                style={{ width:"100%", background:"transparent", border:"none", outline:"none", fontSize:14, fontWeight:700, color:TEXT, fontFamily:"inherit", padding:0 }}
+              />
+            </div>
           </div>
-          <div style={{ fontSize:16, fontWeight:700, color:TEXT, marginBottom:6 }}>{ro.customer || "—"}</div>
           <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
             {ro.phone && (
               <a href={"tel:"+ro.phone} style={{ display:"flex", alignItems:"center", gap:5, color:ACCENT, fontSize:13, fontWeight:600, textDecoration:"none", background:ACCENT2, padding:"6px 12px", borderRadius:20 }}>
-                
+
  {ro.phone}
               </a>
             )}
             {ro.email && (
               <a href={"mailto:"+ro.email} style={{ display:"flex", alignItems:"center", gap:5, color:"#7C3AED", fontSize:13, fontWeight:600, textDecoration:"none", background:"#FAF5FF", padding:"6px 12px", borderRadius:20 }}>
-                
+
  {ro.email}
               </a>
             )}
