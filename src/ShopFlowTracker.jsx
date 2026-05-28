@@ -1405,7 +1405,7 @@ function NoteThread({ ro, currentUser2, onAddNote }) {
 function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, onHoursChange, wide, isAdmin, isTech, colId, serviceTypes, jobPresets, currentUser2, onAddNote }) {
   const [editing, setEditing] = useState(false);
   const [showJobPickerEdit, setShowJobPickerEdit] = useState(false);
-  const [f, setF] = useState({ ...ro, serviceType: ro.serviceType||"st-main", tag: ro.tag||"" });
+  const [f, setF] = useState({ ...ro, serviceType: ro.serviceType||"st-main", tag: ro.tag||"", advisor: ro.advisor||"" });
   const jobPresetsForEdit = jobPresets || DEFAULT_JOB_PRESETS;
   const elapsed = timer ? (timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000) : timer.elapsed) : 0;
   const jobs = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
@@ -1492,7 +1492,10 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
             <div><label style={labelStyle}>Mileage Out</label>{inp("mileageOut","e.g. 45010","number")}</div>
           </div>
           {sec("Customer Info")}
-          <div><label style={labelStyle}>Customer Name</label>{inp("customer","Full name or stock #")}</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+            <div><label style={labelStyle}>Customer Name</label>{inp("customer","Full name or stock #")}</div>
+            <div><label style={labelStyle}>Advisor</label>{inp("advisor","e.g. Mario")}</div>
+          </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
             <div><label style={labelStyle}>Phone</label>{inp("phone","555-0000","tel")}</div>
             <div><label style={labelStyle}>Email</label>{inp("email","email@email.com","email")}</div>
@@ -1622,6 +1625,10 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
         {/* ── CUSTOMER INFO ── */}
         <div style={{ marginBottom:18 }}>
           <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"1px", marginBottom:10 }}>Customer</div>
+          <div style={{ display:"flex", alignItems:"baseline", gap:8, marginBottom:6 }}>
+            <span style={{ fontSize:9, fontWeight:700, color:MUTED, textTransform:"uppercase", letterSpacing:"0.5px", flexShrink:0 }}>Advisor</span>
+            <span style={{ fontSize:13, fontWeight:700, color: ro.advisor ? TEXT2 : "rgba(255,255,255,0.2)" }}>{ro.advisor || "—"}</span>
+          </div>
           <div style={{ fontSize:16, fontWeight:700, color:TEXT, marginBottom:6 }}>{ro.customer || "—"}</div>
           <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
             {ro.phone && (
@@ -1783,6 +1790,7 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
     roNum: defaultRoNum,
     year: "", make: "", model: "",
     tag: "",
+    advisor: "",
     serviceType: "st-main",
     waitStatus: "dropoff",
     priority: "NORMAL",
@@ -1835,10 +1843,16 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
           </div>
         </div>
 
-        {/* Tag */}
-        <div>
-          <label style={labelStyle}>Tag</label>
-          <input placeholder="e.g. 4521" value={f.tag} onChange={e => setF(p => ({ ...p, tag: e.target.value }))} style={inputStyle} />
+        {/* Tag + Advisor */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+          <div>
+            <label style={labelStyle}>Tag</label>
+            <input placeholder="e.g. 4521" value={f.tag} onChange={e => setF(p => ({ ...p, tag: e.target.value }))} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Advisor</label>
+            <input placeholder="e.g. Mario" value={f.advisor} onChange={e => setF(p => ({ ...p, advisor: e.target.value }))} style={inputStyle} />
+          </div>
         </div>
 
         {/* Service Type */}
@@ -1909,7 +1923,7 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
 // ─── New RO Modal ─────────────────────────────────────────────────────────────
 function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes, jobPresets }) {
   const defaultRoNum = "RO-" + String(nextNum).padStart(4,"0");
-  const [f, setF] = useState({ roNum:defaultRoNum, serviceType:"st-main", year:"", make:"", model:"", color:"", plate:"", tag:"", mileageIn:"", vin:"", customer:"", phone:"", email:"", waitStatus:"none", priority:"NORMAL", hours:"", jobs:"", parts:"", concern:"", cause:"", correction:"", notes:"", promiseTime:"", dest:"queue", assignQueue:"q-main", assignTech:"", assignCol:"ondeck" });
+  const [f, setF] = useState({ roNum:defaultRoNum, serviceType:"st-main", year:"", make:"", model:"", color:"", plate:"", tag:"", mileageIn:"", vin:"", customer:"", advisor:"", phone:"", email:"", waitStatus:"none", priority:"NORMAL", hours:"", jobs:"", parts:"", concern:"", cause:"", correction:"", notes:"", promiseTime:"", dest:"queue", assignQueue:"q-main", assignTech:"", assignCol:"ondeck" });
   const [showJobPicker, setShowJobPicker] = useState(false);
   function handleAdd() {
     const roId = "ro-" + Date.now();
@@ -1960,7 +1974,10 @@ function NewROModal({ onAdd, onClose, nextNum, techs, queues, wide, serviceTypes
         </div>
         {/* Customer */}
         <div style={{ fontSize:10, fontWeight:800, color:MUTED, textTransform:"uppercase", letterSpacing:"1px", paddingBottom:6, borderBottom:"1px solid "+BORDER, marginTop:4 }}>Customer Info</div>
-        <div><label style={labelStyle}>Customer Name / Stock #</label><input placeholder="Full name or stock number" value={f.customer} onChange={e => setF(p => ({...p, customer:e.target.value}))} style={inputStyle}/></div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+          <div><label style={labelStyle}>Customer Name / Stock #</label><input placeholder="Full name or stock number" value={f.customer} onChange={e => setF(p => ({...p, customer:e.target.value}))} style={inputStyle}/></div>
+          <div><label style={labelStyle}>Advisor</label><input placeholder="e.g. Mario" value={f.advisor||""} onChange={e => setF(p => ({...p, advisor:e.target.value}))} style={inputStyle}/></div>
+        </div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
           <div><label style={labelStyle}>Phone</label><input type="tel" placeholder="555-0000" value={f.phone} onChange={e => setF(p => ({...p, phone:e.target.value}))} style={inputStyle}/></div>
           <div><label style={labelStyle}>Email</label><input type="email" placeholder="email@email.com" value={f.email} onChange={e => setF(p => ({...p, email:e.target.value}))} style={inputStyle}/></div>
@@ -4253,7 +4270,7 @@ export default function ShopFlowTracker() {
   }
   function handleAddRO(f) {
     const roId = "ro-" + Date.now();
-    const ro = { id:roId, roNum:f.roNum||"RO-"+String(state.nextNum).padStart(4,"0"), serviceType:f.serviceType||"st-main", promiseTime:f.promiseTime||"", roNotes:[], year:f.year, make:f.make, model:f.model, color:f.color||"", vin:f.vin||"", plate:f.plate||"", tag:f.tag||"", mileageIn:f.mileageIn||"", mileageOut:"", customer:f.customer, phone:f.phone||"", email:f.email||"", waitStatus:f.waitStatus||"dropoff", priority:f.priority, hours:f.hours, jobs:f.jobs, parts:f.parts||"", concern:f.concern||"", cause:f.cause||"", correction:f.correction||"", notes:f.notes };
+    const ro = { id:roId, roNum:f.roNum||"RO-"+String(state.nextNum).padStart(4,"0"), serviceType:f.serviceType||"st-main", promiseTime:f.promiseTime||"", roNotes:[], year:f.year, make:f.make, model:f.model, color:f.color||"", vin:f.vin||"", plate:f.plate||"", tag:f.tag||"", mileageIn:f.mileageIn||"", mileageOut:"", customer:f.customer, advisor:f.advisor||"", phone:f.phone||"", email:f.email||"", waitStatus:f.waitStatus||"dropoff", priority:f.priority, hours:f.hours, jobs:f.jobs, parts:f.parts||"", concern:f.concern||"", cause:f.cause||"", correction:f.correction||"", notes:f.notes };
     upd(s => {
       const ns = { ...s, ros:[...s.ros, ro], nextNum:s.nextNum+1, timers:{ ...s.timers, [roId]:{ running:false, elapsed:0, startedAt:null } } };
       if (f.dest === "tech" && f.assignTech) {
