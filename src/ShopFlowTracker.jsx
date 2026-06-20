@@ -741,6 +741,12 @@ function abbrevJob(j) {
 // ─── Display Mode ────────────────────────────────────────────────────────────
 
 function DisplayCard({ ro, timer, serviceTypes, compact }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!timer?.running) return;
+    const t = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [timer?.running]);
   const svcType = serviceTypes?.find(s => s.id === ro.serviceType);
   const isUrgent = ro.priority === 'HIGH';
   const leftColor = isUrgent ? '#FF3D4E' : (svcType?.color || '#1D6BF3');
@@ -1078,6 +1084,12 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
   const pressing = useRef(false);
   const startX   = useRef(0);
   const startY   = useRef(0);
+  const [, setROTick] = useState(0);
+  useEffect(() => {
+    if (!timer?.running) return;
+    const t = setInterval(() => setROTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [timer?.running]);
   const vehicle     = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
   const svcType     = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
   const accentKey   = isMoving ? "ondeck" : (colId || "ondeck");
@@ -4817,8 +4829,6 @@ export default function ShopFlowTracker() {
   const [showTimeClock, setShowTimeClock]     = useState(false);
   const [detailRO, setDetailRO]       = useState(null);  const [movingRO, setMovingRO]       = useState(null);
   const [collapsed, setCollapsed]     = useState({});
-  const [, setTick] = useState(0);
-  const tickRef = useRef(null);
   const isWide  = useIsWide();
   const isDisplay  = currentUser?.role === "display";
   const isAdmin   = currentUser && currentUser.role === "admin";
@@ -4974,10 +4984,6 @@ export default function ShopFlowTracker() {
     scheduleReconSave();
   }, [reconRecords, scheduleReconSave]);
 
-  useEffect(() => {
-    tickRef.current = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(tickRef.current);
-  }, []);
   // ── Promise time notifications ──
   const firedAlertsRef = useRef({}); // tracks { [key]: true } to avoid duplicates
   useEffect(() => {
