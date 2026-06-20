@@ -4975,6 +4975,9 @@ export default function ShopFlowTracker() {
     reconSaveTimer.current = setTimeout(async () => {
       if (!fromRemote && reconFirestoreReady.current) {
         const records = reconRef.current;
+        // Guard: never write empty array — mirrors main board hasRealData check.
+        // Prevents initial-load echo race where timer fires with [] before user data loads.
+        if (records.length === 0) return;
         console.log('[Recon] saving', records.length, 'record(s) to Firestore');
         try { await setDoc(doc(db, 'reconstate', 'main'), { records }); }
         catch(e) { console.error('[Recon] save failed', e); }
