@@ -4089,9 +4089,24 @@ function daysSinceDate(ds) {
 }
 function computeReconIsGreen(rec) {
   if (!rec.approvedToProceed) return false;
-  const ps = rec.partsSummary || {};
-  if (!ps.total || ps.total === 0) return true;
-  return (ps.arrived || 0) >= ps.total;
+  const approvedRecs = (rec.recs||[]).filter(r => r.status === 'approved');
+  if (approvedRecs.length === 0) return true;
+  return approvedRecs.every(r => {
+    const ps = r.partStatus || 'no-parts-needed';
+    if (ps === 'no-parts-needed' || ps === 'on-hand') return true;
+    return ps === 'needs-part' && r.partArrived === true;
+  });
+}
+function computeReconBottleneck(rec) {
+  const pending = (rec.recs||[]).filter(r => r.status === 'approved' && r.partStatus === 'needs-part' && !r.partArrived && r.partEta);
+  if (!pending.length) return null;
+  return pending.reduce((latest, r) => (!latest || r.partEta > latest.partEta) ? r : latest, null);
+}
+function isReconYellow(rec) {
+  if (computeReconIsGreen(rec)) return false;
+  const bn = computeReconBottleneck(rec);
+  if (!bn) return false;
+  return bn.partEta === new Date().toISOString().split('T')[0];
 }
 
 // ─── Used Car Recon — NewReconModal ──────────────────────────────────────────
@@ -4194,9 +4209,30 @@ function ReconDetailSheet({ record, onUpdate, onClose, currentUser, techs, onSen
   const [newRecJob,   setNewRecJob]   = useState('');
   const [newRecHours, setNewRecHours] = useState('');
   const [showTechPicker, setShowTechPicker] = useState(false);
+  const [recPartNames, setRecPartNames] = useState({});
   const isGreen = computeReconIsGreen(record);
 
   function logEntry(action) { return { action, performedBy: currentUser.name, timestamp: Date.now() }; }
+
+  function handleSetRecPartStatus(recId, newStatus) {
+    const rec = (record.recs||[]).find(r => r.id === recId);
+    onUpdate(record.id, { recs:(record.recs||[]).map(r => r.id === recId ? { ...r, partStatus:newStatus } : r), activityLog:[...(record.activityLog||[]), logEntry('Parts status: '+newStatus+' — '+(rec?.jobName||''))] });
+  }
+  function handleSaveRecPartName(recId) {
+    const val = recPartNames[recId] ?? ((record.recs||[]).find(r=>r.id===recId)?.partName||'');
+    const cur = (record.recs||[]).find(r=>r.id===recId)?.partName||'';
+    if (val === cur) return;
+    const rec = (record.recs||[]).find(r=>r.id===recId);
+    onUpdate(record.id, { recs:(record.recs||[]).map(r => r.id === recId ? { ...r, partName:val } : r), activityLog:[...(record.activityLog||[]), logEntry('Part name: '+val+' — '+(rec?.jobName||''))] });
+  }
+  function handleSaveRecPartEta(recId, eta) {
+    const rec = (record.recs||[]).find(r=>r.id===recId);
+    onUpdate(record.id, { recs:(record.recs||[]).map(r => r.id === recId ? { ...r, partEta:eta } : r), activityLog:[...(record.activityLog||[]), logEntry('Part ETA: '+eta+' — '+(rec?.jobName||''))] });
+  }
+  function handleMarkPartArrived(recId) {
+    const rec = (record.recs||[]).find(r=>r.id===recId);
+    onUpdate(record.id, { recs:(record.recs||[]).map(r => r.id === recId ? { ...r, partArrived:true } : r), activityLog:[...(record.activityLog||[]), logEntry('Part arrived: '+(rec?.jobName||''))] });
+  }
 
   function handleSaveNotes() {
     if (editNotes === record.notes) return;
@@ -4216,7 +4252,7 @@ function ReconDetailSheet({ record, onUpdate, onClose, currentUser, techs, onSen
   }
   function handleApproveRec(recId) {
     const rec = (record.recs||[]).find(r => r.id === recId);
-    onUpdate(record.id, { recs:(record.recs||[]).map(r => r.id === recId ? { ...r, status:'approved' } : r), activityLog:[...(record.activityLog||[]), logEntry('Rec approved: '+(rec?.jobName||''))] });
+    onUpdate(record.id, { recs:(record.recs||[]).map(r => r.id === recId ? { ...r, status:'approved', partStatus:'no-parts-needed' } : r), activityLog:[...(record.activityLog||[]), logEntry('Rec approved: '+(rec?.jobName||''))] });
   }
   function handleDeclineRec(recId) {
     const rec = (record.recs||[]).find(r => r.id === recId);
@@ -4336,24 +4372,71 @@ function ReconDetailSheet({ record, onUpdate, onClose, currentUser, techs, onSen
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {(record.recs||[]).map(rec => {
                 const approved = rec.status === 'approved';
+                const partSt = rec.partStatus || 'no-parts-needed';
                 return (
-                  <div key={rec.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:approved?'rgba(0,230,118,0.07)':'rgba(255,255,255,0.04)', border:'0.5px solid '+(approved?'rgba(0,230,118,0.2)':'rgba(255,255,255,0.08)'), borderRadius:12 }}>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:14, fontWeight:600, color:TEXT, marginBottom:2 }}>{rec.jobName}</div>
-                      <div style={{ display:'flex', gap:10, fontSize:10, color:TEXT3 }}>
-                        {rec.flatRateHours > 0 && <span>{rec.flatRateHours}h flat rate</span>}
-                        <span>by {rec.addedBy}</span>
+                  <div key={rec.id} style={{ background:approved?'rgba(0,230,118,0.07)':'rgba(255,255,255,0.04)', border:'0.5px solid '+(approved?'rgba(0,230,118,0.2)':'rgba(255,255,255,0.08)'), borderRadius:12, padding:'10px 14px' }}>
+                    {/* Job name row */}
+                    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:approved?8:0 }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:600, color:TEXT, marginBottom:2 }}>{rec.jobName}</div>
+                        <div style={{ display:'flex', gap:10, fontSize:10, color:TEXT3 }}>
+                          {rec.flatRateHours > 0 && <span>{rec.flatRateHours}h flat rate</span>}
+                          <span>by {rec.addedBy}</span>
+                        </div>
                       </div>
+                      {approved ? (
+                        <span style={{ fontSize:10, fontWeight:700, color:SUCCESS, background:'rgba(0,230,118,0.15)', padding:'3px 10px', borderRadius:20, whiteSpace:'nowrap', flexShrink:0 }}>✓ Approved</span>
+                      ) : canApprove ? (
+                        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                          <button onClick={() => handleApproveRec(rec.id)} style={{ padding:'6px 12px', background:'rgba(0,230,118,0.12)', color:SUCCESS, border:'1px solid rgba(0,230,118,0.3)', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>✓</button>
+                          <button onClick={() => handleDeclineRec(rec.id)} style={{ padding:'6px 12px', background:'rgba(255,61,78,0.12)', color:DANGER, border:'1px solid rgba(255,61,78,0.3)', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>✗</button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize:10, fontWeight:600, color:WARN, background:'rgba(255,159,46,0.12)', padding:'3px 10px', borderRadius:20, whiteSpace:'nowrap', flexShrink:0 }}>Pending</span>
+                      )}
                     </div>
-                    {approved ? (
-                      <span style={{ fontSize:10, fontWeight:700, color:SUCCESS, background:'rgba(0,230,118,0.15)', padding:'3px 10px', borderRadius:20, whiteSpace:'nowrap', flexShrink:0 }}>✓ Approved</span>
-                    ) : canApprove ? (
-                      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-                        <button onClick={() => handleApproveRec(rec.id)} style={{ padding:'6px 12px', background:'rgba(0,230,118,0.12)', color:SUCCESS, border:'1px solid rgba(0,230,118,0.3)', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>✓</button>
-                        <button onClick={() => handleDeclineRec(rec.id)} style={{ padding:'6px 12px', background:'rgba(255,61,78,0.12)', color:DANGER, border:'1px solid rgba(255,61,78,0.3)', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>✗</button>
+                    {/* Parts tracking — approved recs only */}
+                    {approved && (
+                      <div>
+                        <div style={{ display:'flex', gap:4, marginBottom:partSt==='needs-part'?6:0 }}>
+                          {[['no-parts-needed','No Parts','#6B7591'],['on-hand','On Hand',SUCCESS],['needs-part','Needs Part',WARN]].map(([val, lbl, col]) => {
+                            const sel = partSt === val;
+                            return (
+                              <button key={val} onClick={() => handleSetRecPartStatus(rec.id, val)}
+                                style={{ flex:1, padding:'6px 4px', borderRadius:8, border:'1px solid '+(sel?col:BORDER), background:sel?col+'22':'rgba(255,255,255,0.03)', color:sel?col:TEXT3, fontWeight:sel?700:500, fontSize:10, cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s', touchAction:'manipulation' }}>
+                                {lbl}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {partSt === 'needs-part' && (
+                          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                              <input
+                                value={recPartNames[rec.id] ?? rec.partName ?? ''}
+                                onChange={e => setRecPartNames(m => ({ ...m, [rec.id]:e.target.value }))}
+                                onBlur={() => handleSaveRecPartName(rec.id)}
+                                placeholder="Part name…"
+                                style={{ ...inputStyle, padding:'8px 10px', fontSize:12 }}
+                              />
+                              <input
+                                type="date"
+                                value={rec.partEta || ''}
+                                onChange={e => handleSaveRecPartEta(rec.id, e.target.value)}
+                                style={{ ...inputStyle, padding:'8px 10px', fontSize:12, colorScheme:'dark' }}
+                              />
+                            </div>
+                            {rec.partArrived ? (
+                              <div style={{ padding:'6px 10px', background:'rgba(0,230,118,0.1)', border:'1px solid rgba(0,230,118,0.25)', borderRadius:8, fontSize:11, fontWeight:700, color:SUCCESS }}>✓ Part Arrived</div>
+                            ) : (
+                              <button onClick={() => handleMarkPartArrived(rec.id)}
+                                style={{ width:'100%', padding:'8px', background:'rgba(0,230,118,0.08)', color:SUCCESS, border:'1px solid rgba(0,230,118,0.25)', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>
+                                Mark Part Arrived
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <span style={{ fontSize:10, fontWeight:600, color:WARN, background:'rgba(255,159,46,0.12)', padding:'3px 10px', borderRadius:20, whiteSpace:'nowrap', flexShrink:0 }}>Pending</span>
                     )}
                   </div>
                 );
@@ -4420,8 +4503,159 @@ function ReconDetailSheet({ record, onUpdate, onClose, currentUser, techs, onSen
   );
 }
 
+// ─── Used Car Recon — Active Board Overlay ────────────────────────────────────
+function ActiveBoardOverlay({ onClose, state, techs, movingRO, onCancelMove, renderCard, handleMove, techStats, isWide }) {
+  const [collapsed, setCollapsed] = useState({});
+  const useFluid = isWide;
+  const GAP = 6;
+  const TECH_W = isWide ? 150 : 100;
+  const CELL_W_MOBILE = 148;
+  const [rowHeight, setRowHeight] = useState(120);
+  useEffect(() => {
+    function calc() {
+      const n = techs.length || 4;
+      setRowHeight(Math.max(Math.floor((window.innerHeight - 60 - 36 - 60 - 6*(n-1)) / n), 100));
+    }
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, [techs.length]);
+
+  const getRO = id => (state.ros||[]).find(r => r.id === id);
+  const usedQueue = (state.queues||[]).find(q => q.id === 'q-used');
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:BG, zIndex:2000, display:'flex', flexDirection:'column', fontFamily:"'Geist',system-ui,sans-serif", WebkitFontSmoothing:'antialiased' }}>
+      {movingRO && (
+        <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:10, background:'linear-gradient(135deg,#1D3A6B,#0A2247)', padding:'8px 16px', display:'flex', alignItems:'center', gap:10, borderBottom:'1px solid rgba(77,125,255,0.3)' }}>
+          <span style={{ fontSize:13, fontWeight:700, color:'#60A5FA', flex:1 }}>Moving {movingRO.roNum} — tap a column to place</span>
+          <button onClick={onCancelMove} style={{ background:'rgba(255,255,255,0.2)', border:'none', color:'#fff', borderRadius:8, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer' }}>Cancel</button>
+        </div>
+      )}
+      <div style={{ background:'rgba(11,18,32,0.97)', backdropFilter:'blur(40px)', WebkitBackdropFilter:'blur(40px)', borderBottom:'1px solid #1B2440', padding:'12px 16px', display:'flex', alignItems:'center', gap:12, flexShrink:0, marginTop:movingRO?44:0, boxShadow:'0 4px 24px rgba(0,0,0,0.4)' }}>
+        <button onClick={onClose} style={{ background:'rgba(255,255,255,0.07)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, width:36, height:36, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:TEXT2, flexShrink:0, fontSize:18, fontWeight:300, touchAction:'manipulation' }}>←</button>
+        <div style={{ flex:1 }}>
+          <div style={{ fontWeight:800, fontSize:16, color:TEXT, letterSpacing:'-0.3px' }}>Active Board</div>
+          <div style={{ fontSize:11, color:TEXT3, marginTop:1 }}>Used Cars • drag-and-drop enabled</div>
+        </div>
+      </div>
+      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', paddingBottom:60 }}>
+        <div style={{ overflowX:useFluid?"hidden":"auto", WebkitOverflowScrolling:"touch", paddingBottom:4, paddingLeft:14, paddingRight:14, paddingTop:10 }}>
+          <div style={{ display:"inline-flex", flexDirection:"column", width:useFluid?"100%":"auto" }}>
+            <div style={{ display:"flex", gap:GAP, marginBottom:6 }}>
+              <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0 }} />
+              {COLS.map(col => {
+                const colCount = techs.reduce((sum, t) => sum + ((state.grid[t.id]?.[col.id]||[]).length), 0);
+                return (
+                  <div key={col.id} style={{ flex:useFluid?1:"none", width:useFluid?"auto":CELL_W_MOBILE, minWidth:useFluid?0:CELL_W_MOBILE, display:"flex", justifyContent:"center" }}>
+                    <div style={{ background:"#141C33", color:col.color, padding:"5px 12px", fontSize:isWide?11:10, fontWeight:700, letterSpacing:"0.5px", whiteSpace:"nowrap", textTransform:"uppercase", borderRadius:"8px 8px 0 0", border:"1px solid #1B2440", borderBottom:"2px solid "+col.color, boxShadow:"0 -2px 12px rgba(0,0,0,0.3)", display:"flex", alignItems:"center", gap:6 }}>
+                      <span>{col.label}</span>
+                      {colCount > 0 && <span style={{ background:col.color+"22", color:col.color, fontSize:9, fontWeight:700, padding:"1px 6px", borderRadius:20 }}>{colCount}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {techs.map(tech => {
+              const { hrs, cumulative } = techStats(tech.id);
+              return (
+                <div key={tech.id} style={{ display:"flex", gap:GAP, marginBottom:GAP, alignItems:"stretch", width:"100%", height:rowHeight, minHeight:rowHeight, maxHeight:rowHeight, flexShrink:0, overflow:"hidden" }}>
+                  <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0, background:"linear-gradient(180deg,#1A233D 0%,#141C33 100%)", borderRadius:12, padding:"10px 10px", boxShadow:"0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 16px rgba(0,0,0,0.4)", border:"1px solid #28324D", display:"flex", flexDirection:"column", justifyContent:"center", gap:6 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <div style={{ width:30, height:30, borderRadius:"50%", background:"linear-gradient(135deg,#4D7DFF,#1D6BF3)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:11, flexShrink:0 }}>{initials(tech.name)}</div>
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:11, color:TEXT, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{tech.name}</div>
+                        <div style={{ fontSize:10, color:TEXT3, marginTop:2, display:"flex", gap:5 }}>
+                          <span style={{ color:SUCCESS, fontWeight:600 }}>{hrs.toFixed(1)}h</span>
+                          <span>{cumulative}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {COLS.map(col => {
+                    const ids = state.grid[tech.id] ? (state.grid[tech.id][col.id]||[]) : [];
+                    const isTarget = movingRO && !ids.includes(movingRO.id);
+                    return (
+                      <div key={col.id}
+                        onClick={() => { if (isTarget) handleMove({ type:"grid", techId:tech.id, colId:col.id }); }}
+                        style={{ flex:useFluid?1:"none", width:useFluid?"auto":CELL_W_MOBILE, minWidth:useFluid?0:CELL_W_MOBILE, flexShrink:useFluid?1:0, background:isTarget?"rgba(77,125,255,0.10)":CELL_BG, border:"1px solid "+(isTarget?ACCENT:col.border), borderRadius:12, padding:ids.length?"6px 6px 4px":0, display:"flex", flexDirection:"column", gap:4, alignItems:ids.length?"stretch":"center", justifyContent:ids.length?"flex-start":"center", alignSelf:"stretch", height:"100%", maxHeight:"100%", minHeight:82, boxSizing:"border-box", overflow:"hidden", cursor:isTarget?"pointer":"default", boxShadow:isTarget?"0 0 0 1.5px "+ACCENT+", "+CELL_SHADOW:CELL_SHADOW, backdropFilter:"blur(4px)", WebkitBackdropFilter:"blur(4px)" }}>
+                        {ids.length === 0 ? (
+                          isTarget ? (
+                            <span style={{ color:ACCENT, fontSize:9, fontWeight:500, textAlign:"center", padding:"0 6px", animation:"pulse 1.5s ease-in-out infinite" }}>Tap to place here</span>
+                          ) : (
+                            <div style={{ padding:"6px 8px", width:"100%", boxSizing:"border-box", opacity:0.3 }}><SkeletonCard /></div>
+                          )
+                        ) : (
+                          ids.map(roId => {
+                            const ro = getRO(roId);
+                            if (!ro) return null;
+                            return (
+                              <div key={ro.id} style={{ flex:1, minHeight:0, overflow:"hidden" }}>
+                                {renderCard(ro, col.id, { compact: ids.length > 1 })}
+                              </div>
+                            );
+                          })
+                        )}
+                        {ids.length > 0 && isTarget && (
+                          <div style={{ margin:"4px 0 6px", padding:"7px", background:"rgba(10,132,255,0.1)", borderRadius:8, textAlign:"center", color:ACCENT, fontSize:10, fontWeight:500 }}>+ Place here</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {usedQueue && (() => {
+          const ids = state.qSlots[usedQueue.id] || [];
+          const isCollapsed = collapsed[usedQueue.id];
+          const isTarget = movingRO && !ids.includes(movingRO.id);
+          return (
+            <div style={{ padding:"10px 14px 0" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+                <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
+                <span style={{ fontSize:10, fontWeight:600, color:TEXT3, letterSpacing:"0.8px", textTransform:"uppercase" }}>Staging Queue</span>
+                <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
+              </div>
+              <div style={{ background:"rgba(14,18,30,0.97)", borderRadius:16, overflow:"hidden", boxShadow:"0 1px 0 rgba(255,255,255,0.09) inset, 0 8px 32px rgba(0,0,0,0.6)", border:"0.5px solid "+(isTarget?usedQueue.color:"rgba(255,255,255,0.07)"), backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)" }}>
+                <div style={{ background:"linear-gradient(135deg,"+usedQueue.color+","+usedQueue.color+"CC)", padding:"12px 14px", display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{ width:28, height:28, background:"rgba(255,255,255,0.2)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>{usedQueue.icon}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ color:"#fff", fontWeight:800, fontSize:14 }}>{usedQueue.name}</div>
+                    <div style={{ color:"rgba(255,255,255,0.7)", fontSize:10, marginTop:1 }}>{usedQueue.subtitle}</div>
+                  </div>
+                  <div style={{ background:"rgba(255,255,255,0.25)", color:"#fff", borderRadius:20, padding:"2px 10px", fontSize:12, fontWeight:800, flexShrink:0 }}>{ids.length}</div>
+                  <button onClick={() => setCollapsed(c => ({ ...c, [usedQueue.id]:!c[usedQueue.id] }))} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.8)", cursor:"pointer", display:"flex", alignItems:"center", flexShrink:0 }}>
+                    {isCollapsed ? <ChevDownIcon /> : <ChevUpIcon />}
+                  </button>
+                </div>
+                {!isCollapsed && (
+                  <div style={{ padding:"10px 10px 8px" }}>
+                    <div style={{ maxHeight:ids.length>3?270:"none", overflowY:ids.length>3?"auto":"visible", WebkitOverflowScrolling:"touch" }}>
+                      {ids.map(roId => { const ro = getRO(roId); if (!ro) return null; return renderCard(ro, "queue"); })}
+                    </div>
+                    {isTarget && (
+                      <button onClick={() => handleMove({ type:"queue", queueId:usedQueue.id })} style={{ width:"100%", padding:12, background:usedQueue.color+"14", color:usedQueue.color, border:"2px dashed "+usedQueue.color, borderRadius:12, fontWeight:800, fontSize:13, cursor:"pointer", fontFamily:"'Barlow',sans-serif", marginTop:6, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                        {usedQueue.icon} Move to {usedQueue.name}
+                      </button>
+                    )}
+                    {ids.length === 0 && !isTarget && (
+                      <div style={{ border:"2px dashed "+BORDER, borderRadius:12, padding:18, textAlign:"center", color:MUTED, fontSize:12 }}>No tickets here</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
 // ─── Used Car Recon — Main Screen ─────────────────────────────────────────────
-function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateRecord, onUpdateRecord, onSendToBoard, onClose, isAdmin, isUCManager, isUCTech, isTech }) {
+function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateRecord, onUpdateRecord, onSendToBoard, onClose, onShowActiveBoard, isAdmin, isUCManager, isUCTech, isTech }) {
   const [showNewCar, setShowNewCar] = useState(false);
   const [detailId, setDetailId] = useState(null);
   const [search, setSearch] = useState('');
@@ -4451,6 +4685,10 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
           <div style={{ fontWeight:800, fontSize:16, color:TEXT, letterSpacing:'-0.3px' }}>Used Car Recon</div>
           <div style={{ fontSize:11, color:TEXT3, marginTop:1 }}>{records.length} {records.length === 1 ? 'vehicle' : 'vehicles'}</div>
         </div>
+        <button onClick={onShowActiveBoard}
+          style={{ height:34, padding:'0 12px', borderRadius:20, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:TEXT2, cursor:'pointer', display:'flex', alignItems:'center', gap:5, fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:12, flexShrink:0, touchAction:'manipulation' }}>
+          Board
+        </button>
         {canCreate && (
           <button onClick={() => setShowNewCar(true)}
             style={{ height:34, padding:'0 16px', borderRadius:20, border:'none', background:'linear-gradient(135deg,#5A8AFF,#4D7DFF)', color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:13, letterSpacing:'-0.01em', boxShadow:'0 4px 16px rgba(77,125,255,0.45)', flexShrink:0, touchAction:'manipulation' }}>
@@ -4475,6 +4713,7 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           {filtered.map(record => {
             const green = computeReconIsGreen(record);
+            const yellow = !green && isReconYellow(record);
             const sc = reconStatusColor(record.status);
             const dsStock = daysSinceDate(record.stockOpenedDate);
             const dsKey = daysSinceDate(record.keyReceivedDate);
@@ -4483,14 +4722,17 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
             return (
               <div key={record.id} onClick={() => setDetailId(record.id)}
                 className="btn-press"
-                style={{ background:CARD_BG, borderRadius:14, border:'1px solid '+(green ? 'rgba(0,230,118,0.35)' : CARD_BORDER), boxShadow:green?'0 0 0 1px rgba(0,230,118,0.08) inset,'+CARD_SHADOW:CARD_SHADOW, padding:'13px 14px', cursor:'pointer', touchAction:'manipulation', animation:'card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)', position:'relative', overflow:'hidden' }}>
+                style={{ background:CARD_BG, borderRadius:14, border:'1px solid '+(green?'rgba(0,230,118,0.35)':yellow?'rgba(255,159,46,0.35)':CARD_BORDER), boxShadow:green?'0 0 0 1px rgba(0,230,118,0.08) inset,'+CARD_SHADOW:yellow?'0 0 0 1px rgba(255,159,46,0.08) inset,'+CARD_SHADOW:CARD_SHADOW, padding:'13px 14px', cursor:'pointer', touchAction:'manipulation', animation:'card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)', position:'relative', overflow:'hidden' }}>
                 {green && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:SUCCESS, boxShadow:'0 0 10px rgba(0,230,118,0.5)' }} />}
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, paddingLeft:green?8:0 }}>
+                {yellow && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:WARN, boxShadow:'0 0 10px rgba(255,159,46,0.5)' }} />}
+                {yellow && <div style={{ position:'absolute', right:8, top:8, width:8, height:8, borderRadius:'50%', background:WARN, boxShadow:'0 0 5px rgba(255,159,46,0.6)', zIndex:1 }} />}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, paddingLeft:(green||yellow)?8:0 }}>
                   <div style={{ minWidth:0, flex:1 }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap' }}>
                       <span style={{ fontFamily:"'Geist Mono',monospace", fontWeight:800, fontSize:14, color:TEXT, letterSpacing:'-0.03em' }}>{record.stockNumber}</span>
                       <span style={{ fontSize:10, fontWeight:600, color:TEXT3 }}>{record.roNumber}</span>
                       {green && <span style={{ width:7, height:7, borderRadius:'50%', background:SUCCESS, display:'inline-block', boxShadow:'0 0 5px '+SUCCESS, flexShrink:0 }} />}
+                      {yellow && <span style={{ fontSize:9, fontWeight:700, color:WARN, background:'rgba(255,159,46,0.15)', padding:'2px 7px', borderRadius:20, whiteSpace:'nowrap' }}>⏳ Part Due Today</span>}
                     </div>
                     <div style={{ fontSize:14, fontWeight:600, color:TEXT2, marginBottom:7, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                       {[record.year, record.make, record.model, record.color].filter(Boolean).join(' ') || 'No vehicle info'}
@@ -4568,6 +4810,7 @@ export default function ShopFlowTracker() {
   const [showChangePin, setShowChangePin]     = useState(false);
   const [showAnalytics, setShowAnalytics]     = useState(false);
   const [showRecon,     setShowRecon]         = useState(false);
+  const [showActiveBoardOverlay, setShowActiveBoardOverlay] = useState(false);
   const [reconRecords,  setReconRecords]      = useState([]);
   const [showActivity,  setShowActivity]      = useState(false);
   const [showActivityReport, setShowActivityReport] = useState(false);
@@ -5682,10 +5925,24 @@ export default function ShopFlowTracker() {
           onUpdateRecord={handleUpdateReconRecord}
           onSendToBoard={handleSendToBoard}
           onClose={() => setShowRecon(false)}
+          onShowActiveBoard={() => setShowActiveBoardOverlay(true)}
           isAdmin={isAdmin}
           isUCManager={isUCManager}
           isUCTech={isUCTech}
           isTech={isTech}
+        />
+      )}
+      {showActiveBoardOverlay && (
+        <ActiveBoardOverlay
+          onClose={() => setShowActiveBoardOverlay(false)}
+          state={state}
+          techs={state.techs}
+          movingRO={movingRO}
+          onCancelMove={() => setMovingRO(null)}
+          renderCard={renderCard}
+          handleMove={handleMove}
+          techStats={techStats}
+          isWide={isWide}
         />
       )}
       {showTimeClock && (
