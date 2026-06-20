@@ -4919,9 +4919,11 @@ export default function ShopFlowTracker() {
     const ref = doc(db, 'reconstate', 'main');
     const unsub = onSnapshot(ref, snap => {
       if (snap.exists()) {
+        const records = snap.data().records || [];
+        reconRef.current = records;          // update ref immediately — prevents stale-ref wipe race
         reconFirestoreReady.current = true;
         reconIsRemote.current = true;
-        setReconRecords(snap.data().records || []);
+        setReconRecords(records);
       } else {
         reconFirestoreReady.current = true;
       }
@@ -4960,7 +4962,9 @@ export default function ShopFlowTracker() {
     reconIsRemote.current = false;
     reconSaveTimer.current = setTimeout(async () => {
       if (!fromRemote && reconFirestoreReady.current) {
-        try { await setDoc(doc(db, 'reconstate', 'main'), { records: reconRef.current }); }
+        const records = reconRef.current;
+        console.log('[Recon] saving', records.length, 'record(s) to Firestore');
+        try { await setDoc(doc(db, 'reconstate', 'main'), { records }); }
         catch(e) { console.error('[Recon] save failed', e); }
       }
     }, 300);
