@@ -1804,8 +1804,9 @@ function RODetail({ ro, timer, onClose, onSave, onDelete, onArchive, onTimer, on
   );
 }
 // ─── Quick Add Modal ──────────────────────────────────────────────────────────
-function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
+function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets, onAddRecon, reconRecords, mainROs }) {
   const defaultRoNum = "RO-" + String(nextNum).padStart(4, "0");
+  const todayStr = new Date().toISOString().split('T')[0];
   const [f, setF] = useState({
     roNum: defaultRoNum,
     year: "", make: "", model: "",
@@ -1817,21 +1818,62 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
     hours: "",
     jobs: "",
   });
+  const [uc, setUc] = useState({
+    stockNumber: "", vin: "", mileage: "",
+    stockOpenedDate: "", keyReceivedDate: todayStr,
+    inspectionType: "general",
+  });
+  const [dupErr, setDupErr] = useState("");
   const [showJobPicker, setShowJobPicker] = useState(false);
   const roNumRef = useRef(null);
   useEffect(() => { setTimeout(() => roNumRef.current?.select(), 80); }, []);
 
+  const isUsedCars = f.serviceType === "st-used";
   const queueMap = { "st-main":"q-main", "st-pdi":"q-pdi", "st-used":"q-used" };
+
+  function setUcF(k, v) { setUc(p => ({ ...p, [k]: v })); setDupErr(""); }
 
   function handleAdd() {
     if (!f.roNum.trim()) return;
+
+    // Duplicate check — only when Used Cars is selected and stock number was entered
+    if (isUsedCars && uc.stockNumber.trim()) {
+      const sn = uc.stockNumber.trim();
+      const rn = f.roNum.trim();
+      const existsInRecon = (reconRecords || []).find(r => r.stockNumber === sn);
+      if (existsInRecon) { setDupErr("Stock #" + sn + " already exists in Used Car Recon."); return; }
+      const rnInRecon = (reconRecords || []).find(r => r.roNumber === rn);
+      if (rnInRecon) { setDupErr("RO # " + rn + " already exists in Used Car Recon."); return; }
+      const rnInBoard = (mainROs || []).find(r => r.roNum && r.roNum.trim() === rn);
+      if (rnInBoard) { setDupErr("RO # " + rn + " already exists on the Kanban Board."); return; }
+    }
+
+    // Generate a shared ID so the RO and recon record are linked by the same ID
+    const sharedId = "ro-" + Date.now();
+
     onAdd({
       ...f,
-      color:"", plate:"", mileageIn:"", vin:"", customer:"", phone:"", email:"",
-      parts:"", concern:"", cause:"", correction:"", notes:"", promiseTime:"",
+      presetId: sharedId,
+      color: "", plate: "", mileageIn: uc.mileage || "", vin: uc.vin || "",
+      customer: uc.stockNumber.trim() ? "Stock #" + uc.stockNumber.trim() : "",
+      phone: "", email: "",
+      parts: "", concern: "", cause: "", correction: "", notes: "", promiseTime: "",
       dest: "queue",
       assignQueue: queueMap[f.serviceType] || "q-main",
     });
+
+    // For Used Cars: also create the recon record, reusing the same shared ID
+    if (isUsedCars && onAddRecon) {
+      onAddRecon({
+        stockNumber: uc.stockNumber,
+        roNumber: f.roNum,
+        year: f.year, make: f.make, model: f.model,
+        vin: uc.vin, mileage: uc.mileage,
+        stockOpenedDate: uc.stockOpenedDate,
+        keyReceivedDate: uc.keyReceivedDate || todayStr,
+        inspectionType: uc.inspectionType,
+      }, { skipShadowRO: true, useRoId: sharedId });
+    }
   }
 
   const ready = f.roNum.trim().length > 0;
@@ -1880,7 +1922,7 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
           <label style={labelStyle}>Service Type</label>
           <div style={{ display:"flex", gap:8 }}>
             {(serviceTypes || DEFAULT_SERVICE_TYPES).map(st => (
-              <button key={st.id} onClick={() => setF(p => ({ ...p, serviceType: st.id }))}
+              <button key={st.id} onClick={() => { setF(p => ({ ...p, serviceType: st.id })); setDupErr(""); }}
                 style={{ flex:1, padding:"13px 6px", borderRadius:12, border:"2px solid "+(f.serviceType===st.id ? st.color : BORDER), background: f.serviceType===st.id ? st.color+"22" : "rgba(255,255,255,0.05)", color: f.serviceType===st.id ? st.color : SUB, fontWeight:700, fontSize:13, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:6, transition:"all 0.15s" }}>
                 <span style={{ width:8, height:8, borderRadius:"50%", background:st.color, display:"inline-block", flexShrink:0 }} />
                 {st.name}
@@ -1888,6 +1930,61 @@ function QuickAddModal({ onAdd, onClose, nextNum, serviceTypes, jobPresets }) {
             ))}
           </div>
         </div>
+
+        {/* ── Used Cars extra fields (shown only when st-used is selected) ── */}
+        {isUsedCars && (
+          <div style={{ display:"flex", flexDirection:"column", gap:14, padding:"14px 16px", background:"rgba(22,163,74,0.06)", border:"1px solid rgba(22,163,74,0.2)", borderRadius:14 }}>
+            <div style={{ fontSize:10, fontWeight:700, color:"#16A34A", textTransform:"uppercase", letterSpacing:"0.8px", marginBottom:-2 }}>Used Car Details</div>
+
+            {dupErr && (
+              <div style={{ background:"rgba(255,61,78,0.12)", border:"1px solid rgba(255,61,78,0.3)", borderRadius:10, padding:"9px 13px", fontSize:13, color:DANGER, fontWeight:500 }}>{dupErr}</div>
+            )}
+
+            {/* Stock Number + VIN */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+              <div>
+                <label style={labelStyle}>Stock Number</label>
+                <input value={uc.stockNumber} onChange={e => setUcF("stockNumber", e.target.value)} placeholder="e.g. UC-1234" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>VIN</label>
+                <input value={uc.vin} onChange={e => setUcF("vin", e.target.value)} placeholder="17-char VIN" style={inputStyle} />
+              </div>
+            </div>
+
+            {/* Mileage */}
+            <div>
+              <label style={labelStyle}>Mileage</label>
+              <input value={uc.mileage} onChange={e => setUcF("mileage", e.target.value)} placeholder="e.g. 45,000" inputMode="numeric" style={inputStyle} />
+            </div>
+
+            {/* Stock Opened + Key Received dates */}
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+              <div>
+                <label style={labelStyle}>Stock Opened Date</label>
+                <input type="date" value={uc.stockOpenedDate} onChange={e => setUcF("stockOpenedDate", e.target.value)} style={{ ...inputStyle, colorScheme:"dark" }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Key Received Date</label>
+                <input type="date" value={uc.keyReceivedDate} onChange={e => setUcF("keyReceivedDate", e.target.value)} style={{ ...inputStyle, colorScheme:"dark" }} />
+              </div>
+            </div>
+
+            {/* Inspection Type tiles */}
+            <div>
+              <label style={labelStyle}>Inspection Type</label>
+              <div style={{ display:"flex", gap:8 }}>
+                {[["general","General","0.5hr"],["full-toyota","Full — Toyota","0.9hr"],["full-other","Full — Other","1.5hr"]].map(([val, lbl, hrs]) => (
+                  <button key={val} onClick={() => setUcF("inspectionType", val)}
+                    style={{ flex:1, padding:"11px 4px", borderRadius:12, border:"2px solid "+(uc.inspectionType===val ? "#16A34A" : BORDER), background:uc.inspectionType===val ? "rgba(22,163,74,0.15)" : "rgba(255,255,255,0.05)", color:uc.inspectionType===val ? "#4ADE80" : SUB, fontWeight:700, fontSize:11, cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", gap:3, transition:"all 0.15s", lineHeight:1.3 }}>
+                    <span>{lbl}</span>
+                    <span style={{ fontSize:10, fontWeight:500, opacity:0.7 }}>{hrs}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Wait / Drop-off */}
         <div>
@@ -4802,7 +4899,7 @@ export default function ShopFlowTracker() {
     }));
   }
   function handleAddRO(f) {
-    const roId = "ro-" + Date.now();
+    const roId = f.presetId || ("ro-" + Date.now());
     const ro = { id:roId, roNum:f.roNum||"RO-"+String(state.nextNum).padStart(4,"0"), serviceType:f.serviceType||"st-main", promiseTime:f.promiseTime||"", roNotes:[], year:f.year, make:f.make, model:f.model, color:f.color||"", vin:f.vin||"", plate:f.plate||"", tag:f.tag||"", mileageIn:f.mileageIn||"", mileageOut:"", customer:f.customer, advisor:f.advisor||"", phone:f.phone||"", email:f.email||"", waitStatus:f.waitStatus||"dropoff", priority:f.priority, hours:f.hours, jobs:f.jobs, parts:f.parts||"", concern:f.concern||"", cause:f.cause||"", correction:f.correction||"", notes:f.notes };
     upd(s => {
       const ns = { ...s, ros:[...s.ros, ro], nextNum:s.nextNum+1, timers:{ ...s.timers, [roId]:{ running:false, elapsed:0, startedAt:null } } };
@@ -4885,15 +4982,18 @@ export default function ShopFlowTracker() {
     upd(s => ({ ...s, displayPin: pin }));
   }
   // ── Used Car Recon handlers ──
-  function handleCreateReconRecord(form) {
-    const id = "recon-" + Date.now();
+  function handleCreateReconRecord(form, opts) {
+    const { skipShadowRO = false, useRoId = null } = opts || {};
+    const id = useRoId || ("recon-" + Date.now());
     const today = new Date().toISOString().split('T')[0];
+    const stockNumber = (form.stockNumber || '').trim();
+    const roNumber    = (form.roNumber || form.roNum || '').trim();
     const record = {
-      id, stockNumber:form.stockNumber.trim(), roNumber:form.roNumber.trim(),
+      id, stockNumber, roNumber,
       year:form.year||'', make:form.make||'', model:form.model||'', color:form.color||'',
       vin:form.vin||'', mileage:form.mileage||'',
-      stockOpenedDate:form.stockOpenedDate, keyReceivedDate:form.keyReceivedDate||today,
-      inspectionType:form.inspectionType, canUpgradeToFull:form.inspectionType==='general',
+      stockOpenedDate:form.stockOpenedDate||'', keyReceivedDate:form.keyReceivedDate||today,
+      inspectionType:form.inspectionType||'general', canUpgradeToFull:(form.inspectionType||'general')==='general',
       recs:[], approvedToProceed:false, partsSummary:{ total:0, arrived:0 }, isGreen:false,
       parkingLocation:'', notes:'', status:'key-received', assignedTech:null,
       movedToActiveBoard:false,
@@ -4901,21 +5001,23 @@ export default function ShopFlowTracker() {
       createdBy:currentUser.name, createdAt:Date.now(),
     };
     setReconRecords(r => [...r, record]);
-    const shadowRO = {
-      id, roNum:form.roNumber.trim(), serviceType:'st-used', promiseTime:'', roNotes:[],
-      year:form.year||'', make:form.make||'', model:form.model||'',
-      color:form.color||'', vin:form.vin||'', plate:'', tag:'',
-      mileageIn:form.mileage||'', mileageOut:'',
-      customer:'Stock #'+form.stockNumber.trim(),
-      advisor:'', phone:'', email:'', waitStatus:'none', priority:'NORMAL', hours:'',
-      jobs:'Used Car Recon', parts:'', concern:'', cause:'', correction:'', notes:'',
-    };
-    upd(s => ({
-      ...s,
-      ros:[...s.ros, shadowRO],
-      qSlots:{ ...s.qSlots, 'q-used':[...(s.qSlots['q-used']||[]), id] },
-      timers:{ ...s.timers, [id]:{ running:false, elapsed:0, startedAt:null } },
-    }));
+    if (!skipShadowRO) {
+      const shadowRO = {
+        id, roNum:roNumber, serviceType:'st-used', promiseTime:'', roNotes:[],
+        year:form.year||'', make:form.make||'', model:form.model||'',
+        color:form.color||'', vin:form.vin||'', plate:'', tag:'',
+        mileageIn:form.mileage||'', mileageOut:'',
+        customer:stockNumber ? 'Stock #'+stockNumber : 'Used Car',
+        advisor:'', phone:'', email:'', waitStatus:'none', priority:'NORMAL', hours:'',
+        jobs:'Used Car Recon', parts:'', concern:'', cause:'', correction:'', notes:'',
+      };
+      upd(s => ({
+        ...s,
+        ros:[...s.ros, shadowRO],
+        qSlots:{ ...s.qSlots, 'q-used':[...(s.qSlots['q-used']||[]), id] },
+        timers:{ ...s.timers, [id]:{ running:false, elapsed:0, startedAt:null } },
+      }));
+    }
   }
   function handleUpdateReconRecord(reconId, updates) {
     setReconRecords(r => r.map(rec => {
@@ -5605,7 +5707,7 @@ export default function ShopFlowTracker() {
         <ChangePinModal user={currentUser} onClose={() => setShowChangePin(false)} onSave={handleSavePin} />
       )}
       {showAdd && (
-        <QuickAddModal onAdd={handleAddRO} onClose={() => setShowAdd(false)} nextNum={state.nextNum} serviceTypes={state.serviceTypes} jobPresets={state.jobPresets} />
+        <QuickAddModal onAdd={handleAddRO} onClose={() => setShowAdd(false)} nextNum={state.nextNum} serviceTypes={state.serviceTypes} jobPresets={state.jobPresets} onAddRecon={handleCreateReconRecord} reconRecords={reconRecords} mainROs={state.ros} />
       )}
       {showArchive && (
         <ArchiveModal archived={state.archived||[]} onClose={() => setShowArchive(false)} onRestore={handleRestore} wide={isWide} />
