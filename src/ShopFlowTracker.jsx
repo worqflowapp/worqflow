@@ -741,20 +741,11 @@ function abbrevJob(j) {
 // ─── Display Mode ────────────────────────────────────────────────────────────
 
 function DisplayCard({ ro, timer, serviceTypes, compact }) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!timer?.running) return;
-    const t = setInterval(() => setTick(n => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [timer?.running]);
   const svcType = serviceTypes?.find(s => s.id === ro.serviceType);
   const isUrgent = ro.priority === 'HIGH';
   const leftColor = isUrgent ? '#FF3D4E' : (svcType?.color || '#1D6BF3');
   const vehicle = [ro.year, ro.make, ro.model].filter(Boolean).join(' ');
   const jobs = ro.jobs ? ro.jobs.split(',').map(j => j.trim()).filter(Boolean) : [];
-  const elapsed = timer
-    ? timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000) : timer.elapsed
-    : 0;
 
   const base = {
     width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'hidden',
@@ -819,11 +810,7 @@ function DisplayCard({ ro, timer, serviceTypes, compact }) {
           })}
           {jobs.length > 3 && <span style={{ fontSize:7, color:'rgba(255,255,255,0.3)', flexShrink:0 }}>+{jobs.length-3}</span>}
         </div>
-        {timer?.running && (
-          <span style={{ fontSize:7, color:'#FF9F0A', background:'rgba(255,159,10,0.12)', padding:'1px 4px', borderRadius:3, whiteSpace:'nowrap', flexShrink:0, fontFamily:'monospace', lineHeight:1.4 }}>
-            {fmtTime(elapsed)}
-          </span>
-        )}
+        <ElapsedTimer timer={timer} compact />
         <span style={{ fontFamily:"'Geist Mono',monospace", fontSize:8, fontWeight:700, color:ro.hours?'#30D158':'rgba(255,255,255,0.15)', background:ro.hours?'rgba(48,209,88,0.12)':'transparent', padding:'1px 4px', borderRadius:3, whiteSpace:'nowrap', flexShrink:0, lineHeight:1.4 }}>
           {ro.hours ? String(ro.hours).replace(/h$/i,'')+'h' : '—'}
         </span>
@@ -1069,6 +1056,35 @@ function DisplayScreen({ state, onLogout }) {
   );
 }
 
+// ─── Elapsed Timer ───────────────────────────────────────────────────────────
+// Isolated component so only this tiny node ticks every second, not the whole ROCard/DisplayCard
+function ElapsedTimer({ timer, compact }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!timer?.running) return;
+    const t = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [timer?.running]);
+  const elapsed = timer
+    ? (timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000) : timer.elapsed)
+    : 0;
+  const running = !!timer?.running;
+  if (compact) {
+    if (!running) return null;
+    return (
+      <span style={{ fontSize:7, color:'#FF9F0A', background:'rgba(255,159,10,0.12)', padding:'1px 4px', borderRadius:3, whiteSpace:'nowrap', flexShrink:0, fontFamily:'monospace', lineHeight:1.4 }}>
+        {fmtTime(elapsed)}
+      </span>
+    );
+  }
+  return (
+    <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontSize:10, letterSpacing:"-0.01em", color:running?WARN:TEXT3, display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap", fontWeight:running?600:400 }}>
+      <span style={{ width:5, height:5, borderRadius:"50%", background:running?WARN:TEXT3, display:"inline-block", flexShrink:0, animation:running?"pulse 1.8s ease-in-out infinite":"none" }}/>
+      {fmtTime(elapsed)}
+    </span>
+  );
+}
+
 // ─── VISUAL: ROCard ── glass card with year/make plate on left ───────────────
 // Column accent colors for left stripe + plate
 const COL_ACCENT = {
@@ -1084,12 +1100,6 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
   const pressing = useRef(false);
   const startX   = useRef(0);
   const startY   = useRef(0);
-  const [, setROTick] = useState(0);
-  useEffect(() => {
-    if (!timer?.running) return;
-    const t = setInterval(() => setROTick(n => n + 1), 1000);
-    return () => clearInterval(t);
-  }, [timer?.running]);
   const vehicle     = [ro.year, ro.make, ro.model].filter(Boolean).join(" ") || "No vehicle";
   const svcType     = serviceTypes && ro.serviceType ? serviceTypes.find(s => s.id === ro.serviceType) : null;
   const accentKey   = isMoving ? "ondeck" : (colId || "ondeck");
@@ -1097,10 +1107,6 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
   const leftColor   = accent.color;
   const leftGlow    = accent.glow;
   const isWaiting   = ro.waitStatus === "waiting";
-  const timerRunning = timer && timer.running;
-  const elapsed     = timer
-    ? (timer.running ? timer.elapsed + Math.floor((Date.now() - timer.startedAt) / 1000) : timer.elapsed)
-    : 0;
   const allJobs     = ro.jobs ? ro.jobs.split(",").map(j => j.trim()).filter(Boolean) : [];
   const visibleJobs = allJobs.slice(0, 3);
   const extraJobs   = allJobs.length - visibleJobs.length;
@@ -1181,7 +1187,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
               {String(ro.hours).replace(/h$/i,"")}h
             </span>
           )}
-          {timerRunning && (
+          {timer?.running && (
             <span style={{ width:4, height:4, borderRadius:"50%", background:WARN, flexShrink:0, animation:"pulse 1.8s ease-in-out infinite" }}/>
           )}
         </div>
@@ -1238,10 +1244,7 @@ const ROCard = memo(function ROCard({ ro, timer, onTap, onMove, isMoving, servic
 
           {/* ROW 4 — timer + status */}
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0, gap:4, marginTop:4 }}>
-            <span style={{ fontFamily:"'Geist Mono','Courier New',monospace", fontSize:10, letterSpacing:"-0.01em", color:timerRunning?WARN:TEXT3, display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap", fontWeight:timerRunning?600:400 }}>
-              <span style={{ width:5, height:5, borderRadius:"50%", background:timerRunning?WARN:TEXT3, display:"inline-block", flexShrink:0, animation:timerRunning?"pulse 1.8s ease-in-out infinite":"none" }}/>
-              {fmtTime(elapsed)}
-            </span>
+            <ElapsedTimer timer={timer} />
             <div style={{ display:"flex", gap:3, alignItems:"center", flexShrink:0 }}>
               {ro.waitStatus === "waiting" && (
                 <span style={{ fontSize:13, lineHeight:1 }} title="Waiting on Parts">⏳</span>
@@ -1360,8 +1363,7 @@ function LiveClock() {
 // ─── Skeleton Card ────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:14, padding:"12px 13px", marginBottom:7, height:140, boxSizing:"border-box", overflow:"hidden", position:"relative", border:"0.5px solid rgba(255,255,255,0.06)" }}>
-      <div style={{ background:"linear-gradient(90deg,rgba(255,255,255,0.03) 0%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.03) 100%)", backgroundSize:"400px 100%", animation:"shimmer 1.4s ease-in-out infinite", position:"absolute", inset:0, borderRadius:14 }}/>
+    <div style={{ background:"rgba(255,255,255,0.04)", borderRadius:14, padding:"12px 13px", marginBottom:7, height:140, boxSizing:"border-box", overflow:"hidden", position:"relative", border:"0.5px solid rgba(255,255,255,0.06)", animation:"pulse 2.4s ease-in-out infinite" }}>
       <div style={{ height:12, background:"rgba(255,255,255,0.07)", borderRadius:6, width:"50%", marginBottom:10 }}/>
       <div style={{ height:10, background:"rgba(255,255,255,0.05)", borderRadius:6, width:"80%", marginBottom:8 }}/>      <div style={{ height:10, background:"rgba(255,255,255,0.04)", borderRadius:6, width:"60%", marginBottom:16 }}/>
       <div style={{ display:"flex", gap:6 }}>
