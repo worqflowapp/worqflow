@@ -211,6 +211,8 @@ const USERS = [
   { id:"t2",      name:"LA",        role:"tech",    pin:"2222"   },
   { id:"t3",      name:"Darcheezy", role:"tech",    pin:"3333"   },
   { id:"t4",      name:"Jason",     role:"tech",    pin:"4444"   },
+  { id:"ucm1",    name:"UC Manager", role:"ucm",   pin:"5000"   },
+  { id:"uct1",    name:"UC Tech",    role:"uct",   pin:"6000"   },
 ];
 const SAMPLE_ROS = [
   { id:"ro-1001", roNum:"RO-1001", promiseTime:"", roNotes:[], serviceType:"st-main", year:"2021", make:"Toyota",    model:"Camry",    color:"White",  vin:"", plate:"ABC1234", mileageIn:"42100", mileageOut:"", customer:"Sarah Mitchell", phone:"555-0101", email:"sarah@email.com", waitStatus:"waiting", priority:"NORMAL", hours:"",    jobs:"Oil Change",  concern:"Oil change due", cause:"", correction:"", parts:"", notes:"" },
@@ -497,6 +499,15 @@ function ReportIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+    </svg>
+  );
+}
+function CarIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1l3-4h8l3 4h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/>
+      <circle cx="7.5" cy="17.5" r="2.5"/>
+      <circle cx="16.5" cy="17.5" r="2.5"/>
     </svg>
   );
 }
@@ -3962,6 +3973,478 @@ function RequestAccessScreen({ deviceId, onRequested, onAdminOverride, onDisplay
   );
 }
 
+// ─── Used Car Recon — helpers ─────────────────────────────────────────────────
+function reconStatusLabel(s) {
+  const M = { 'key-received':'Key Received', 'awaiting-inspection':'Awaiting Inspection', 'inspection-in-progress':'Inspection In Progress', 'recs-pending':'Recs Pending', 'approved-waiting-parts':'Waiting on Parts', 'in-shop':'In Shop', 'wholesale':'Wholesale' };
+  return M[s] || s;
+}
+function reconStatusColor(s) {
+  const M = { 'key-received':'#6B7591', 'awaiting-inspection':'#4D7DFF', 'inspection-in-progress':'#FF9F2E', 'recs-pending':'#BF5AF2', 'approved-waiting-parts':'#FFD60A', 'in-shop':'#00E676', 'wholesale':'#FF3D4E' };
+  return M[s] || '#6B7591';
+}
+function reconInspHours(t) { return t === 'full-toyota' ? 0.9 : t === 'full-other' ? 1.5 : 0.5; }
+function reconInspLabel(t) { return t === 'full-toyota' ? 'Full Toyota (0.9h)' : t === 'full-other' ? 'Full Other (1.5h)' : 'General (0.5h)'; }
+function daysSinceDate(ds) {
+  if (!ds) return null;
+  const d = new Date(ds);
+  if (isNaN(d)) return null;
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+function computeReconIsGreen(rec) {
+  if (!rec.approvedToProceed) return false;
+  const ps = rec.partsSummary || {};
+  if (!ps.total || ps.total === 0) return true;
+  return (ps.arrived || 0) >= ps.total;
+}
+
+// ─── Used Car Recon — NewReconModal ──────────────────────────────────────────
+function NewReconModal({ onAdd, onClose, records, mainROs, currentUser }) {
+  const today = new Date().toISOString().split('T')[0];
+  const [form, setForm] = useState({ stockNumber:'', roNumber:'', year:'', make:'', model:'', color:'', vin:'', mileage:'', stockOpenedDate:'', keyReceivedDate:today, inspectionType:'general' });
+  const [err, setErr] = useState('');
+  function setF(k, v) { setForm(f => ({ ...f, [k]:v })); setErr(''); }
+  function handleSubmit() {
+    if (!form.stockNumber.trim()) { setErr('Stock number is required'); return; }
+    if (!form.roNumber.trim()) { setErr('RO number is required'); return; }
+    if (!form.stockOpenedDate) { setErr('Stock opened date is required'); return; }
+    const sn = form.stockNumber.trim();
+    const rn = form.roNumber.trim();
+    if ((records||[]).find(r => r.stockNumber === sn)) { setErr('Stock #' + sn + ' already exists in Used Car Recon'); return; }
+    if ((records||[]).find(r => r.roNumber === rn)) { setErr('RO #' + rn + ' already exists in Used Car Recon'); return; }
+    if ((mainROs||[]).find(r => r.roNum && r.roNum.trim() === rn)) { setErr('RO #' + rn + ' already exists on the Kanban Board'); return; }
+    onAdd(form);
+    onClose();
+  }
+  const inputS = { ...inputStyle, marginBottom:0 };
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:5000, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+      <div style={{ background:SHEET_BG, borderRadius:'22px 22px 0 0', width:'100%', maxWidth:520, maxHeight:'92vh', display:'flex', flexDirection:'column', boxShadow:'0 -2px 0 rgba(255,255,255,0.06), 0 -20px 80px rgba(0,0,0,0.8)', animation:'slide-up 0.32s cubic-bezier(0.32,0.72,0,1)' }}>
+        <div style={{ width:36, height:4, background:'rgba(255,255,255,0.2)', borderRadius:2, margin:'12px auto 0', flexShrink:0 }} />
+        <div style={{ padding:'12px 20px 10px', borderBottom:'0.5px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+          <div style={{ fontWeight:700, fontSize:17, color:TEXT }}>New Used Car</div>
+          <button onClick={onClose} style={{ background:'rgba(255,255,255,0.08)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:10, width:32, height:32, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:TEXT2 }}><XIcon /></button>
+        </div>
+        <div style={{ overflowY:'auto', flex:1, padding:'16px 20px 36px', display:'flex', flexDirection:'column', gap:14, WebkitOverflowScrolling:'touch' }}>
+          {err && <div style={{ background:'rgba(255,61,78,0.12)', border:'1px solid rgba(255,61,78,0.3)', borderRadius:10, padding:'10px 14px', fontSize:13, color:DANGER, fontWeight:500 }}>{err}</div>}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div><label style={labelStyle}>Stock # *</label><input value={form.stockNumber} onChange={e => setF('stockNumber', e.target.value)} placeholder="e.g. UC-1234" style={inputS} /></div>
+            <div><label style={labelStyle}>RO # *</label><input value={form.roNumber} onChange={e => setF('roNumber', e.target.value)} placeholder="e.g. RO-5678" style={inputS} /></div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+            <div><label style={labelStyle}>Year</label><input value={form.year} onChange={e => setF('year', e.target.value)} placeholder="2021" style={inputS} /></div>
+            <div><label style={labelStyle}>Make</label><input value={form.make} onChange={e => setF('make', e.target.value)} placeholder="Toyota" style={inputS} /></div>
+            <div><label style={labelStyle}>Model</label><input value={form.model} onChange={e => setF('model', e.target.value)} placeholder="Camry" style={inputS} /></div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div><label style={labelStyle}>Color</label><input value={form.color} onChange={e => setF('color', e.target.value)} placeholder="Silver" style={inputS} /></div>
+            <div><label style={labelStyle}>Mileage</label><input value={form.mileage} onChange={e => setF('mileage', e.target.value)} placeholder="45,000" style={inputS} /></div>
+          </div>
+          <div><label style={labelStyle}>VIN</label><input value={form.vin} onChange={e => setF('vin', e.target.value)} placeholder="1HGBH41JXMN109186" style={inputS} /></div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div><label style={labelStyle}>Stock Opened Date *</label><input type="date" value={form.stockOpenedDate} onChange={e => setF('stockOpenedDate', e.target.value)} style={{ ...inputS, colorScheme:'dark' }} /></div>
+            <div><label style={labelStyle}>Key Received Date</label><input type="date" value={form.keyReceivedDate} onChange={e => setF('keyReceivedDate', e.target.value)} style={{ ...inputS, colorScheme:'dark' }} /></div>
+          </div>
+          <div>
+            <label style={labelStyle}>Inspection Type</label>
+            <div style={{ display:'flex', gap:8 }}>
+              {[['general','General (0.5h)'],['full-toyota','Full Toyota (0.9h)'],['full-other','Full Other (1.5h)']].map(([val, lbl]) => (
+                <button key={val} onClick={() => setF('inspectionType', val)}
+                  style={{ flex:1, padding:'10px 6px', borderRadius:12, border:'1.5px solid '+(form.inspectionType===val?ACCENT:'rgba(255,255,255,0.1)'), background:form.inspectionType===val?ACCENT+'22':'rgba(255,255,255,0.05)', color:form.inspectionType===val?ACCENT:TEXT3, fontWeight:600, fontSize:11, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>{lbl}</button>
+              ))}
+            </div>
+          </div>
+          <button onClick={handleSubmit} style={{ width:'100%', padding:15, background:'linear-gradient(135deg,#5A8AFF,#4D7DFF)', color:'#fff', border:'none', borderRadius:14, fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 4px 16px rgba(77,125,255,0.4)', touchAction:'manipulation' }}>
+            Add Car to Recon
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Used Car Recon — TechPickerModal ────────────────────────────────────────
+function ReconTechPickerModal({ techs, onPick, onClose }) {
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', zIndex:5500, display:'flex', alignItems:'center', justifyContent:'center', padding:24 }}>
+      <div style={{ background:SHEET_BG, borderRadius:20, width:'100%', maxWidth:360, padding:'20px 20px 24px', boxShadow:'0 20px 80px rgba(0,0,0,0.8)', animation:'fade-in 0.2s ease', border:'0.5px solid rgba(255,255,255,0.08)' }}>
+        <div style={{ fontWeight:700, fontSize:16, color:TEXT, marginBottom:4 }}>Assign Tech</div>
+        <div style={{ fontSize:12, color:TEXT3, marginBottom:18 }}>Select the tech to assign this car to on the board</div>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {(techs||[]).map(t => (
+            <button key={t.id} onClick={() => onPick(t.id)}
+              style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:14, cursor:'pointer', fontFamily:'inherit', color:TEXT, textAlign:'left', touchAction:'manipulation' }}>
+              <div style={{ width:34, height:34, borderRadius:'50%', background:'linear-gradient(135deg,#4D7DFF,#1D6BF3)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:800, fontSize:12, color:'#fff', flexShrink:0 }}>{initials(t.name)}</div>
+              <div>
+                <div style={{ fontWeight:600, fontSize:14 }}>{t.name}</div>
+                <div style={{ fontSize:11, color:TEXT3, marginTop:1 }}>Tech</div>
+              </div>
+            </button>
+          ))}
+        </div>
+        <button onClick={onClose} style={{ width:'100%', marginTop:14, padding:'11px', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:12, color:TEXT3, fontWeight:600, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Used Car Recon — DetailSheet ─────────────────────────────────────────────
+function ReconDetailSheet({ record, onUpdate, onClose, currentUser, techs, onSendToBoard, canApprove, canApproveToProceed, canSendToBoard }) {
+  const [editNotes,   setEditNotes]   = useState(record.notes || '');
+  const [editParking, setEditParking] = useState(record.parkingLocation || '');
+  const [showAddRec,  setShowAddRec]  = useState(false);
+  const [newRecJob,   setNewRecJob]   = useState('');
+  const [newRecHours, setNewRecHours] = useState('');
+  const [showTechPicker, setShowTechPicker] = useState(false);
+  const isGreen = computeReconIsGreen(record);
+
+  function logEntry(action) { return { action, performedBy: currentUser.name, timestamp: Date.now() }; }
+
+  function handleSaveNotes() {
+    if (editNotes === record.notes) return;
+    onUpdate(record.id, { notes: editNotes, activityLog: [...(record.activityLog||[]), logEntry('Notes updated')] });
+  }
+  function handleSaveParking() {
+    if (editParking === record.parkingLocation) return;
+    onUpdate(record.id, { parkingLocation: editParking, activityLog: [...(record.activityLog||[]), logEntry('Parking location updated: ' + editParking)] });
+  }
+  function handleAddRec() {
+    if (!newRecJob.trim()) return;
+    const rec = { id:'rec-'+Date.now(), jobName:newRecJob.trim(), flatRateHours:parseFloat(newRecHours)||0, addedBy:currentUser.name, addedAt:Date.now(), status:'pending' };
+    const newRecs = [...(record.recs||[]), rec];
+    const newStatus = (record.status === 'key-received' || record.status === 'awaiting-inspection') ? 'recs-pending' : record.status;
+    onUpdate(record.id, { recs:newRecs, status:newStatus, activityLog:[...(record.activityLog||[]), logEntry('Rec added: ' + rec.jobName + (rec.flatRateHours ? ' ('+rec.flatRateHours+'h)' : ''))] });
+    setNewRecJob(''); setNewRecHours(''); setShowAddRec(false);
+  }
+  function handleApproveRec(recId) {
+    const rec = (record.recs||[]).find(r => r.id === recId);
+    onUpdate(record.id, { recs:(record.recs||[]).map(r => r.id === recId ? { ...r, status:'approved' } : r), activityLog:[...(record.activityLog||[]), logEntry('Rec approved: '+(rec?.jobName||''))] });
+  }
+  function handleDeclineRec(recId) {
+    const rec = (record.recs||[]).find(r => r.id === recId);
+    onUpdate(record.id, { recs:(record.recs||[]).filter(r => r.id !== recId), activityLog:[...(record.activityLog||[]), logEntry('Rec declined & removed: '+(rec?.jobName||''))] });
+  }
+  function handleApproveToProceed() {
+    const hasParts = (record.partsSummary?.total || 0) > 0;
+    const newStatus = hasParts ? 'approved-waiting-parts' : record.status;
+    const updated = { ...record, approvedToProceed:true };
+    onUpdate(record.id, { approvedToProceed:true, status:newStatus, isGreen:computeReconIsGreen(updated), activityLog:[...(record.activityLog||[]), logEntry('Approved to Proceed')] });
+  }
+  function handleUpgradeInsp(type) {
+    onUpdate(record.id, { inspectionType:type, canUpgradeToFull:false, activityLog:[...(record.activityLog||[]), logEntry('Inspection upgraded to: '+reconInspLabel(type))] });
+  }
+
+  const hasApprovedRec = (record.recs||[]).some(r => r.status === 'approved');
+  const canProceed = hasApprovedRec || (record.recs||[]).length === 0;
+  const statusColor = reconStatusColor(record.status);
+
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:4500, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+      <div style={{ background:SHEET_BG, borderRadius:'22px 22px 0 0', width:'100%', maxWidth:600, maxHeight:'93vh', display:'flex', flexDirection:'column', boxShadow:'0 -2px 0 rgba(255,255,255,0.06), 0 -20px 80px rgba(0,0,0,0.8)', animation:'slide-up 0.32s cubic-bezier(0.32,0.72,0,1)' }}>
+        <div style={{ width:36, height:4, background:'rgba(255,255,255,0.2)', borderRadius:2, margin:'12px auto 0', flexShrink:0 }} />
+        {/* Header */}
+        <div style={{ padding:'12px 18px 12px', borderBottom:'0.5px solid rgba(255,255,255,0.08)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0, gap:10 }}>
+          <div style={{ minWidth:0, flex:1 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <span style={{ fontWeight:800, fontSize:16, color:TEXT, fontFamily:"'Geist Mono',monospace" }}>{record.stockNumber}</span>
+              <span style={{ fontWeight:600, fontSize:12, color:TEXT3 }}>{record.roNumber}</span>
+              {isGreen && <span style={{ fontSize:9, fontWeight:700, color:SUCCESS, background:'rgba(0,230,118,0.15)', padding:'2px 8px', borderRadius:20 }}>✓ GREEN</span>}
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+              <span style={{ fontSize:10, fontWeight:700, color:statusColor, background:statusColor+'22', padding:'2px 9px', borderRadius:20 }}>{reconStatusLabel(record.status)}</span>
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8, flexShrink:0, alignItems:'center' }}>
+            {canSendToBoard && isGreen && !record.movedToActiveBoard && (
+              <button onClick={() => setShowTechPicker(true)}
+                style={{ padding:'8px 14px', background:'linear-gradient(135deg,#2ED158,#00E676)', color:'#000', border:'none', borderRadius:10, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', boxShadow:'0 4px 16px rgba(0,230,118,0.35)', touchAction:'manipulation', whiteSpace:'nowrap' }}>
+                Send to Board →
+              </button>
+            )}
+            {record.movedToActiveBoard && (
+              <span style={{ fontSize:11, fontWeight:700, color:SUCCESS, padding:'6px 10px', background:'rgba(0,230,118,0.1)', borderRadius:10, whiteSpace:'nowrap' }}>✓ In Shop</span>
+            )}
+            <button onClick={onClose} style={{ background:'rgba(255,255,255,0.07)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, width:32, height:32, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:TEXT2, flexShrink:0 }}><XIcon /></button>
+          </div>
+        </div>
+        {/* Scrollable body */}
+        <div style={{ overflowY:'auto', flex:1, padding:'16px 18px 48px', WebkitOverflowScrolling:'touch', display:'flex', flexDirection:'column', gap:14 }}>
+          {/* Vehicle */}
+          <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:12, padding:'12px 14px', border:'0.5px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ fontSize:9, fontWeight:700, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:6 }}>Vehicle</div>
+            <div style={{ fontSize:17, fontWeight:700, color:TEXT, marginBottom:6 }}>{[record.year, record.make, record.model].filter(Boolean).join(' ') || '—'}</div>
+            <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
+              {record.color && <span><span style={{ fontSize:9, color:TEXT3 }}>Color </span><span style={{ fontSize:12, color:TEXT2, fontWeight:600 }}>{record.color}</span></span>}
+              {record.mileage && <span><span style={{ fontSize:9, color:TEXT3 }}>Miles </span><span style={{ fontSize:12, color:TEXT2, fontWeight:600 }}>{record.mileage}</span></span>}
+            </div>
+            {record.vin && <div style={{ marginTop:6 }}><span style={{ fontSize:9, color:TEXT3 }}>VIN </span><span style={{ fontSize:11, color:TEXT2, fontFamily:"'Geist Mono',monospace", letterSpacing:'0.05em' }}>{record.vin}</span></div>}
+          </div>
+          {/* Dates */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:12, padding:'12px 14px', border:'0.5px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:4 }}>Stock Opened</div>
+              <div style={{ fontSize:14, fontWeight:700, color:TEXT }}>{record.stockOpenedDate || '—'}</div>
+              {daysSinceDate(record.stockOpenedDate) !== null && <div style={{ fontSize:11, color:TEXT3, marginTop:2 }}>{daysSinceDate(record.stockOpenedDate)} days ago</div>}
+            </div>
+            <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:12, padding:'12px 14px', border:'0.5px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:4 }}>Key Received</div>
+              <div style={{ fontSize:14, fontWeight:700, color:TEXT }}>{record.keyReceivedDate || '—'}</div>
+              {daysSinceDate(record.keyReceivedDate) !== null && <div style={{ fontSize:11, color:TEXT3, marginTop:2 }}>{daysSinceDate(record.keyReceivedDate)} days ago</div>}
+            </div>
+          </div>
+          {/* Inspection */}
+          <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:12, padding:'12px 14px', border:'0.5px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}>
+              <div>
+                <div style={{ fontSize:9, fontWeight:700, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:3 }}>Inspection Type</div>
+                <div style={{ fontSize:14, fontWeight:700, color:TEXT }}>{reconInspLabel(record.inspectionType)}</div>
+                <div style={{ fontSize:11, color:TEXT3, marginTop:2 }}>{reconInspHours(record.inspectionType)}h flagged</div>
+              </div>
+              {record.inspectionType === 'general' && record.canUpgradeToFull && canApprove && (
+                <div style={{ display:'flex', gap:6 }}>
+                  <button onClick={() => handleUpgradeInsp('full-toyota')} style={{ padding:'6px 10px', background:'rgba(77,125,255,0.12)', color:ACCENT, border:'1px solid rgba(77,125,255,0.3)', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Toyota</button>
+                  <button onClick={() => handleUpgradeInsp('full-other')} style={{ padding:'6px 10px', background:'rgba(77,125,255,0.12)', color:ACCENT, border:'1px solid rgba(77,125,255,0.3)', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Other</button>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Recs */}
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:TEXT2, textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                Recommended Jobs <span style={{ color:TEXT3, fontWeight:500, textTransform:'none', letterSpacing:'normal' }}>({(record.recs||[]).length})</span>
+              </div>
+              <button onClick={() => setShowAddRec(v => !v)}
+                style={{ display:'flex', alignItems:'center', gap:5, padding:'6px 12px', background:ACCENT+'22', color:ACCENT, border:'1px solid '+ACCENT+'44', borderRadius:20, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>
+                <PlusIcon /> Add Rec
+              </button>
+            </div>
+            {showAddRec && (
+              <div style={{ background:'rgba(77,125,255,0.08)', border:'1px solid rgba(77,125,255,0.2)', borderRadius:12, padding:'12px 14px', marginBottom:10 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 80px', gap:8, marginBottom:8 }}>
+                  <input value={newRecJob} onChange={e => setNewRecJob(e.target.value)} placeholder="Job description…" style={{ ...inputStyle, padding:'10px 12px', fontSize:13 }} />
+                  <input value={newRecHours} onChange={e => setNewRecHours(e.target.value)} placeholder="Hrs" type="number" step="0.1" min="0" style={{ ...inputStyle, padding:'10px 12px', fontSize:13 }} />
+                </div>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={handleAddRec} style={{ flex:1, padding:'9px', background:'linear-gradient(135deg,#5A8AFF,#4D7DFF)', color:'#fff', border:'none', borderRadius:10, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Add</button>
+                  <button onClick={() => { setShowAddRec(false); setNewRecJob(''); setNewRecHours(''); }} style={{ padding:'9px 14px', background:'rgba(255,255,255,0.06)', color:TEXT3, border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, fontWeight:600, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Cancel</button>
+                </div>
+              </div>
+            )}
+            {(record.recs||[]).length === 0 && !showAddRec && (
+              <div style={{ textAlign:'center', padding:'20px', color:TEXT3, fontSize:12, background:'rgba(255,255,255,0.02)', borderRadius:12, border:'1px dashed rgba(255,255,255,0.1)' }}>No recs added yet</div>
+            )}
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {(record.recs||[]).map(rec => {
+                const approved = rec.status === 'approved';
+                return (
+                  <div key={rec.id} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:approved?'rgba(0,230,118,0.07)':'rgba(255,255,255,0.04)', border:'0.5px solid '+(approved?'rgba(0,230,118,0.2)':'rgba(255,255,255,0.08)'), borderRadius:12 }}>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:14, fontWeight:600, color:TEXT, marginBottom:2 }}>{rec.jobName}</div>
+                      <div style={{ display:'flex', gap:10, fontSize:10, color:TEXT3 }}>
+                        {rec.flatRateHours > 0 && <span>{rec.flatRateHours}h flat rate</span>}
+                        <span>by {rec.addedBy}</span>
+                      </div>
+                    </div>
+                    {approved ? (
+                      <span style={{ fontSize:10, fontWeight:700, color:SUCCESS, background:'rgba(0,230,118,0.15)', padding:'3px 10px', borderRadius:20, whiteSpace:'nowrap', flexShrink:0 }}>✓ Approved</span>
+                    ) : canApprove ? (
+                      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                        <button onClick={() => handleApproveRec(rec.id)} style={{ padding:'6px 12px', background:'rgba(0,230,118,0.12)', color:SUCCESS, border:'1px solid rgba(0,230,118,0.3)', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>✓</button>
+                        <button onClick={() => handleDeclineRec(rec.id)} style={{ padding:'6px 12px', background:'rgba(255,61,78,0.12)', color:DANGER, border:'1px solid rgba(255,61,78,0.3)', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>✗</button>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize:10, fontWeight:600, color:WARN, background:'rgba(255,159,46,0.12)', padding:'3px 10px', borderRadius:20, whiteSpace:'nowrap', flexShrink:0 }}>Pending</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {/* Approved to Proceed */}
+          {!record.approvedToProceed ? (
+            canApproveToProceed && (
+              <button onClick={handleApproveToProceed} disabled={!canProceed}
+                style={{ width:'100%', padding:'14px', background:canProceed?'linear-gradient(135deg,#1D6BF3,#0A84FF)':'rgba(255,255,255,0.06)', color:canProceed?'#fff':'rgba(255,255,255,0.2)', border:'none', borderRadius:14, fontWeight:700, fontSize:15, cursor:canProceed?'pointer':'default', fontFamily:'inherit', boxShadow:canProceed?'0 4px 16px rgba(10,132,255,0.4)':'none', touchAction:'manipulation' }}>
+                {canProceed ? '✓ Approved to Proceed' : 'Approve or remove all pending recs first'}
+              </button>
+            )
+          ) : (
+            <div style={{ padding:'12px 14px', background:'rgba(0,230,118,0.08)', border:'1px solid rgba(0,230,118,0.2)', borderRadius:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:18 }}>✓</span>
+              <span style={{ fontSize:14, fontWeight:700, color:SUCCESS }}>Approved to Proceed</span>
+            </div>
+          )}
+          {/* Parts summary */}
+          <div style={{ background:'rgba(255,255,255,0.03)', borderRadius:12, padding:'12px 14px', border:'0.5px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ fontSize:9, fontWeight:700, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:6 }}>Parts Summary</div>
+            <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+              <span style={{ fontSize:26, fontWeight:800, color:(record.partsSummary?.total||0)>0&&(record.partsSummary?.arrived||0)>=(record.partsSummary?.total||0)?SUCCESS:TEXT }}>{record.partsSummary?.arrived || 0}</span>
+              <span style={{ fontSize:14, color:TEXT3 }}>/ {record.partsSummary?.total || 0} arrived</span>
+            </div>
+            {!(record.partsSummary?.total > 0) && <div style={{ fontSize:11, color:TEXT3, marginTop:2 }}>No parts tracked yet — Parts tab coming soon</div>}
+          </div>
+          {/* Parking location */}
+          <div>
+            <label style={labelStyle}>Parking Location</label>
+            <input value={editParking} onChange={e => setEditParking(e.target.value)} onBlur={handleSaveParking} placeholder="e.g. Lot B, Row 3" style={{ ...inputStyle }} />
+          </div>
+          {/* Notes */}
+          <div>
+            <label style={labelStyle}>Notes</label>
+            <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} onBlur={handleSaveNotes} placeholder="Add notes about this vehicle…"
+              style={{ ...inputStyle, minHeight:80, resize:'vertical', display:'block', lineHeight:1.5 }} />
+          </div>
+          {/* Activity log */}
+          {(record.activityLog||[]).length > 0 && (
+            <div>
+              <div style={{ fontSize:10, fontWeight:700, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.7px', marginBottom:10 }}>Activity Log</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+                {[...(record.activityLog||[])].reverse().map((e, i) => (
+                  <div key={i} style={{ display:'flex', gap:10, padding:'8px 0', borderBottom:'0.5px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ width:6, height:6, borderRadius:'50%', background:ACCENT, marginTop:6, flexShrink:0 }} />
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, color:TEXT2 }}>{e.action}</div>
+                      <div style={{ fontSize:10, color:TEXT3, marginTop:2 }}>{e.performedBy} · {new Date(e.timestamp).toLocaleString()}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {showTechPicker && (
+        <ReconTechPickerModal techs={techs} onPick={techId => { setShowTechPicker(false); onSendToBoard(record.id, techId); }} onClose={() => setShowTechPicker(false)} />
+      )}
+    </div>
+  );
+}
+
+// ─── Used Car Recon — Main Screen ─────────────────────────────────────────────
+function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateRecord, onUpdateRecord, onSendToBoard, onClose, isAdmin, isUCManager, isUCTech, isTech }) {
+  const [showNewCar, setShowNewCar] = useState(false);
+  const [detailId, setDetailId] = useState(null);
+  const [search, setSearch] = useState('');
+
+  const canCreate    = isAdmin || isUCManager || isUCTech;
+  const canApprove   = isAdmin || isUCManager;
+  const canProceed   = isAdmin || isUCManager;
+  const canSendBoard = isAdmin || isUCManager;
+
+  const filtered = [...records].filter(r => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return r.stockNumber.toLowerCase().includes(q) ||
+           r.roNumber.toLowerCase().includes(q) ||
+           `${r.year||''} ${r.make||''} ${r.model||''}`.toLowerCase().includes(q) ||
+           (r.color||'').toLowerCase().includes(q);
+  }).sort((a, b) => (b.createdAt||0) - (a.createdAt||0));
+
+  const detailRecord = detailId ? records.find(r => r.id === detailId) : null;
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:BG, zIndex:1500, display:'flex', flexDirection:'column', fontFamily:"'Geist',system-ui,sans-serif", WebkitFontSmoothing:'antialiased' }}>
+      {/* Header */}
+      <div style={{ background:'rgba(11,18,32,0.97)', backdropFilter:'blur(40px)', WebkitBackdropFilter:'blur(40px)', borderBottom:'1px solid #1B2440', padding:'12px 16px', display:'flex', alignItems:'center', gap:12, flexShrink:0, boxShadow:'0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04) inset' }}>
+        <button onClick={onClose} style={{ background:'rgba(255,255,255,0.07)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, width:36, height:36, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:TEXT2, flexShrink:0, fontSize:18, fontWeight:300, touchAction:'manipulation' }}>←</button>
+        <div style={{ flex:1 }}>
+          <div style={{ fontWeight:800, fontSize:16, color:TEXT, letterSpacing:'-0.3px' }}>Used Car Recon</div>
+          <div style={{ fontSize:11, color:TEXT3, marginTop:1 }}>{records.length} {records.length === 1 ? 'vehicle' : 'vehicles'}</div>
+        </div>
+        {canCreate && (
+          <button onClick={() => setShowNewCar(true)}
+            style={{ height:34, padding:'0 16px', borderRadius:20, border:'none', background:'linear-gradient(135deg,#5A8AFF,#4D7DFF)', color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:13, letterSpacing:'-0.01em', boxShadow:'0 4px 16px rgba(77,125,255,0.45)', flexShrink:0, touchAction:'manipulation' }}>
+            <PlusIcon /> New Car
+          </button>
+        )}
+      </div>
+      {/* Search */}
+      <div style={{ padding:'10px 14px', background:'rgba(11,18,32,0.8)', borderBottom:'0.5px solid rgba(255,255,255,0.06)', flexShrink:0 }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by stock #, RO #, vehicle…"
+          style={{ ...inputStyle, padding:'10px 14px', fontSize:13 }} />
+      </div>
+      {/* List */}
+      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'10px 12px 48px' }}>
+        {filtered.length === 0 && (
+          <div style={{ textAlign:'center', padding:'60px 20px 40px', color:TEXT3 }}>
+            <div style={{ fontSize:40, marginBottom:12 }}>🚗</div>
+            <div style={{ fontSize:15, fontWeight:600, color:TEXT2, marginBottom:6 }}>{search ? 'No matches' : 'No vehicles yet'}</div>
+            <div style={{ fontSize:13 }}>{search ? 'Try a different search' : 'Tap "New Car" to add the first one'}</div>
+          </div>
+        )}
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {filtered.map(record => {
+            const green = computeReconIsGreen(record);
+            const sc = reconStatusColor(record.status);
+            const dsStock = daysSinceDate(record.stockOpenedDate);
+            const dsKey = daysSinceDate(record.keyReceivedDate);
+            const pendingRecs = (record.recs||[]).filter(r => r.status === 'pending').length;
+            const approvedRecs = (record.recs||[]).filter(r => r.status === 'approved').length;
+            return (
+              <div key={record.id} onClick={() => setDetailId(record.id)}
+                className="btn-press"
+                style={{ background:CARD_BG, borderRadius:14, border:'1px solid '+(green ? 'rgba(0,230,118,0.35)' : CARD_BORDER), boxShadow:green?'0 0 0 1px rgba(0,230,118,0.08) inset,'+CARD_SHADOW:CARD_SHADOW, padding:'13px 14px', cursor:'pointer', touchAction:'manipulation', animation:'card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)', position:'relative', overflow:'hidden' }}>
+                {green && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:SUCCESS, boxShadow:'0 0 10px rgba(0,230,118,0.5)' }} />}
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, paddingLeft:green?8:0 }}>
+                  <div style={{ minWidth:0, flex:1 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap' }}>
+                      <span style={{ fontFamily:"'Geist Mono',monospace", fontWeight:800, fontSize:14, color:TEXT, letterSpacing:'-0.03em' }}>{record.stockNumber}</span>
+                      <span style={{ fontSize:10, fontWeight:600, color:TEXT3 }}>{record.roNumber}</span>
+                      {green && <span style={{ width:7, height:7, borderRadius:'50%', background:SUCCESS, display:'inline-block', boxShadow:'0 0 5px '+SUCCESS, flexShrink:0 }} />}
+                    </div>
+                    <div style={{ fontSize:14, fontWeight:600, color:TEXT2, marginBottom:7, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                      {[record.year, record.make, record.model, record.color].filter(Boolean).join(' ') || 'No vehicle info'}
+                    </div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:sc, background:sc+'22', padding:'2px 9px', borderRadius:20 }}>{reconStatusLabel(record.status)}</span>
+                      {record.assignedTech && <span style={{ fontSize:10, fontWeight:600, color:ACCENT, background:ACCENT+'18', padding:'2px 9px', borderRadius:20 }}>{(techs||[]).find(t=>t.id===record.assignedTech)?.name || 'Tech'}</span>}
+                      {approvedRecs > 0 && <span style={{ fontSize:10, fontWeight:600, color:SUCCESS, background:'rgba(0,230,118,0.12)', padding:'2px 9px', borderRadius:20 }}>{approvedRecs} approved</span>}
+                      {pendingRecs > 0 && <span style={{ fontSize:10, fontWeight:600, color:WARN, background:'rgba(255,159,46,0.12)', padding:'2px 9px', borderRadius:20 }}>{pendingRecs} pending</span>}
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5, flexShrink:0 }}>
+                    {dsStock !== null && (
+                      <div style={{ textAlign:'right' }}>
+                        <div style={{ fontSize:8, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Stock</div>
+                        <div style={{ fontSize:14, fontWeight:800, color:dsStock>30?DANGER:dsStock>14?WARN:TEXT, lineHeight:1 }}>{dsStock}d</div>
+                      </div>
+                    )}
+                    {dsKey !== null && (
+                      <div style={{ textAlign:'right' }}>
+                        <div style={{ fontSize:8, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Key</div>
+                        <div style={{ fontSize:12, fontWeight:600, color:TEXT3, lineHeight:1 }}>{dsKey}d</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {showNewCar && (
+        <NewReconModal onAdd={f => { onCreateRecord(f); setShowNewCar(false); }} onClose={() => setShowNewCar(false)} records={records} mainROs={mainROs} currentUser={currentUser} />
+      )}
+      {detailRecord && (
+        <ReconDetailSheet
+          record={detailRecord}
+          onUpdate={(id, updates) => onUpdateRecord(id, updates)}
+          onClose={() => setDetailId(null)}
+          currentUser={currentUser}
+          techs={techs}
+          onSendToBoard={(reconId, techId) => { onSendToBoard(reconId, techId); setDetailId(null); }}
+          canApprove={canApprove}
+          canApproveToProceed={canProceed}
+          canSendToBoard={canSendBoard}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function ShopFlowTracker() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -3987,6 +4470,8 @@ export default function ShopFlowTracker() {
   const [partsCollapsed, setPartsCollapsed]   = useState(false);
   const [showChangePin, setShowChangePin]     = useState(false);
   const [showAnalytics, setShowAnalytics]     = useState(false);
+  const [showRecon,     setShowRecon]         = useState(false);
+  const [reconRecords,  setReconRecords]      = useState([]);
   const [showActivity,  setShowActivity]      = useState(false);
   const [showActivityReport, setShowActivityReport] = useState(false);
   const [showTimeClock, setShowTimeClock]     = useState(false);
@@ -3999,7 +4484,9 @@ export default function ShopFlowTracker() {
   const isAdmin   = currentUser && currentUser.role === "admin";
   const isManager = currentUser && currentUser.role === "manager";
   const isAdvisor = currentUser && currentUser.role === "advisor";
-  const isTech    = currentUser && currentUser.role === "tech";
+  const isTech      = currentUser && currentUser.role === "tech";
+  const isUCManager = currentUser && currentUser.role === "ucm";
+  const isUCTech    = currentUser && currentUser.role === "uct";
   function handleLogout() {
     try { localStorage.removeItem('sft-session'); } catch(e) {}
     setCurrentUser(null);
@@ -4013,6 +4500,10 @@ export default function ShopFlowTracker() {
   const saveTimer = useRef(null);
   const stateRef = useRef(state);
   const firestoreReady = useRef(false);
+  const reconRef            = useRef([]);
+  const reconIsRemote       = useRef(false);
+  const reconSaveTimer      = useRef(null);
+  const reconFirestoreReady = useRef(false);
 
   // ── Device approval check ──
   useEffect(() => {
@@ -4083,6 +4574,21 @@ export default function ShopFlowTracker() {
     return unsub;
   }, []);
 
+  // ── Recon Firebase listener ──
+  useEffect(() => {
+    const ref = doc(db, 'reconstate', 'main');
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        reconFirestoreReady.current = true;
+        reconIsRemote.current = true;
+        setReconRecords(snap.data().records || []);
+      } else {
+        reconFirestoreReady.current = true;
+      }
+    }, err => console.error('[Recon] snapshot error', err));
+    return unsub;
+  }, []);
+
   // ── Debounced save ──
   const scheduleSave = useCallback((s) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -4106,6 +4612,24 @@ export default function ShopFlowTracker() {
     stateRef.current = state;
     scheduleSave(state);
   }, [state, scheduleSave]);
+
+  // ── Recon debounced save ──
+  const scheduleReconSave = useCallback(() => {
+    if (reconSaveTimer.current) clearTimeout(reconSaveTimer.current);
+    const fromRemote = reconIsRemote.current;
+    reconIsRemote.current = false;
+    reconSaveTimer.current = setTimeout(async () => {
+      if (!fromRemote && reconFirestoreReady.current) {
+        try { await setDoc(doc(db, 'reconstate', 'main'), { records: reconRef.current }); }
+        catch(e) { console.error('[Recon] save failed', e); }
+      }
+    }, 300);
+  }, []);
+  useEffect(() => {
+    reconRef.current = reconRecords;
+    scheduleReconSave();
+  }, [reconRecords, scheduleReconSave]);
+
   useEffect(() => {
     tickRef.current = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(tickRef.current);
@@ -4359,6 +4883,66 @@ export default function ShopFlowTracker() {
   }
   function handleSaveDisplayPin(pin) {
     upd(s => ({ ...s, displayPin: pin }));
+  }
+  // ── Used Car Recon handlers ──
+  function handleCreateReconRecord(form) {
+    const id = "recon-" + Date.now();
+    const today = new Date().toISOString().split('T')[0];
+    const record = {
+      id, stockNumber:form.stockNumber.trim(), roNumber:form.roNumber.trim(),
+      year:form.year||'', make:form.make||'', model:form.model||'', color:form.color||'',
+      vin:form.vin||'', mileage:form.mileage||'',
+      stockOpenedDate:form.stockOpenedDate, keyReceivedDate:form.keyReceivedDate||today,
+      inspectionType:form.inspectionType, canUpgradeToFull:form.inspectionType==='general',
+      recs:[], approvedToProceed:false, partsSummary:{ total:0, arrived:0 }, isGreen:false,
+      parkingLocation:'', notes:'', status:'key-received', assignedTech:null,
+      movedToActiveBoard:false,
+      activityLog:[{ action:'Record created', performedBy:currentUser.name, timestamp:Date.now() }],
+      createdBy:currentUser.name, createdAt:Date.now(),
+    };
+    setReconRecords(r => [...r, record]);
+    const shadowRO = {
+      id, roNum:form.roNumber.trim(), serviceType:'st-used', promiseTime:'', roNotes:[],
+      year:form.year||'', make:form.make||'', model:form.model||'',
+      color:form.color||'', vin:form.vin||'', plate:'', tag:'',
+      mileageIn:form.mileage||'', mileageOut:'',
+      customer:'Stock #'+form.stockNumber.trim(),
+      advisor:'', phone:'', email:'', waitStatus:'none', priority:'NORMAL', hours:'',
+      jobs:'Used Car Recon', parts:'', concern:'', cause:'', correction:'', notes:'',
+    };
+    upd(s => ({
+      ...s,
+      ros:[...s.ros, shadowRO],
+      qSlots:{ ...s.qSlots, 'q-used':[...(s.qSlots['q-used']||[]), id] },
+      timers:{ ...s.timers, [id]:{ running:false, elapsed:0, startedAt:null } },
+    }));
+  }
+  function handleUpdateReconRecord(reconId, updates) {
+    setReconRecords(r => r.map(rec => {
+      if (rec.id !== reconId) return rec;
+      const merged = { ...rec, ...updates };
+      merged.isGreen = computeReconIsGreen(merged);
+      return merged;
+    }));
+  }
+  function handleSendToBoard(reconId, techId) {
+    const tech = (state.techs||[]).find(t => t.id === techId);
+    setReconRecords(r => r.map(rec => {
+      if (rec.id !== reconId) return rec;
+      return {
+        ...rec, movedToActiveBoard:true, assignedTech:techId, status:'in-shop',
+        isGreen:computeReconIsGreen(rec),
+        activityLog:[...(rec.activityLog||[]), {
+          action:'Sent to active board'+(tech?' — '+tech.name:''),
+          performedBy:currentUser.name, timestamp:Date.now(),
+        }],
+      };
+    }));
+    upd(s => {
+      const ns = removeFromAll(s, reconId);
+      const tg = ns.grid[techId] || { ondeck:[], inprogress:[], completed:[], delivered:[] };
+      return { ...ns, grid:{ ...ns.grid, [techId]:{ ...tg, ondeck:[...(tg.ondeck||[]), reconId] } } };
+    });
   }
   function handleSaveTechs(newTechs) {
     upd(s => {
@@ -4621,8 +5205,8 @@ export default function ShopFlowTracker() {
                 </div>
               </div>
             )}
-            {/* icons: admin on all screens, tech on desktop only; manager + advisor never */}
-            {(isAdmin || (isTech && isWide)) && <div style={{ display:"flex", gap:8, minWidth:"max-content", ...(!isWide && isAdmin ? { overflowX:"auto", flexShrink:0, maxWidth:"calc(100vw - 150px)", WebkitOverflowScrolling:"touch", scrollbarWidth:"none", msOverflowStyle:"none", paddingBottom:2 } : {}) }}>
+            {/* icons: admin on all screens, tech on desktop only, ucm/uct always; manager + advisor never */}
+            {(isAdmin || (isTech && isWide) || isUCManager || isUCTech) && <div style={{ display:"flex", gap:8, minWidth:"max-content", ...(!isWide && (isAdmin || isUCManager || isUCTech) ? { overflowX:"auto", flexShrink:0, maxWidth:"calc(100vw - 150px)", WebkitOverflowScrolling:"touch", scrollbarWidth:"none", msOverflowStyle:"none", paddingBottom:2 } : {}) }}>
               {canSeeAll && (
                 <button onClick={() => setShowAnalytics(true)} title="Analytics" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                   <AnalyticsIcon />
@@ -4671,8 +5255,13 @@ export default function ShopFlowTracker() {
               <button onClick={() => setShowChangePin(true)} title="Change PIN" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <KeyIcon />
               </button>
+              {(isAdmin || isManager || isUCManager || isUCTech || isTech) && (
+                <button onClick={() => setShowRecon(true)} title="Used Car Recon" style={{ width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                  <CarIcon />
+                </button>
+              )}
             </div>}
-            {(isAdmin || (isTech && isWide)) && (
+            {(isAdmin || (isTech && isWide) || isUCManager || isUCTech) && (
               <button onClick={() => handleLogout()} title="Switch Account" style={{ flexShrink:0, width:36, height:36, borderRadius:10, border:"1px solid rgba(255,255,255,0.12)", background:"rgba(255,255,255,0.07)", color:"#94A3B8", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
                 <LogoutIcon />
               </button>
@@ -4980,6 +5569,22 @@ export default function ShopFlowTracker() {
       {/* Modals */}
       {showAnalytics && (
         <AnalyticsScreen state={state} onClose={() => setShowAnalytics(false)} />
+      )}
+      {showRecon && (
+        <UsedCarReconScreen
+          records={reconRecords}
+          currentUser={currentUser}
+          techs={state.techs}
+          mainROs={state.ros}
+          onCreateRecord={handleCreateReconRecord}
+          onUpdateRecord={handleUpdateReconRecord}
+          onSendToBoard={handleSendToBoard}
+          onClose={() => setShowRecon(false)}
+          isAdmin={isAdmin}
+          isUCManager={isUCManager}
+          isUCTech={isUCTech}
+          isTech={isTech}
+        />
       )}
       {showTimeClock && (
         <TimeClockReport state={state} techs={state.techs} onClose={() => setShowTimeClock(false)} />
