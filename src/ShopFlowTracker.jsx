@@ -4668,16 +4668,69 @@ function ActiveBoardOverlay({ onClose, state, techs, movingRO, onCancelMove, ren
   );
 }
 
+// ─── Used Car Recon — Section Header Components ──────────────────────────────
+function ReconSectionHeader({ title, count, isCollapsed, onToggle, accent, icon }) {
+  return (
+    <button onClick={onToggle}
+      style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.07)', borderRadius:12, cursor:'pointer', fontFamily:"'Geist',system-ui,sans-serif", touchAction:'manipulation', marginBottom: isCollapsed ? 0 : 8 }}>
+      {icon && <span style={{ fontSize:14, flexShrink:0 }}>{icon}</span>}
+      <span style={{ fontWeight:700, fontSize:13, flex:1, textAlign:'left', color:accent||TEXT2 }}>{title}</span>
+      <span style={{ fontSize:11, fontWeight:700, color:accent||TEXT3, background:(accent||ACCENT)+'18', padding:'2px 8px', borderRadius:20, flexShrink:0 }}>{count}</span>
+      <span style={{ color:TEXT3, flexShrink:0, display:'flex', alignItems:'center', transition:'transform 0.2s', transform:isCollapsed?'rotate(-90deg)':'none' }}><ChevDownIcon /></span>
+    </button>
+  );
+}
+function ReconSubSectionHeader({ title, count, isCollapsed, onToggle, accent }) {
+  return (
+    <button onClick={onToggle}
+      style={{ width:'100%', display:'flex', alignItems:'center', gap:8, padding:'5px 10px 5px 12px', background:'transparent', border:'none', cursor:'pointer', fontFamily:"'Geist',system-ui,sans-serif", touchAction:'manipulation', marginBottom: isCollapsed ? 0 : 4 }}>
+      <span style={{ fontWeight:600, fontSize:10, flex:1, textAlign:'left', color:accent||TEXT3, textTransform:'uppercase', letterSpacing:'0.6px' }}>{title}</span>
+      <span style={{ fontSize:10, fontWeight:700, color:accent||TEXT3, background:'rgba(255,255,255,0.08)', padding:'1px 7px', borderRadius:20, flexShrink:0 }}>{count}</span>
+      <span style={{ color:TEXT3, flexShrink:0, display:'flex', alignItems:'center', transition:'transform 0.2s', transform:isCollapsed?'rotate(-90deg)':'none' }}><ChevDownIcon /></span>
+    </button>
+  );
+}
+
 // ─── Used Car Recon — Main Screen ─────────────────────────────────────────────
 function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateRecord, onUpdateRecord, onSendToBoard, onClose, onShowActiveBoard, isAdmin, isUCManager, isUCTech, isTech }) {
-  const [showNewCar, setShowNewCar] = useState(false);
-  const [detailId, setDetailId] = useState(null);
-  const [search, setSearch] = useState('');
+  const [showNewCar,     setShowNewCar]     = useState(false);
+  const [detailId,       setDetailId]       = useState(null);
+  const [search,         setSearch]         = useState('');
+  const [sec,            setSec]            = useState({
+    needsAttention:false, waitingOnParts:true, inShop:false, wholesale:true,
+    na_awaiting:false, na_decision:false, na_recsPending:false,
+    na_approvedReady:false, na_partsArrived:false, na_other:false,
+  });
+  const [archiveConfirm, setArchiveConfirm] = useState(false);
 
   const canCreate    = isAdmin || isUCManager || isUCTech;
   const canApprove   = isAdmin || isUCManager;
-  const canProceed   = isAdmin || isUCManager;
   const canSendBoard = isAdmin || isUCManager;
+
+  const today = new Date().toISOString().split('T')[0];
+  const hasSearch = search.trim().length > 0;
+  function toggle(key) { setSec(s => ({ ...s, [key]: !s[key] })); }
+  function isCol(key) { return !hasSearch && sec[key]; }
+
+  function bucket(rec) {
+    if (rec.archived) return null;
+    if (rec.isWholesale) return 'wholesale';
+    if (rec.movedToActiveBoard) return 'inShop';
+    const green = computeReconIsGreen(rec);
+    const bn = computeReconBottleneck(rec);
+    if (rec.approvedToProceed && !green && bn) return 'waitingOnParts';
+    const partArrivedToday = green && rec.approvedToProceed &&
+      (rec.recs||[]).some(r => r.status==='approved' && r.partArrived && r.partEta===today);
+    if (partArrivedToday) return 'na_partsArrived';
+    if (green && rec.approvedToProceed) return 'na_approvedReady';
+    const needsDecision = rec.inspectionType==='general' &&
+      (rec.generalInspectionDecision||'pending')==='pending' &&
+      (rec.recs||[]).length > 0;
+    if (needsDecision) return 'na_decision';
+    if ((rec.recs||[]).some(r => r.status==='pending')) return 'na_recsPending';
+    if (rec.status==='key-received' || rec.status==='awaiting-inspection') return 'na_awaiting';
+    return 'na_other';
+  }
 
   const filtered = [...records].filter(r => {
     if (!search.trim()) return true;
@@ -4688,7 +4741,102 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
            (r.color||'').toLowerCase().includes(q);
   }).sort((a, b) => (b.createdAt||0) - (a.createdAt||0));
 
+  const bkts = { na_awaiting:[], na_decision:[], na_recsPending:[], na_approvedReady:[], na_partsArrived:[], na_other:[], waitingOnParts:[], inShop:[], wholesale:[] };
+  for (const r of filtered) { const b = bucket(r); if (b) bkts[b].push(r); }
+  bkts.waitingOnParts.sort((a, b) => {
+    const aE = computeReconBottleneck(a)?.partEta || '9999';
+    const bE = computeReconBottleneck(b)?.partEta || '9999';
+    return aE < bE ? -1 : aE > bE ? 1 : 0;
+  });
+
+  const naCount = bkts.na_awaiting.length + bkts.na_decision.length + bkts.na_recsPending.length +
+    bkts.na_approvedReady.length + bkts.na_partsArrived.length + bkts.na_other.length;
+  const visibleCount = records.filter(r => !r.archived).length;
   const detailRecord = detailId ? records.find(r => r.id === detailId) : null;
+
+  function handleGenDecision(recordId, decision) {
+    const rec = records.find(r => r.id === recordId);
+    const log = [...(rec?.activityLog||[]), { action:decision==='wholesale'?'Sent to Wholesale':'Inspection upgraded to: '+reconInspLabel(decision), performedBy:currentUser.name, timestamp:Date.now() }];
+    if (decision === 'wholesale') {
+      onUpdateRecord(recordId, { isWholesale:true, generalInspectionDecision:'wholesale', status:'wholesale', activityLog:log });
+    } else {
+      onUpdateRecord(recordId, { generalInspectionDecision:'proceed-full', inspectionType:decision, canUpgradeToFull:false, activityLog:log });
+    }
+  }
+  function handleArchive(recordId) { onUpdateRecord(recordId, { archived:true, archivedAt:Date.now() }); }
+  function handleArchiveAll() {
+    bkts.wholesale.forEach(r => onUpdateRecord(r.id, { archived:true, archivedAt:Date.now() }));
+    setArchiveConfirm(false);
+  }
+
+  function reconCard(record, opts) {
+    const showDecision = opts?.showDecision || false;
+    const showArchive  = opts?.showArchive  || false;
+    const green = computeReconIsGreen(record);
+    const yellow = !green && isReconYellow(record);
+    const sc = reconStatusColor(record.status);
+    const dsStock = daysSinceDate(record.stockOpenedDate);
+    const dsKey = daysSinceDate(record.keyReceivedDate);
+    const pendingRecs  = (record.recs||[]).filter(r => r.status==='pending').length;
+    const approvedRecs = (record.recs||[]).filter(r => r.status==='approved').length;
+    const cardBorder = green?'rgba(0,230,118,0.35)':yellow?'rgba(255,159,46,0.35)':CARD_BORDER;
+    const cardShadow = green?'0 0 0 1px rgba(0,230,118,0.08) inset,'+CARD_SHADOW:yellow?'0 0 0 1px rgba(255,159,46,0.08) inset,'+CARD_SHADOW:CARD_SHADOW;
+    const bottomRadius = showDecision ? '0' : '14px';
+    return (
+      <div key={record.id}>
+        <div onClick={() => setDetailId(record.id)} className="btn-press"
+          style={{ background:CARD_BG, borderRadius:'14px 14px '+bottomRadius+' '+bottomRadius, border:'1px solid '+cardBorder, boxShadow:cardShadow, padding:'13px 14px', cursor:'pointer', touchAction:'manipulation', animation:'card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)', position:'relative', overflow:'hidden' }}>
+          {green  && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:SUCCESS, boxShadow:'0 0 10px rgba(0,230,118,0.5)' }} />}
+          {yellow && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:WARN, boxShadow:'0 0 10px rgba(255,159,46,0.5)' }} />}
+          {yellow && <div style={{ position:'absolute', right:8, top:8, width:8, height:8, borderRadius:'50%', background:WARN, boxShadow:'0 0 5px rgba(255,159,46,0.6)', zIndex:1 }} />}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, paddingLeft:(green||yellow)?8:0 }}>
+            <div style={{ minWidth:0, flex:1 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap' }}>
+                <span style={{ fontFamily:"'Geist Mono',monospace", fontWeight:800, fontSize:14, color:TEXT, letterSpacing:'-0.03em' }}>{record.stockNumber}</span>
+                <span style={{ fontSize:10, fontWeight:600, color:TEXT3 }}>{record.roNumber}</span>
+                {green  && <span style={{ width:7, height:7, borderRadius:'50%', background:SUCCESS, display:'inline-block', boxShadow:'0 0 5px '+SUCCESS, flexShrink:0 }} />}
+                {yellow && <span style={{ fontSize:9, fontWeight:700, color:WARN, background:'rgba(255,159,46,0.15)', padding:'2px 7px', borderRadius:20, whiteSpace:'nowrap' }}>⏳ Part Due Today</span>}
+              </div>
+              <div style={{ fontSize:14, fontWeight:600, color:TEXT2, marginBottom:7, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {[record.year, record.make, record.model, record.color].filter(Boolean).join(' ') || 'No vehicle info'}
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                <span style={{ fontSize:10, fontWeight:700, color:sc, background:sc+'22', padding:'2px 9px', borderRadius:20 }}>{reconStatusLabel(record.status)}</span>
+                {record.assignedTech && <span style={{ fontSize:10, fontWeight:600, color:ACCENT, background:ACCENT+'18', padding:'2px 9px', borderRadius:20 }}>{(techs||[]).find(t=>t.id===record.assignedTech)?.name||'Tech'}</span>}
+                {approvedRecs > 0 && <span style={{ fontSize:10, fontWeight:600, color:SUCCESS, background:'rgba(0,230,118,0.12)', padding:'2px 9px', borderRadius:20 }}>{approvedRecs} approved</span>}
+                {pendingRecs  > 0 && <span style={{ fontSize:10, fontWeight:600, color:WARN,    background:'rgba(255,159,46,0.12)', padding:'2px 9px', borderRadius:20 }}>{pendingRecs} pending</span>}
+              </div>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5, flexShrink:0 }}>
+              {dsStock !== null && <div style={{ textAlign:'right' }}><div style={{ fontSize:8, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Stock</div><div style={{ fontSize:14, fontWeight:800, color:dsStock>30?DANGER:dsStock>14?WARN:TEXT, lineHeight:1 }}>{dsStock}d</div></div>}
+              {dsKey   !== null && <div style={{ textAlign:'right' }}><div style={{ fontSize:8, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Key</div><div style={{ fontSize:12, fontWeight:600, color:TEXT3, lineHeight:1 }}>{dsKey}d</div></div>}
+            </div>
+          </div>
+        </div>
+        {showDecision && canApprove && (
+          <div style={{ padding:'10px 12px', background:'rgba(191,90,242,0.06)', border:'0.5px solid rgba(191,90,242,0.2)', borderTop:'none', borderRadius:'0 0 14px 14px' }}>
+            <div style={{ fontSize:10, fontWeight:600, color:'rgba(191,90,242,0.8)', marginBottom:8 }}>General inspection complete — choose next step:</div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={e => { e.stopPropagation(); handleGenDecision(record.id,'full-toyota'); }}
+                style={{ flex:1, padding:'9px 4px', background:'rgba(77,125,255,0.1)', color:ACCENT, border:'1px solid rgba(77,125,255,0.25)', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>Full Toyota</button>
+              <button onClick={e => { e.stopPropagation(); handleGenDecision(record.id,'full-other'); }}
+                style={{ flex:1, padding:'9px 4px', background:'rgba(77,125,255,0.1)', color:ACCENT, border:'1px solid rgba(77,125,255,0.25)', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>Full Other</button>
+              <button onClick={e => { e.stopPropagation(); handleGenDecision(record.id,'wholesale'); }}
+                style={{ flex:1, padding:'9px 4px', background:'rgba(255,61,78,0.08)', color:DANGER, border:'1px solid rgba(255,61,78,0.2)', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>→ Wholesale</button>
+            </div>
+          </div>
+        )}
+        {showArchive && (isAdmin || isUCManager) && (
+          <div style={{ marginTop:4, display:'flex', justifyContent:'flex-end', paddingRight:2 }}>
+            <button onClick={() => handleArchive(record.id)}
+              style={{ padding:'6px 16px', background:'rgba(255,61,78,0.06)', color:DANGER, border:'1px solid rgba(255,61,78,0.18)', borderRadius:10, fontWeight:600, fontSize:11, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>
+              Archive
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{ position:'fixed', inset:0, background:BG, zIndex:1500, display:'flex', flexDirection:'column', fontFamily:"'Geist',system-ui,sans-serif", WebkitFontSmoothing:'antialiased' }}>
@@ -4697,7 +4845,7 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
         <button onClick={onClose} style={{ background:'rgba(255,255,255,0.07)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, width:36, height:36, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:TEXT2, flexShrink:0, fontSize:18, fontWeight:300, touchAction:'manipulation' }}>←</button>
         <div style={{ flex:1 }}>
           <div style={{ fontWeight:800, fontSize:16, color:TEXT, letterSpacing:'-0.3px' }}>Used Car Recon</div>
-          <div style={{ fontSize:11, color:TEXT3, marginTop:1 }}>{records.length} {records.length === 1 ? 'vehicle' : 'vehicles'}</div>
+          <div style={{ fontSize:11, color:TEXT3, marginTop:1 }}>{visibleCount} {visibleCount===1?'vehicle':'vehicles'}</div>
         </div>
         <button onClick={onShowActiveBoard}
           style={{ height:34, padding:'0 12px', borderRadius:20, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:TEXT2, cursor:'pointer', display:'flex', alignItems:'center', gap:5, fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:12, flexShrink:0, touchAction:'manipulation' }}>
@@ -4715,69 +4863,143 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by stock #, RO #, vehicle…"
           style={{ ...inputStyle, padding:'10px 14px', fontSize:13 }} />
       </div>
-      {/* List */}
+      {/* Body */}
       <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'10px 12px 48px' }}>
-        {filtered.length === 0 && (
+        {visibleCount === 0 && !hasSearch && (
           <div style={{ textAlign:'center', padding:'60px 20px 40px', color:TEXT3 }}>
             <div style={{ fontSize:40, marginBottom:12 }}>🚗</div>
-            <div style={{ fontSize:15, fontWeight:600, color:TEXT2, marginBottom:6 }}>{search ? 'No matches' : 'No vehicles yet'}</div>
-            <div style={{ fontSize:13 }}>{search ? 'Try a different search' : 'Tap "New Car" to add the first one'}</div>
+            <div style={{ fontSize:15, fontWeight:600, color:TEXT2, marginBottom:6 }}>No vehicles yet</div>
+            <div style={{ fontSize:13 }}>Tap "New Car" to add the first one</div>
           </div>
         )}
-        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-          {filtered.map(record => {
-            const green = computeReconIsGreen(record);
-            const yellow = !green && isReconYellow(record);
-            const sc = reconStatusColor(record.status);
-            const dsStock = daysSinceDate(record.stockOpenedDate);
-            const dsKey = daysSinceDate(record.keyReceivedDate);
-            const pendingRecs = (record.recs||[]).filter(r => r.status === 'pending').length;
-            const approvedRecs = (record.recs||[]).filter(r => r.status === 'approved').length;
-            return (
-              <div key={record.id} onClick={() => setDetailId(record.id)}
-                className="btn-press"
-                style={{ background:CARD_BG, borderRadius:14, border:'1px solid '+(green?'rgba(0,230,118,0.35)':yellow?'rgba(255,159,46,0.35)':CARD_BORDER), boxShadow:green?'0 0 0 1px rgba(0,230,118,0.08) inset,'+CARD_SHADOW:yellow?'0 0 0 1px rgba(255,159,46,0.08) inset,'+CARD_SHADOW:CARD_SHADOW, padding:'13px 14px', cursor:'pointer', touchAction:'manipulation', animation:'card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)', position:'relative', overflow:'hidden' }}>
-                {green && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:SUCCESS, boxShadow:'0 0 10px rgba(0,230,118,0.5)' }} />}
-                {yellow && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:WARN, boxShadow:'0 0 10px rgba(255,159,46,0.5)' }} />}
-                {yellow && <div style={{ position:'absolute', right:8, top:8, width:8, height:8, borderRadius:'50%', background:WARN, boxShadow:'0 0 5px rgba(255,159,46,0.6)', zIndex:1 }} />}
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10, paddingLeft:(green||yellow)?8:0 }}>
-                  <div style={{ minWidth:0, flex:1 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap' }}>
-                      <span style={{ fontFamily:"'Geist Mono',monospace", fontWeight:800, fontSize:14, color:TEXT, letterSpacing:'-0.03em' }}>{record.stockNumber}</span>
-                      <span style={{ fontSize:10, fontWeight:600, color:TEXT3 }}>{record.roNumber}</span>
-                      {green && <span style={{ width:7, height:7, borderRadius:'50%', background:SUCCESS, display:'inline-block', boxShadow:'0 0 5px '+SUCCESS, flexShrink:0 }} />}
-                      {yellow && <span style={{ fontSize:9, fontWeight:700, color:WARN, background:'rgba(255,159,46,0.15)', padding:'2px 7px', borderRadius:20, whiteSpace:'nowrap' }}>⏳ Part Due Today</span>}
-                    </div>
-                    <div style={{ fontSize:14, fontWeight:600, color:TEXT2, marginBottom:7, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                      {[record.year, record.make, record.model, record.color].filter(Boolean).join(' ') || 'No vehicle info'}
-                    </div>
-                    <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                      <span style={{ fontSize:10, fontWeight:700, color:sc, background:sc+'22', padding:'2px 9px', borderRadius:20 }}>{reconStatusLabel(record.status)}</span>
-                      {record.assignedTech && <span style={{ fontSize:10, fontWeight:600, color:ACCENT, background:ACCENT+'18', padding:'2px 9px', borderRadius:20 }}>{(techs||[]).find(t=>t.id===record.assignedTech)?.name || 'Tech'}</span>}
-                      {approvedRecs > 0 && <span style={{ fontSize:10, fontWeight:600, color:SUCCESS, background:'rgba(0,230,118,0.12)', padding:'2px 9px', borderRadius:20 }}>{approvedRecs} approved</span>}
-                      {pendingRecs > 0 && <span style={{ fontSize:10, fontWeight:600, color:WARN, background:'rgba(255,159,46,0.12)', padding:'2px 9px', borderRadius:20 }}>{pendingRecs} pending</span>}
-                    </div>
+        {hasSearch && filtered.filter(r=>!r.archived).length === 0 && (
+          <div style={{ textAlign:'center', padding:'60px 20px 40px', color:TEXT3 }}>
+            <div style={{ fontSize:40, marginBottom:12 }}>🔍</div>
+            <div style={{ fontSize:15, fontWeight:600, color:TEXT2, marginBottom:6 }}>No matches</div>
+            <div style={{ fontSize:13 }}>Try a different search</div>
+          </div>
+        )}
+
+        {/* ── 1. Needs Attention ───────────────────────────── */}
+        {naCount > 0 && (
+          <div style={{ marginBottom:14 }}>
+            <ReconSectionHeader title="Needs Attention" count={naCount} isCollapsed={isCol('needsAttention')} onToggle={() => toggle('needsAttention')} accent={WARN} icon="⚠" />
+            {!isCol('needsAttention') && (
+              <div style={{ paddingLeft:8, display:'flex', flexDirection:'column', gap:2 }}>
+
+                {/* a. Awaiting Inspection */}
+                {bkts.na_awaiting.length > 0 && (
+                  <div style={{ marginBottom:6 }}>
+                    <ReconSubSectionHeader title="Awaiting Inspection" count={bkts.na_awaiting.length} isCollapsed={isCol('na_awaiting')} onToggle={() => toggle('na_awaiting')} accent={ACCENT} />
+                    {!isCol('na_awaiting') && <div style={{ display:'flex', flexDirection:'column', gap:8, paddingLeft:4 }}>{bkts.na_awaiting.map(r => reconCard(r))}</div>}
                   </div>
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:5, flexShrink:0 }}>
-                    {dsStock !== null && (
-                      <div style={{ textAlign:'right' }}>
-                        <div style={{ fontSize:8, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Stock</div>
-                        <div style={{ fontSize:14, fontWeight:800, color:dsStock>30?DANGER:dsStock>14?WARN:TEXT, lineHeight:1 }}>{dsStock}d</div>
-                      </div>
-                    )}
-                    {dsKey !== null && (
-                      <div style={{ textAlign:'right' }}>
-                        <div style={{ fontSize:8, color:TEXT3, textTransform:'uppercase', letterSpacing:'0.5px' }}>Key</div>
-                        <div style={{ fontSize:12, fontWeight:600, color:TEXT3, lineHeight:1 }}>{dsKey}d</div>
-                      </div>
-                    )}
+                )}
+
+                {/* b. General Inspection — Decision Needed */}
+                {bkts.na_decision.length > 0 && (
+                  <div style={{ marginBottom:6 }}>
+                    <ReconSubSectionHeader title="General Inspection — Decision Needed" count={bkts.na_decision.length} isCollapsed={isCol('na_decision')} onToggle={() => toggle('na_decision')} accent="#BF5AF2" />
+                    {!isCol('na_decision') && <div style={{ display:'flex', flexDirection:'column', gap:10, paddingLeft:4 }}>{bkts.na_decision.map(r => reconCard(r, { showDecision:true }))}</div>}
                   </div>
+                )}
+
+                {/* c. Recs Pending Approval */}
+                {bkts.na_recsPending.length > 0 && (
+                  <div style={{ marginBottom:6 }}>
+                    <ReconSubSectionHeader title="Recs Pending Approval" count={bkts.na_recsPending.length} isCollapsed={isCol('na_recsPending')} onToggle={() => toggle('na_recsPending')} accent={WARN} />
+                    {!isCol('na_recsPending') && <div style={{ display:'flex', flexDirection:'column', gap:8, paddingLeft:4 }}>{bkts.na_recsPending.map(r => reconCard(r))}</div>}
+                  </div>
+                )}
+
+                {/* d. Approved — Ready Now */}
+                {bkts.na_approvedReady.length > 0 && (
+                  <div style={{ marginBottom:6 }}>
+                    <ReconSubSectionHeader title="Approved — Ready Now" count={bkts.na_approvedReady.length} isCollapsed={isCol('na_approvedReady')} onToggle={() => toggle('na_approvedReady')} accent={SUCCESS} />
+                    {!isCol('na_approvedReady') && <div style={{ display:'flex', flexDirection:'column', gap:8, paddingLeft:4 }}>{bkts.na_approvedReady.map(r => reconCard(r))}</div>}
+                  </div>
+                )}
+
+                {/* e. Parts Arrived Today */}
+                {bkts.na_partsArrived.length > 0 && (
+                  <div style={{ marginBottom:6 }}>
+                    <ReconSubSectionHeader title="Parts Arrived Today" count={bkts.na_partsArrived.length} isCollapsed={isCol('na_partsArrived')} onToggle={() => toggle('na_partsArrived')} accent={SUCCESS} />
+                    {!isCol('na_partsArrived') && <div style={{ display:'flex', flexDirection:'column', gap:8, paddingLeft:4 }}>{bkts.na_partsArrived.map(r => reconCard(r))}</div>}
+                  </div>
+                )}
+
+                {/* Catch-all: Pending Review */}
+                {bkts.na_other.length > 0 && (
+                  <div style={{ marginBottom:6 }}>
+                    <ReconSubSectionHeader title="Pending Review" count={bkts.na_other.length} isCollapsed={isCol('na_other')} onToggle={() => toggle('na_other')} accent={TEXT3} />
+                    {!isCol('na_other') && <div style={{ display:'flex', flexDirection:'column', gap:8, paddingLeft:4 }}>{bkts.na_other.map(r => reconCard(r))}</div>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 2. Waiting on Parts ──────────────────────────── */}
+        {bkts.waitingOnParts.length > 0 && (
+          <div style={{ marginBottom:14 }}>
+            <ReconSectionHeader title="Waiting on Parts" count={bkts.waitingOnParts.length} isCollapsed={isCol('waitingOnParts')} onToggle={() => toggle('waitingOnParts')} accent="#FFD60A" icon="⏳" />
+            {!isCol('waitingOnParts') && (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {bkts.waitingOnParts.map(r => {
+                  const bn = computeReconBottleneck(r);
+                  return (
+                    <div key={r.id}>
+                      {bn && <div style={{ fontSize:10, fontWeight:700, color:bn.partEta===today?WARN:'#FFD60A', paddingLeft:4, marginBottom:3 }}>ETA: {bn.partEta}{bn.partEta===today?' — Today!':''}</div>}
+                      {reconCard(r)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 3. In Shop ───────────────────────────────────── */}
+        {bkts.inShop.length > 0 && (
+          <div style={{ marginBottom:14 }}>
+            <ReconSectionHeader title="In Shop" count={bkts.inShop.length} isCollapsed={isCol('inShop')} onToggle={() => toggle('inShop')} accent={SUCCESS} icon="🔧" />
+            {!isCol('inShop') && (
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {bkts.inShop.map(r => reconCard(r))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 4. Wholesale ─────────────────────────────────── */}
+        {bkts.wholesale.length > 0 && (
+          <div style={{ marginBottom:14 }}>
+            <ReconSectionHeader title="Wholesale" count={bkts.wholesale.length} isCollapsed={isCol('wholesale')} onToggle={() => toggle('wholesale')} accent={DANGER} icon="💲" />
+            {!isCol('wholesale') && (
+              <div>
+                {(isAdmin || isUCManager) && bkts.wholesale.length > 1 && (
+                  archiveConfirm ? (
+                    <div style={{ background:'rgba(255,61,78,0.08)', border:'1px solid rgba(255,61,78,0.2)', borderRadius:12, padding:'12px 14px', marginBottom:10, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+                      <span style={{ fontSize:13, color:TEXT2, flex:1 }}>Archive all {bkts.wholesale.length} wholesale cars?</span>
+                      <button onClick={handleArchiveAll} style={{ padding:'8px 16px', background:DANGER, color:'#fff', border:'none', borderRadius:10, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>Confirm</button>
+                      <button onClick={() => setArchiveConfirm(false)} style={{ padding:'8px 12px', background:'rgba(255,255,255,0.07)', color:TEXT3, border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, fontWeight:600, fontSize:12, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setArchiveConfirm(true)}
+                      style={{ width:'100%', marginBottom:10, padding:'9px 14px', background:'rgba(255,61,78,0.05)', color:DANGER, border:'1px solid rgba(255,61,78,0.18)', borderRadius:12, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:"'Geist',system-ui,sans-serif", touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                      Archive All ({bkts.wholesale.length})
+                    </button>
+                  )
+                )}
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {bkts.wholesale.map(r => reconCard(r, { showArchive:true }))}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            )}
+          </div>
+        )}
       </div>
+
       {showNewCar && (
         <NewReconModal onAdd={f => { onCreateRecord(f); setShowNewCar(false); }} onClose={() => setShowNewCar(false)} records={records} mainROs={mainROs} currentUser={currentUser} />
       )}
@@ -4790,7 +5012,7 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
           techs={techs}
           onSendToBoard={(reconId, techId) => { onSendToBoard(reconId, techId); setDetailId(null); }}
           canApprove={canApprove}
-          canApproveToProceed={canProceed}
+          canApproveToProceed={canApprove}
           canSendToBoard={canSendBoard}
         />
       )}
@@ -5255,6 +5477,7 @@ export default function ShopFlowTracker() {
       recs:[], approvedToProceed:false, partsSummary:{ total:0, arrived:0 }, isGreen:false,
       parkingLocation:'', notes:'', status:'key-received', assignedTech:null,
       movedToActiveBoard:false,
+      generalInspectionDecision:'pending', isWholesale:false, archived:false,
       activityLog:[{ action:'Record created', performedBy:currentUser.name, timestamp:Date.now() }],
       createdBy:currentUser.name, createdAt:Date.now(),
     };
