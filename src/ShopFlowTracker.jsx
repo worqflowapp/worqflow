@@ -4839,7 +4839,7 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
   }
 
   return (
-    <div style={{ position:'fixed', inset:0, background:BG, zIndex:1500, display:'flex', flexDirection:'column', fontFamily:"'Geist',system-ui,sans-serif", WebkitFontSmoothing:'antialiased' }}>
+    <div style={{ position:'fixed', inset:0, background:BG, zIndex:1500, display:'flex', flexDirection:'column', overflow:'hidden', fontFamily:"'Geist',system-ui,sans-serif", WebkitFontSmoothing:'antialiased' }}>
       {/* Header */}
       <div style={{ background:'rgba(11,18,32,0.97)', backdropFilter:'blur(40px)', WebkitBackdropFilter:'blur(40px)', borderBottom:'1px solid #1B2440', padding:'12px 16px', display:'flex', alignItems:'center', gap:12, flexShrink:0, boxShadow:'0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04) inset' }}>
         <button onClick={onClose} style={{ background:'rgba(255,255,255,0.07)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, width:36, height:36, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:TEXT2, flexShrink:0, fontSize:18, fontWeight:300, touchAction:'manipulation' }}>←</button>
