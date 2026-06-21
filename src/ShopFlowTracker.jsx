@@ -4864,7 +4864,7 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
           style={{ ...inputStyle, padding:'10px 14px', fontSize:13 }} />
       </div>
       {/* Body */}
-      <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'10px 12px 48px' }}>
+      <div style={{ flex:1, minHeight:0, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'10px 12px 48px' }}>
         {visibleCount === 0 && !hasSearch && (
           <div style={{ textAlign:'center', padding:'60px 20px 40px', color:TEXT3 }}>
             <div style={{ fontSize:40, marginBottom:12 }}>🚗</div>
