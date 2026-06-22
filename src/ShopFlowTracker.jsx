@@ -4703,6 +4703,19 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
   });
   const [archiveConfirm, setArchiveConfirm] = useState(false);
 
+  // Lock body scroll so iOS doesn't route swipe gestures to the background page.
+  // Without this, the kanban board's tall DOM (1500px+) creates a page-level scroll
+  // that iOS intercepts instead of letting the overlay's scroll container handle it.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+      document.documentElement.style.overflow = '';
+    };
+  }, []);
+
   const canCreate    = isAdmin || isUCManager || isUCTech;
   const canApprove   = isAdmin || isUCManager;
   const canSendBoard = isAdmin || isUCManager;
