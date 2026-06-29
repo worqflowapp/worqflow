@@ -5270,6 +5270,7 @@ export default function ShopFlowTracker() {
   const isTech      = currentUser && currentUser.role === "tech";
   const isUCManager = currentUser && currentUser.role === "ucm";
   const isUCTech    = currentUser && currentUser.role === "uct";
+  const isReconManager = isUCManager || (currentUser?.id === 't3');
   function handleLogout() {
     try { localStorage.removeItem('sft-session'); } catch(e) {}
     setCurrentUser(null);
@@ -6373,7 +6374,7 @@ export default function ShopFlowTracker() {
           onSendToBoard={handleSendToBoard}
           onClose={() => setShowRecon(false)}
           isAdmin={isAdmin}
-          isUCManager={isUCManager}
+          isUCManager={isReconManager}
           isUCTech={isUCTech}
           isTech={isTech}
           boardState={state}
