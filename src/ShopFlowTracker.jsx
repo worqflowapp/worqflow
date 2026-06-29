@@ -4838,8 +4838,13 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
   });
   const [archiveConfirm,   setArchiveConfirm]   = useState(false);
   const [movingReconCard,  setMovingReconCard]  = useState(null);
+  const [searchFocused,    setSearchFocused]    = useState(false);
+  const [highlightId,      setHighlightId]      = useState(null);
   const holdTimerRef = useRef(null);
   const heldRef      = useRef(false);
+  const prevSecRef   = useRef(null);
+  const cardRefs     = useRef({});
+  const filteredRef  = useRef([]);
 
   // Lock body scroll so iOS doesn't route swipe gestures to the background page.
   // Without this, the kanban board's tall DOM (1500px+) creates a page-level scroll
@@ -4891,6 +4896,8 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
            `${r.year||''} ${r.make||''} ${r.model||''}`.toLowerCase().includes(q) ||
            (r.color||'').toLowerCase().includes(q);
   }).sort((a, b) => (b.createdAt||0) - (a.createdAt||0));
+  filteredRef.current = filtered;
+  const searchResults = hasSearch ? filtered.filter(r => !r.archived) : [];
 
   const bkts = { na_awaiting:[], na_decision:[], na_recsPending:[], na_approvedReady:[], na_partsArrived:[], na_other:[], waitingOnParts:[], inShop:[], wholesale:[] };
   for (const r of filtered) { const b = bucket(r); if (b) bkts[b].push(r); }
@@ -4920,6 +4927,45 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
     setArchiveConfirm(false);
   }
 
+  function bucketLabel(b) {
+    const map = {
+      na_awaiting:'Needs Attention', na_decision:'Needs Attention',
+      na_recsPending:'Waiting on Approval', na_approvedReady:'Needs Attention',
+      na_partsArrived:'Needs Attention', na_other:'Needs Attention',
+      waitingOnParts:'Waiting on Parts', inShop:'In Shop', wholesale:'Wholesale',
+    };
+    return map[b] || '';
+  }
+
+  function handleSearchChange(val) {
+    if (!search.trim() && val.trim()) prevSecRef.current = sec;
+    if (search.trim() && !val.trim() && prevSecRef.current) {
+      setSec(prevSecRef.current);
+      prevSecRef.current = null;
+    }
+    setSearch(val);
+  }
+
+  function navigateTo(record) {
+    setHighlightId(record.id);
+    setSearchFocused(false);
+  }
+
+  useEffect(() => {
+    if (!highlightId) return;
+    const scrollTimer = setTimeout(() => {
+      cardRefs.current[highlightId]?.scrollIntoView({ behavior:'smooth', block:'center' });
+    }, 80);
+    const clearTimer = setTimeout(() => setHighlightId(null), 2000);
+    return () => { clearTimeout(scrollTimer); clearTimeout(clearTimer); };
+  }, [highlightId]);
+
+  useEffect(() => {
+    if (!hasSearch) return;
+    const results = filteredRef.current.filter(r => !r.archived);
+    if (results.length === 1) navigateTo(results[0]);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const boardROCount = boardState ? (techs||[]).reduce((sum, t) => {
     if (!boardState.grid?.[t.id]) return sum;
     return sum + COLS.reduce((s, c) => s + (boardState.grid[t.id][c.id]||[]).length, 0);
@@ -4943,8 +4989,16 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
     const cardBorder = green?'rgba(0,230,118,0.35)':yellow?'rgba(255,159,46,0.35)':CARD_BORDER;
     const cardShadow = green?'0 0 0 1px rgba(0,230,118,0.08) inset,'+CARD_SHADOW:yellow?'0 0 0 1px rgba(255,159,46,0.08) inset,'+CARD_SHADOW:CARD_SHADOW;
     const bottomRadius = showDecision ? '0' : '14px';
+    const isHighlighted = highlightId === record.id;
+    const isMover = movingReconCard?.id === record.id;
+    const activeBorder = isMover ? SUCCESS : isHighlighted ? '#FFD84A' : cardBorder;
+    const activeShadow = isMover
+      ? `0 0 0 2px ${SUCCESS}, ${cardShadow}`
+      : isHighlighted
+      ? `0 0 0 3px rgba(255,216,74,0.4), 0 0 24px rgba(255,216,74,0.2), ${cardShadow}`
+      : cardShadow;
     return (
-      <div key={record.id}>
+      <div key={record.id} ref={el => { if (el) cardRefs.current[record.id] = el; else delete cardRefs.current[record.id]; }}>
         <div
           onClick={() => { if (heldRef.current) { heldRef.current = false; return; } setDetailId(record.id); }}
           onPointerDown={e => {
@@ -4966,7 +5020,7 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
           onPointerUp={() => { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }}
           onPointerCancel={() => { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }}
           className="btn-press"
-          style={{ background:CARD_BG, borderRadius:'14px 14px '+bottomRadius+' '+bottomRadius, border:'1px solid '+(movingReconCard?.id===record.id?SUCCESS:cardBorder), boxShadow:movingReconCard?.id===record.id?'0 0 0 2px '+SUCCESS+', '+cardShadow:cardShadow, padding:'13px 14px', cursor:'pointer', touchAction:'manipulation', animation:'card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)', position:'relative', overflow:'hidden' }}>
+          style={{ background:CARD_BG, borderRadius:'14px 14px '+bottomRadius+' '+bottomRadius, border:'1px solid '+activeBorder, boxShadow:activeShadow, transition:'border-color 0.4s, box-shadow 0.4s', padding:'13px 14px', cursor:'pointer', touchAction:'manipulation', animation:'card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)', position:'relative', overflow:'hidden' }}>
           {green  && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:SUCCESS, boxShadow:'0 0 10px rgba(0,230,118,0.5)' }} />}
           {yellow && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:WARN, boxShadow:'0 0 10px rgba(255,159,46,0.5)' }} />}
           {yellow && <div style={{ position:'absolute', right:8, top:8, width:8, height:8, borderRadius:'50%', background:WARN, boxShadow:'0 0 5px rgba(255,159,46,0.6)', zIndex:1 }} />}
@@ -5036,9 +5090,34 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
         )}
       </div>
       {/* Search */}
-      <div style={{ padding:'10px 14px', background:'rgba(11,18,32,0.8)', borderBottom:'0.5px solid rgba(255,255,255,0.06)', flexShrink:0 }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by stock #, RO #, vehicle…"
-          style={{ ...inputStyle, padding:'10px 14px', fontSize:13 }} />
+      <div style={{ padding:'10px 14px', background:'rgba(11,18,32,0.8)', borderBottom:'0.5px solid rgba(255,255,255,0.06)', flexShrink:0, position:'relative' }}>
+        <input
+          value={search}
+          onChange={e => handleSearchChange(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setTimeout(() => setSearchFocused(false), 160)}
+          placeholder="Search stock #, RO #, year, make, model…"
+          style={{ ...inputStyle, padding:'10px 14px', fontSize:13 }}
+        />
+        {searchFocused && searchResults.length > 1 && (
+          <div style={{ position:'absolute', left:14, right:14, top:'calc(100% - 10px)', zIndex:200, background:'rgba(14,18,30,0.98)', borderRadius:'0 0 14px 14px', border:'0.5px solid rgba(255,255,255,0.12)', borderTop:'none', maxHeight:280, overflowY:'auto', WebkitOverflowScrolling:'touch', boxShadow:'0 16px 48px rgba(0,0,0,0.75)' }}>
+            {searchResults.map(r => {
+              const b = bucket(r);
+              const vehicle = [r.year, r.make, r.model].filter(Boolean).join(' ') || 'No vehicle info';
+              return (
+                <button key={r.id}
+                  onPointerDown={e => { e.preventDefault(); navigateTo(r); }}
+                  style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'transparent', border:'none', borderBottom:'0.5px solid rgba(255,255,255,0.05)', cursor:'pointer', textAlign:'left', fontFamily:"'Geist',system-ui,sans-serif", touchAction:'manipulation' }}>
+                  <div style={{ minWidth:0, flex:1 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:TEXT, marginBottom:2 }}>{r.stockNumber} — {vehicle}</div>
+                    <div style={{ fontSize:10, color:TEXT3 }}>{r.roNumber} · {bucketLabel(b)}</div>
+                  </div>
+                  <span style={{ fontSize:12, color:TEXT3, flexShrink:0 }}>›</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
       {/* Body */}
       <div style={{ flex:1, minHeight:0, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'10px 12px 48px' }}>
