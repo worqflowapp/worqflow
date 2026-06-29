@@ -4668,6 +4668,140 @@ function ActiveBoardOverlay({ onClose, state, techs, movingRO, onCancelMove, ren
   );
 }
 
+// ─── Inline Board Content (reused by both overlay and inline section) ─────────
+function ReconInlineBoardContent({ boardState, techs, renderCard, handleMove, techStats, isWide, movingRO, movingReconCard, onDropReconCard }) {
+  const [collapsed, setCollapsed] = useState({});
+  const useFluid = isWide;
+  const GAP = 6;
+  const TECH_W = isWide ? 150 : 100;
+  const CELL_W_MOBILE = 148;
+  const ROW_H = 120;
+
+  const getRO = id => (boardState.ros||[]).find(r => r.id === id);
+  const usedQueue = (boardState.queues||[]).find(q => q.id === 'q-used');
+
+  return (
+    <div style={{ paddingBottom:8 }}>
+      <div style={{ overflowX:useFluid?"hidden":"auto", WebkitOverflowScrolling:"touch", paddingBottom:4, paddingLeft:8, paddingRight:8, paddingTop:6 }}>
+        <div style={{ display:"inline-flex", flexDirection:"column", width:useFluid?"100%":"auto" }}>
+          <div style={{ display:"flex", gap:GAP, marginBottom:6 }}>
+            <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0 }} />
+            {COLS.map(col => {
+              const colCount = (techs||[]).reduce((sum, t) => sum + ((boardState.grid[t.id]?.[col.id]||[]).length), 0);
+              return (
+                <div key={col.id} style={{ flex:useFluid?1:"none", width:useFluid?"auto":CELL_W_MOBILE, minWidth:useFluid?0:CELL_W_MOBILE, display:"flex", justifyContent:"center" }}>
+                  <div style={{ background:"#141C33", color:col.color, padding:"5px 12px", fontSize:isWide?11:10, fontWeight:700, letterSpacing:"0.5px", whiteSpace:"nowrap", textTransform:"uppercase", borderRadius:"8px 8px 0 0", border:"1px solid #1B2440", borderBottom:"2px solid "+col.color, boxShadow:"0 -2px 12px rgba(0,0,0,0.3)", display:"flex", alignItems:"center", gap:6 }}>
+                    <span>{col.label}</span>
+                    {colCount > 0 && <span style={{ background:col.color+"22", color:col.color, fontSize:9, fontWeight:700, padding:"1px 6px", borderRadius:20 }}>{colCount}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {(techs||[]).map(tech => {
+            const { hrs, cumulative } = techStats(tech.id);
+            const isReconTarget = !!movingReconCard;
+            return (
+              <div key={tech.id} style={{ display:"flex", gap:GAP, marginBottom:GAP, alignItems:"stretch", width:"100%", height:ROW_H, minHeight:ROW_H, maxHeight:ROW_H, flexShrink:0, overflow:"hidden", position:"relative" }}>
+                <div style={{ width:TECH_W, minWidth:TECH_W, flexShrink:0, background:"linear-gradient(180deg,#1A233D 0%,#141C33 100%)", borderRadius:12, padding:"10px 10px", boxShadow:"0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 16px rgba(0,0,0,0.4)", border:"1px solid #28324D", display:"flex", flexDirection:"column", justifyContent:"center", gap:6 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <div style={{ width:30, height:30, borderRadius:"50%", background:"linear-gradient(135deg,#4D7DFF,#1D6BF3)", color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:11, flexShrink:0 }}>{initials(tech.name)}</div>
+                    <div style={{ minWidth:0 }}>
+                      <div style={{ fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:11, color:TEXT, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{tech.name}</div>
+                      <div style={{ fontSize:10, color:TEXT3, marginTop:2, display:"flex", gap:5 }}>
+                        <span style={{ color:SUCCESS, fontWeight:600 }}>{hrs.toFixed(1)}h</span>
+                        <span>{cumulative}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {COLS.map(col => {
+                  const ids = boardState.grid[tech.id] ? (boardState.grid[tech.id][col.id]||[]) : [];
+                  const isROTarget = movingRO && !ids.includes(movingRO.id);
+                  return (
+                    <div key={col.id}
+                      onClick={() => { if (isROTarget) handleMove({ type:"grid", techId:tech.id, colId:col.id }); }}
+                      style={{ flex:useFluid?1:"none", width:useFluid?"auto":CELL_W_MOBILE, minWidth:useFluid?0:CELL_W_MOBILE, flexShrink:useFluid?1:0, background:isROTarget?"rgba(77,125,255,0.10)":CELL_BG, border:"1px solid "+(isROTarget?ACCENT:col.border), borderRadius:12, padding:ids.length?"6px 6px 4px":0, display:"flex", flexDirection:"column", gap:4, alignItems:ids.length?"stretch":"center", justifyContent:ids.length?"flex-start":"center", alignSelf:"stretch", height:"100%", maxHeight:"100%", minHeight:82, boxSizing:"border-box", overflow:"hidden", cursor:isROTarget?"pointer":"default", boxShadow:isROTarget?"0 0 0 1.5px "+ACCENT+", "+CELL_SHADOW:CELL_SHADOW, backdropFilter:"blur(4px)", WebkitBackdropFilter:"blur(4px)" }}>
+                      {ids.length === 0 ? (
+                        isROTarget ? (
+                          <span style={{ color:ACCENT, fontSize:9, fontWeight:500, textAlign:"center", padding:"0 6px", animation:"pulse 1.5s ease-in-out infinite" }}>Tap to place here</span>
+                        ) : (
+                          <SkeletonCard />
+                        )
+                      ) : (
+                        ids.map(roId => {
+                          const ro = getRO(roId);
+                          if (!ro) return null;
+                          return (
+                            <div key={ro.id} style={{ flex:1, minHeight:0, overflow:"hidden" }}>
+                              {renderCard(ro, col.id, { compact:ids.length > 1 })}
+                            </div>
+                          );
+                        })
+                      )}
+                      {ids.length > 0 && isROTarget && (
+                        <div style={{ margin:"4px 0 6px", padding:"7px", background:"rgba(10,132,255,0.1)", borderRadius:8, textAlign:"center", color:ACCENT, fontSize:10, fontWeight:500 }}>+ Place here</div>
+                      )}
+                    </div>
+                  );
+                })}
+                {isReconTarget && (
+                  <div onClick={() => onDropReconCard(tech.id)}
+                    style={{ position:"absolute", inset:0, background:"rgba(0,230,118,0.09)", border:"2px solid rgba(0,230,118,0.5)", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", zIndex:5, backdropFilter:"blur(2px)", WebkitBackdropFilter:"blur(2px)" }}>
+                    <span style={{ color:SUCCESS, fontWeight:700, fontSize:12, textShadow:"0 1px 4px rgba(0,0,0,0.6)" }}>→ Assign to {tech.name}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {usedQueue && (() => {
+        const ids = boardState.qSlots[usedQueue.id] || [];
+        const isCollapsedQ = collapsed[usedQueue.id];
+        const isROTarget = movingRO && !ids.includes(movingRO.id);
+        return (
+          <div style={{ padding:"6px 8px 0" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+              <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
+              <span style={{ fontSize:10, fontWeight:600, color:TEXT3, letterSpacing:"0.8px", textTransform:"uppercase" }}>Staging Queue</span>
+              <div style={{ flex:1, height:"0.5px", background:"rgba(255,255,255,0.06)" }}/>
+            </div>
+            <div style={{ background:"rgba(14,18,30,0.97)", borderRadius:16, overflow:"hidden", boxShadow:"0 1px 0 rgba(255,255,255,0.09) inset, 0 8px 32px rgba(0,0,0,0.6)", border:"0.5px solid "+(isROTarget?usedQueue.color:"rgba(255,255,255,0.07)"), backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)" }}>
+              <div style={{ background:"linear-gradient(135deg,"+usedQueue.color+","+usedQueue.color+"CC)", padding:"12px 14px", display:"flex", alignItems:"center", gap:10 }}>
+                <div style={{ width:28, height:28, background:"rgba(255,255,255,0.2)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>{usedQueue.icon}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ color:"#fff", fontWeight:800, fontSize:14 }}>{usedQueue.name}</div>
+                  <div style={{ color:"rgba(255,255,255,0.7)", fontSize:10, marginTop:1 }}>{usedQueue.subtitle}</div>
+                </div>
+                <div style={{ background:"rgba(255,255,255,0.25)", color:"#fff", borderRadius:20, padding:"2px 10px", fontSize:12, fontWeight:800, flexShrink:0 }}>{ids.length}</div>
+                <button onClick={() => setCollapsed(c => ({ ...c, [usedQueue.id]:!c[usedQueue.id] }))} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.8)", cursor:"pointer", display:"flex", alignItems:"center", flexShrink:0 }}>
+                  {isCollapsedQ ? <ChevDownIcon /> : <ChevUpIcon />}
+                </button>
+              </div>
+              {!isCollapsedQ && (
+                <div style={{ padding:"10px 10px 8px" }}>
+                  <div style={{ maxHeight:ids.length>3?270:"none", overflowY:ids.length>3?"auto":"visible", WebkitOverflowScrolling:"touch" }}>
+                    {ids.map(roId => { const ro = getRO(roId); if (!ro) return null; return renderCard(ro, "queue"); })}
+                  </div>
+                  {isROTarget && (
+                    <button onClick={() => handleMove({ type:"queue", queueId:usedQueue.id })} style={{ width:"100%", padding:12, background:usedQueue.color+"14", color:usedQueue.color, border:"2px dashed "+usedQueue.color, borderRadius:12, fontWeight:800, fontSize:13, cursor:"pointer", fontFamily:"'Barlow',sans-serif", marginTop:6, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                      {usedQueue.icon} Move to {usedQueue.name}
+                    </button>
+                  )}
+                  {ids.length === 0 && !isROTarget && (
+                    <div style={{ border:"2px dashed "+BORDER, borderRadius:12, padding:18, textAlign:"center", color:MUTED, fontSize:12 }}>No tickets here</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 // ─── Used Car Recon — Section Header Components ──────────────────────────────
 function ReconSectionHeader({ title, count, isCollapsed, onToggle, accent, icon }) {
   return (
@@ -4692,16 +4826,20 @@ function ReconSubSectionHeader({ title, count, isCollapsed, onToggle, accent }) 
 }
 
 // ─── Used Car Recon — Main Screen ─────────────────────────────────────────────
-function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateRecord, onUpdateRecord, onSendToBoard, onClose, onShowActiveBoard, isAdmin, isUCManager, isUCTech, isTech }) {
-  const [showNewCar,     setShowNewCar]     = useState(false);
-  const [detailId,       setDetailId]       = useState(null);
-  const [search,         setSearch]         = useState('');
-  const [sec,            setSec]            = useState({
+function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateRecord, onUpdateRecord, onSendToBoard, onClose, isAdmin, isUCManager, isUCTech, isTech, boardState, renderCard, handleMove, techStats, isWide, movingRO, onCancelMove }) {
+  const [showNewCar,       setShowNewCar]       = useState(false);
+  const [detailId,         setDetailId]         = useState(null);
+  const [search,           setSearch]           = useState('');
+  const [sec,              setSec]              = useState({
+    board:true,
     needsAttention:false, waitingOnParts:true, inShop:false, wholesale:true,
     na_awaiting:false, na_decision:false, na_recsPending:false,
     na_approvedReady:false, na_partsArrived:false, na_other:false,
   });
-  const [archiveConfirm, setArchiveConfirm] = useState(false);
+  const [archiveConfirm,   setArchiveConfirm]   = useState(false);
+  const [movingReconCard,  setMovingReconCard]  = useState(null);
+  const holdTimerRef = useRef(null);
+  const heldRef      = useRef(false);
 
   // Lock body scroll so iOS doesn't route swipe gestures to the background page.
   // Without this, the kanban board's tall DOM (1500px+) creates a page-level scroll
@@ -4782,6 +4920,16 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
     setArchiveConfirm(false);
   }
 
+  const boardROCount = boardState ? (techs||[]).reduce((sum, t) => {
+    if (!boardState.grid?.[t.id]) return sum;
+    return sum + COLS.reduce((s, c) => s + (boardState.grid[t.id][c.id]||[]).length, 0);
+  }, 0) : 0;
+
+  function handleDropReconCard(techId) {
+    onSendToBoard(movingReconCard.id, techId);
+    setMovingReconCard(null);
+  }
+
   function reconCard(record, opts) {
     const showDecision = opts?.showDecision || false;
     const showArchive  = opts?.showArchive  || false;
@@ -4797,8 +4945,28 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
     const bottomRadius = showDecision ? '0' : '14px';
     return (
       <div key={record.id}>
-        <div onClick={() => setDetailId(record.id)} className="btn-press"
-          style={{ background:CARD_BG, borderRadius:'14px 14px '+bottomRadius+' '+bottomRadius, border:'1px solid '+cardBorder, boxShadow:cardShadow, padding:'13px 14px', cursor:'pointer', touchAction:'manipulation', animation:'card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)', position:'relative', overflow:'hidden' }}>
+        <div
+          onClick={() => { if (heldRef.current) { heldRef.current = false; return; } setDetailId(record.id); }}
+          onPointerDown={e => {
+            if (!canSendBoard || record.movedToActiveBoard || record.isWholesale || record.archived) return;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            holdTimerRef.current = setTimeout(() => {
+              holdTimerRef.current = null;
+              heldRef.current = true;
+              setMovingReconCard(record);
+              setSec(s => ({ ...s, board: false }));
+            }, 500);
+          }}
+          onPointerMove={e => {
+            if (holdTimerRef.current && (Math.abs(e.movementX) > 8 || Math.abs(e.movementY) > 8)) {
+              clearTimeout(holdTimerRef.current);
+              holdTimerRef.current = null;
+            }
+          }}
+          onPointerUp={() => { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }}
+          onPointerCancel={() => { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; }}
+          className="btn-press"
+          style={{ background:CARD_BG, borderRadius:'14px 14px '+bottomRadius+' '+bottomRadius, border:'1px solid '+(movingReconCard?.id===record.id?SUCCESS:cardBorder), boxShadow:movingReconCard?.id===record.id?'0 0 0 2px '+SUCCESS+', '+cardShadow:cardShadow, padding:'13px 14px', cursor:'pointer', touchAction:'manipulation', animation:'card-in 0.22s cubic-bezier(0.34,1.56,0.64,1)', position:'relative', overflow:'hidden' }}>
           {green  && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:SUCCESS, boxShadow:'0 0 10px rgba(0,230,118,0.5)' }} />}
           {yellow && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:3, background:WARN, boxShadow:'0 0 10px rgba(255,159,46,0.5)' }} />}
           {yellow && <div style={{ position:'absolute', right:8, top:8, width:8, height:8, borderRadius:'50%', background:WARN, boxShadow:'0 0 5px rgba(255,159,46,0.6)', zIndex:1 }} />}
@@ -4860,10 +5028,6 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
           <div style={{ fontWeight:800, fontSize:16, color:TEXT, letterSpacing:'-0.3px' }}>Used Car Recon</div>
           <div style={{ fontSize:11, color:TEXT3, marginTop:1 }}>{visibleCount} {visibleCount===1?'vehicle':'vehicles'}</div>
         </div>
-        <button onClick={onShowActiveBoard}
-          style={{ height:34, padding:'0 12px', borderRadius:20, border:'1px solid rgba(255,255,255,0.15)', background:'rgba(255,255,255,0.07)', color:TEXT2, cursor:'pointer', display:'flex', alignItems:'center', gap:5, fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:12, flexShrink:0, touchAction:'manipulation' }}>
-          Board
-        </button>
         {canCreate && (
           <button onClick={() => setShowNewCar(true)}
             style={{ height:34, padding:'0 16px', borderRadius:20, border:'none', background:'linear-gradient(135deg,#5A8AFF,#4D7DFF)', color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', gap:6, fontFamily:"'Geist',system-ui,sans-serif", fontWeight:600, fontSize:13, letterSpacing:'-0.01em', boxShadow:'0 4px 16px rgba(77,125,255,0.45)', flexShrink:0, touchAction:'manipulation' }}>
@@ -4878,6 +5042,35 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
       </div>
       {/* Body */}
       <div style={{ flex:1, minHeight:0, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'10px 12px 48px' }}>
+
+        {/* Moving recon card banner */}
+        {movingReconCard && (
+          <div style={{ position:'sticky', top:0, zIndex:10, background:'linear-gradient(135deg,#0D3320,#0A2015)', border:'1px solid rgba(0,230,118,0.3)', borderRadius:12, padding:'10px 14px', marginBottom:10, display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontSize:13, fontWeight:700, color:SUCCESS, flex:1 }}>Hold on board row to assign {movingReconCard.stockNumber}</span>
+            <button onClick={() => setMovingReconCard(null)} style={{ background:'rgba(255,255,255,0.12)', border:'none', color:TEXT2, borderRadius:8, padding:'5px 12px', fontSize:12, fontWeight:700, cursor:'pointer', touchAction:'manipulation' }}>Cancel</button>
+          </div>
+        )}
+
+        {/* ── 0. Board ─────────────────────────────────────── */}
+        {!hasSearch && boardState && (
+          <div style={{ marginBottom:14 }}>
+            <ReconSectionHeader title="Board" count={boardROCount} isCollapsed={isCol('board')} onToggle={() => toggle('board')} accent={ACCENT} icon="🛠" />
+            {!isCol('board') && (
+              <ReconInlineBoardContent
+                boardState={boardState}
+                techs={techs||[]}
+                renderCard={renderCard}
+                handleMove={handleMove}
+                techStats={techStats}
+                isWide={isWide}
+                movingRO={movingRO}
+                movingReconCard={movingReconCard}
+                onDropReconCard={handleDropReconCard}
+              />
+            )}
+          </div>
+        )}
+
         {visibleCount === 0 && !hasSearch && (
           <div style={{ textAlign:'center', padding:'60px 20px 40px', color:TEXT3 }}>
             <div style={{ fontSize:40, marginBottom:12 }}>🚗</div>
@@ -5059,7 +5252,6 @@ export default function ShopFlowTracker() {
   const [showChangePin, setShowChangePin]     = useState(false);
   const [showAnalytics, setShowAnalytics]     = useState(false);
   const [showRecon,     setShowRecon]         = useState(false);
-  const [showActiveBoardOverlay, setShowActiveBoardOverlay] = useState(false);
   const [reconRecords,  setReconRecords]      = useState([]);
   const [showActivity,  setShowActivity]      = useState(false);
   const [showActivityReport, setShowActivityReport] = useState(false);
@@ -6176,24 +6368,17 @@ export default function ShopFlowTracker() {
           onUpdateRecord={handleUpdateReconRecord}
           onSendToBoard={handleSendToBoard}
           onClose={() => setShowRecon(false)}
-          onShowActiveBoard={() => setShowActiveBoardOverlay(true)}
           isAdmin={isAdmin}
           isUCManager={isUCManager}
           isUCTech={isUCTech}
           isTech={isTech}
-        />
-      )}
-      {showActiveBoardOverlay && (
-        <ActiveBoardOverlay
-          onClose={() => setShowActiveBoardOverlay(false)}
-          state={state}
-          techs={state.techs}
-          movingRO={movingRO}
-          onCancelMove={() => setMovingRO(null)}
+          boardState={state}
           renderCard={renderCard}
           handleMove={handleMove}
           techStats={techStats}
           isWide={isWide}
+          movingRO={movingRO}
+          onCancelMove={() => setMovingRO(null)}
         />
       )}
       {showTimeClock && (
