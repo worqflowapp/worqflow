@@ -4832,8 +4832,8 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
   const [search,           setSearch]           = useState('');
   const [sec,              setSec]              = useState({
     board:true,
-    needsAttention:false, waitingOnParts:true, inShop:false, wholesale:true,
-    na_awaiting:false, na_decision:false, na_recsPending:false,
+    needsAttention:false, waitingOnApproval:true, waitingOnParts:true, inShop:false, wholesale:true,
+    na_awaiting:false, na_decision:false,
     na_approvedReady:false, na_partsArrived:false, na_other:false,
   });
   const [archiveConfirm,   setArchiveConfirm]   = useState(false);
@@ -4900,7 +4900,7 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
     return aE < bE ? -1 : aE > bE ? 1 : 0;
   });
 
-  const naCount = bkts.na_awaiting.length + bkts.na_decision.length + bkts.na_recsPending.length +
+  const naCount = bkts.na_awaiting.length + bkts.na_decision.length +
     bkts.na_approvedReady.length + bkts.na_partsArrived.length + bkts.na_other.length;
   const visibleCount = records.filter(r => !r.archived).length;
   const detailRecord = detailId ? records.find(r => r.id === detailId) : null;
@@ -5109,15 +5109,7 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
                   </div>
                 )}
 
-                {/* c. Recs Pending Approval */}
-                {bkts.na_recsPending.length > 0 && (
-                  <div style={{ marginBottom:6 }}>
-                    <ReconSubSectionHeader title="Recs Pending Approval" count={bkts.na_recsPending.length} isCollapsed={isCol('na_recsPending')} onToggle={() => toggle('na_recsPending')} accent={WARN} />
-                    {!isCol('na_recsPending') && <div style={{ display:'flex', flexDirection:'column', gap:8, paddingLeft:4 }}>{bkts.na_recsPending.map(r => reconCard(r))}</div>}
-                  </div>
-                )}
-
-                {/* d. Approved — Ready Now */}
+                {/* c. Approved — Ready Now */}
                 {bkts.na_approvedReady.length > 0 && (
                   <div style={{ marginBottom:6 }}>
                     <ReconSubSectionHeader title="Approved — Ready Now" count={bkts.na_approvedReady.length} isCollapsed={isCol('na_approvedReady')} onToggle={() => toggle('na_approvedReady')} accent={SUCCESS} />
@@ -5145,7 +5137,19 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
           </div>
         )}
 
-        {/* ── 2. Waiting on Parts ──────────────────────────── */}
+        {/* ── 2. Waiting on Approval ───────────────────────── */}
+        <div style={{ marginBottom:14 }}>
+          <ReconSectionHeader title="Waiting on Approval" count={bkts.na_recsPending.length} isCollapsed={isCol('waitingOnApproval')} onToggle={() => toggle('waitingOnApproval')} accent={WARN} icon="🕐" />
+          {!isCol('waitingOnApproval') && (
+            bkts.na_recsPending.length === 0
+              ? <div style={{ textAlign:'center', padding:'16px 0 8px', color:TEXT3, fontSize:12 }}>No vehicles</div>
+              : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {bkts.na_recsPending.map(r => reconCard(r))}
+                </div>
+          )}
+        </div>
+
+        {/* ── 3. Waiting on Parts ──────────────────────────── */}
         <div style={{ marginBottom:14 }}>
           <ReconSectionHeader title="Waiting on Parts" count={bkts.waitingOnParts.length} isCollapsed={isCol('waitingOnParts')} onToggle={() => toggle('waitingOnParts')} accent="#FFD60A" icon="⏳" />
           {!isCol('waitingOnParts') && (

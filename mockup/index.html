@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Worqflow — Premium Redesign</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#080810;color:#fff;font-family:'Space Grotesk',sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* ── HEADER ── */
+.header{
+  height:62px;
+  background:rgba(12,12,22,0.92);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(255,255,255,0.07);
+  display:flex;align-items:center;padding:0 18px;gap:14px;flex-shrink:0;
+  box-shadow:0 1px 0 rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.4);
+}
+.logo{
+  width:34px;height:34px;
+  background:linear-gradient(135deg,#0A84FF 0%,#0055cc 100%);
+  border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:15px;color:#fff;flex-shrink:0;
+  box-shadow:0 0 12px rgba(10,132,255,0.5);
+}
+.header-brand{flex-shrink:0;}
+.header-brand .name{font-weight:700;font-size:14px;color:#fff;letter-spacing:-0.2px;}
+.header-brand .sub{font-size:10px;color:rgba(255,255,255,0.35);margin-top:1px;}
+.hdivider{width:1px;height:30px;background:rgba(255,255,255,0.08);flex-shrink:0;}
+
+/* goal block */
+.goal-block{display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
+.goal-row{display:flex;align-items:baseline;gap:5px;}
+.goal-num{font-size:24px;font-weight:800;color:#30D158;letter-spacing:-1px;text-shadow:0 0 20px rgba(48,209,88,0.4);}
+.goal-of{font-size:11px;color:rgba(255,255,255,0.35);font-weight:500;}
+.goal-rev{font-size:10px;color:rgba(255,255,255,0.4);margin-top:1px;}
+.goal-bar{width:130px;height:3px;background:rgba(255,255,255,0.08);border-radius:2px;margin-top:3px;overflow:hidden;}
+.goal-fill{height:100%;width:99%;background:linear-gradient(90deg,#30D158,#0A84FF);border-radius:2px;box-shadow:0 0 6px rgba(48,209,88,0.6);}
+
+/* stat chips */
+.stat-chips{display:flex;gap:8px;align-items:center;}
+.chip{
+  display:flex;flex-direction:column;align-items:center;
+  padding:4px 16px;border-radius:10px;
+  background:rgba(255,255,255,0.04);
+  border:0.5px solid rgba(255,255,255,0.09);
+  flex-shrink:0;
+}
+.chip .cn{font-size:17px;font-weight:800;color:#fff;line-height:1.1;}
+.chip .cl{font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.6px;white-space:nowrap;margin-top:1px;}
+.chip.green .cn{color:#30D158;text-shadow:0 0 12px rgba(48,209,88,0.3);}
+
+/* header right */
+.hright{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.hdate{font-size:11px;color:rgba(255,255,255,0.35);white-space:nowrap;}
+.hbtn{
+  display:flex;align-items:center;gap:6px;
+  padding:7px 14px;border-radius:10px;
+  border:0.5px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.05);
+  color:rgba(255,255,255,0.65);font-size:12px;font-weight:600;
+  cursor:pointer;font-family:inherit;
+  transition:background .15s;
+}
+.hbtn-icon{
+  width:34px;height:34px;border-radius:9px;
+  border:0.5px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.05);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:15px;position:relative;
+}
+.nbadge{
+  position:absolute;top:-5px;right:-5px;
+  width:17px;height:17px;background:#FF453A;
+  border-radius:50%;font-size:9px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid #080810;
+}
+.btn-new{
+  display:flex;align-items:center;gap:6px;
+  padding:8px 18px;border-radius:10px;border:none;
+  background:linear-gradient(135deg,#0A84FF,#006EE0);
+  color:#fff;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit;white-space:nowrap;
+  box-shadow:0 2px 12px rgba(10,132,255,0.4);
+}
+
+/* ── BODY ── */
+.body{display:flex;flex:1;overflow:hidden;}
+
+/* ── LEFT SIDEBAR ── */
+.lsidebar{
+  width:172px;flex-shrink:0;
+  background:rgba(10,10,20,0.7);
+  backdrop-filter:blur(20px);
+  border-right:1px solid rgba(255,255,255,0.06);
+  display:flex;flex-direction:column;
+  overflow-y:auto;padding:14px 10px;
+  gap:0;
+}
+.slabel{
+  font-size:9px;font-weight:800;
+  color:rgba(255,255,255,0.25);
+  text-transform:uppercase;letter-spacing:1.2px;
+  margin-bottom:10px;padding:0 3px;
+}
+
+/* tech card */
+.tcard{
+  background:rgba(255,255,255,0.03);
+  border:0.5px solid rgba(255,255,255,0.07);
+  border-radius:14px;padding:10px;margin-bottom:8px;
+  cursor:pointer;transition:background .15s, border-color .15s;
+  position:relative;overflow:hidden;
+}
+.tcard::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent);
+}
+.tcard-top{display:flex;align-items:center;gap:9px;margin-bottom:9px;}
+.tavatar{
+  width:40px;height:40px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:13px;color:#fff;
+  flex-shrink:0;position:relative;
+}
+.tdot{
+  position:absolute;bottom:1px;right:1px;
+  width:9px;height:9px;background:#30D158;
+  border-radius:50%;border:2px solid #0a0a14;
+}
+.tname{font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.teff{font-size:11px;font-weight:700;margin-top:1px;}
+.tbar{height:3px;background:rgba(255,255,255,0.07);border-radius:2px;margin-bottom:6px;overflow:hidden;}
+.tbar-fill{height:100%;border-radius:2px;}
+.tstats{display:flex;justify-content:space-between;}
+.tstat{font-size:9.5px;color:rgba(255,255,255,0.35);}
+.add-tech{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:9px;border-radius:10px;
+  border:1px dashed rgba(255,255,255,0.12);
+  background:none;color:rgba(255,255,255,0.25);
+  font-size:11px;font-weight:600;cursor:pointer;
+  width:100%;font-family:inherit;margin-top:2px;
+}
+
+/* ── KANBAN ── */
+.kanban{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:12px 10px 0;}
+.colhdrs{display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;}
+.colhdr{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:8px 12px;
+  border-top:2px solid;
+  border-left:0.5px solid rgba(255,255,255,0.06);
+  border-right:0.5px solid rgba(255,255,255,0.06);
+  border-bottom:none;
+  border-radius:12px 12px 0 0;
+  background:rgba(255,255,255,0.025);
+}
+.cname{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;}
+.ccnt{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;}
+.col-ondeck{border-color:#0A84FF;color:#0A84FF;}
+.col-ondeck .ccnt{background:rgba(10,132,255,0.15);color:#0A84FF;}
+.col-inprog{border-color:#FF9F0A;color:#FF9F0A;}
+.col-inprog .ccnt{background:rgba(255,159,10,0.15);color:#FF9F0A;}
+.col-done{border-color:#30D158;color:#30D158;}
+.col-done .ccnt{background:rgba(48,209,88,0.15);color:#30D158;}
+
+.kgrid{display:flex;gap:8px;flex:1;overflow:hidden;}
+.kcol{flex:1;display:flex;flex-direction:column;gap:6px;overflow-y:auto;padding-bottom:8px;}
+
+/* ── RO CARD ── */
+.rocard{
+  background:rgba(16,18,32,0.95);
+  border:0.5px solid rgba(255,255,255,0.08);
+  border-radius:14px;
+  display:flex;flex-direction:row;
+  flex-shrink:0;position:relative;overflow:hidden;
+  box-shadow:0 2px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+  transition:border-color .2s, box-shadow .2s;
+}
+/* left accent bar */
+.rocard::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;
+  width:3px;border-radius:3px 0 0 3px;
+}
+.rocard.ondeck::before{background:linear-gradient(180deg,#0A84FF,#0055cc);}
+.rocard.inprog::before{background:linear-gradient(180deg,#FF9F0A,#cc7a00);}
+.rocard.urgent::before{background:linear-gradient(180deg,#FF453A,#cc1a0a);}
+.rocard.done::before{background:linear-gradient(180deg,#30D158,#1a8c38);}
+
+/* card photo panel */
+.cphoto{
+  width:110px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+  margin:8px 0 8px 10px;
+  border-radius:10px;
+}
+
+/* service type color panels */
+.svc-oil    {background:linear-gradient(135deg,rgba(255,159,10,0.18),rgba(255,159,10,0.06));border:0.5px solid rgba(255,159,10,0.2);}
+.svc-brake  {background:linear-gradient(135deg,rgba(255,69,58,0.18),rgba(255,69,58,0.06));border:0.5px solid rgba(255,69,58,0.2);}
+.svc-align  {background:linear-gradient(135deg,rgba(10,132,255,0.18),rgba(10,132,255,0.06));border:0.5px solid rgba(10,132,255,0.2);}
+.svc-diag   {background:linear-gradient(135deg,rgba(191,90,242,0.18),rgba(191,90,242,0.06));border:0.5px solid rgba(191,90,242,0.2);}
+.svc-inspect{background:linear-gradient(135deg,rgba(48,209,88,0.18),rgba(48,209,88,0.06));border:0.5px solid rgba(48,209,88,0.2);}
+.svc-tire   {background:linear-gradient(135deg,rgba(50,173,230,0.18),rgba(50,173,230,0.06));border:0.5px solid rgba(50,173,230,0.2);}
+.svc-trans  {background:linear-gradient(135deg,rgba(255,107,53,0.18),rgba(255,107,53,0.06));border:0.5px solid rgba(255,107,53,0.2);}
+.svc-repair {background:linear-gradient(135deg,rgba(255,159,10,0.18),rgba(255,159,10,0.06));border:0.5px solid rgba(255,159,10,0.2);}
+
+/* icon inside panel */
+.svc-ico{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:100%;height:100%;}
+.svc-ico svg{width:32px;height:32px;opacity:0.9;}
+.svc-tag{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;opacity:0.7;}
+
+/* card body */
+.cbody{flex:1;min-width:0;display:flex;flex-direction:column;padding:10px 12px 10px 12px;gap:0;justify-content:space-between;}
+.crow1{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;}
+.cro{font-size:13px;font-weight:800;color:#fff;letter-spacing:-0.2px;}
+.ccheck{
+  width:20px;height:20px;border-radius:50%;
+  background:rgba(48,209,88,0.2);border:1.5px solid #30D158;
+  display:flex;align-items:center;justify-content:center;font-size:10px;
+  flex-shrink:0;
+}
+.crow2{margin-bottom:2px;}
+.cvehicle{font-size:12px;font-weight:600;color:rgba(255,255,255,0.75);}
+.cjob{font-size:11px;color:rgba(255,255,255,0.38);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.crow3{display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:space-between;}
+.ctimer{display:flex;align-items:center;gap:4px;font-size:11px;color:rgba(255,255,255,0.45);}
+.ctech{display:flex;align-items:center;gap:5px;}
+.tchip{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7.5px;font-weight:800;color:#fff;flex-shrink:0;}
+.tchip-name{font-size:10.5px;color:rgba(255,255,255,0.55);}
+.camount{font-size:12px;font-weight:700;color:#30D158;}
+.cpbar{height:2.5px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden;margin-top:8px;}
+.cpfill{height:100%;border-radius:2px;}
+
+/* empty cell */
+.empty{
+  border:1px dashed rgba(255,255,255,0.08);border-radius:14px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;height:92px;flex-shrink:0;
+  background:rgba(255,255,255,0.01);
+}
+.empty-txt{font-size:11px;color:rgba(255,255,255,0.18);font-weight:500;}
+.empty-sub{font-size:10px;color:rgba(255,255,255,0.1);}
+
+/* ── RIGHT SIDEBAR ── */
+.rsidebar{
+  width:215px;flex-shrink:0;
+  background:rgba(10,10,20,0.7);
+  backdrop-filter:blur(20px);
+  border-left:1px solid rgba(255,255,255,0.06);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.rsinner{flex:1;overflow-y:auto;padding:14px 10px;}
+.qitem{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 10px;border-radius:10px;
+  background:rgba(255,255,255,0.025);
+  border:0.5px solid rgba(255,255,255,0.06);
+  margin-bottom:5px;gap:6px;
+}
+.qro{font-size:12px;font-weight:700;color:#fff;}
+.qbadge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;white-space:nowrap;display:inline-block;margin-top:2px;}
+.bapproval{background:rgba(255,69,58,0.12);color:#FF453A;}
+.bparts{background:rgba(255,159,10,0.12);color:#FF9F0A;}
+.bondeck{background:rgba(10,132,255,0.12);color:#0A84FF;}
+.qtimer{font-size:10px;color:rgba(255,255,255,0.35);}
+.view-all-btn{
+  margin:4px 10px 10px;padding:8px;border-radius:9px;
+  border:0.5px solid rgba(255,255,255,0.08);
+  background:rgba(255,255,255,0.025);
+  color:rgba(255,255,255,0.35);font-size:11px;font-weight:600;
+  cursor:pointer;width:calc(100% - 20px);font-family:inherit;
+}
+
+/* ── BOTTOM ── */
+.bottom{
+  height:144px;flex-shrink:0;
+  background:rgba(10,10,20,0.8);
+  backdrop-filter:blur(20px);
+  border-top:1px solid rgba(255,255,255,0.06);
+  display:flex;overflow:hidden;
+}
+.bsec{flex:1;border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;overflow:hidden;}
+.bsec:last-child{border-right:none;}
+.bhdr{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 14px 7px;
+  border-bottom:0.5px solid rgba(255,255,255,0.05);
+}
+.btitle{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:rgba(255,255,255,0.4);}
+.bbadge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;}
+.bcards{display:flex;gap:8px;padding:8px 12px;overflow-x:auto;flex:1;align-items:center;}
+
+/* parts card */
+.pcard{
+  background:rgba(255,255,255,0.03);
+  border:0.5px solid rgba(255,255,255,0.07);
+  border-radius:10px;padding:8px;
+  flex-shrink:0;width:182px;
+  display:flex;gap:8px;align-items:center;
+}
+.psvc{
+  width:46px;height:46px;border-radius:9px;
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+}
+.psvc svg{width:22px;height:22px;}
+.pinfo{flex:1;min-width:0;}
+.pro{font-size:11px;font-weight:700;color:#fff;}
+.pveh{font-size:9.5px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.pjob{font-size:9px;color:rgba(255,255,255,0.3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;margin-bottom:5px;}
+.peta{display:flex;align-items:center;justify-content:space-between;}
+.peta-l{font-size:8.5px;color:rgba(255,255,255,0.25);font-weight:700;text-transform:uppercase;}
+.peta-d{font-size:10px;font-weight:700;color:#FF9F0A;}
+
+.bempty{display:flex;align-items:center;justify-content:center;flex:1;}
+.bempty-txt{font-size:11px;color:rgba(255,255,255,0.15);}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">W</div>
+  <div class="header-brand">
+    <div class="name">Service Department</div>
+    <div class="sub">Target: 50.0 Hrs</div>
+  </div>
+  <div class="hdivider"></div>
+  <div class="goal-block">
+    <div class="goal-row">
+      <span class="goal-num">49.7</span>
+      <span class="goal-of">/ 50.0 HRS GOAL</span>
+    </div>
+    <div class="goal-rev">$6,412</div>
+    <div class="goal-bar"><div class="goal-fill"></div></div>
+  </div>
+  <div class="hdivider"></div>
+  <div class="stat-chips">
+    <div class="chip"><span class="cn">18</span><span class="cl">Active ROs</span></div>
+    <div class="chip"><span class="cn">6</span><span class="cl">Waiting Parts</span></div>
+    <div class="chip"><span class="cn">4</span><span class="cl">Awaiting Approval</span></div>
+    <div class="chip green"><span class="cn">$12,412</span><span class="cl">Projected Today</span></div>
+  </div>
+  <div class="hright">
+    <span class="hdate">Sun May 24 &nbsp;·&nbsp; 12:19 PM</span>
+    <button class="hbtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      Filters
+    </button>
+    <button class="hbtn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Search RO
+    </button>
+    <div class="hbtn-icon">🔔<span class="nbadge">3</span></div>
+    <div class="hbtn-icon">📺</div>
+    <button class="btn-new">+ New RO</button>
+  </div>
+</div>
+
+<!-- BODY -->
+<div class="body">
+
+<!-- LEFT SIDEBAR -->
+<div class="lsidebar">
+  <div class="slabel">Technicians</div>
+
+  <div class="tcard">
+    <div class="tcard-top">
+      <div class="tavatar" style="background:linear-gradient(135deg,#0A84FF,#0044bb);box-shadow:0 0 10px rgba(10,132,255,0.35);">TS<div class="tdot"></div></div>
+      <div><div class="tname">Tyler S.</div><div class="teff" style="color:#30D158;">118%</div></div>
+    </div>
+    <div class="tbar"><div class="tbar-fill" style="width:100%;background:linear-gradient(90deg,#30D158,#0A84FF);box-shadow:0 0 4px rgba(48,209,88,0.5);"></div></div>
+    <div class="tstats"><span class="tstat">3 Active ROs</span><span class="tstat">2.6h Today</span></div>
+  </div>
+
+  <div class="tcard">
+    <div class="tcard-top">
+      <div class="tavatar" style="background:linear-gradient(135deg,#FF9F0A,#cc7000);box-shadow:0 0 10px rgba(255,159,10,0.35);">LA<div class="tdot"></div></div>
+      <div><div class="tname">Luis A.</div><div class="teff" style="color:#0A84FF;">105%</div></div>
+    </div>
+    <div class="tbar"><div class="tbar-fill" style="width:80%;background:linear-gradient(90deg,#0A84FF,#0044bb);"></div></div>
+    <div class="tstats"><span class="tstat">2 Active ROs</span><span class="tstat">3.7h Today</span></div>
+  </div>
+
+  <div class="tcard">
+    <div class="tcard-top">
+      <div class="tavatar" style="background:linear-gradient(135deg,#30D158,#1a8c38);box-shadow:0 0 10px rgba(48,209,88,0.3);">DP<div class="tdot"></div></div>
+      <div><div class="tname">Derek P.</div><div class="teff" style="color:#FF9F0A;">92%</div></div>
+    </div>
+    <div class="tbar"><div class="tbar-fill" style="width:68%;background:linear-gradient(90deg,#FF9F0A,#cc7000);"></div></div>
+    <div class="tstats"><span class="tstat">1 Active RO</span><span class="tstat">2.3h Today</span></div>
+  </div>
+
+  <div class="tcard">
+    <div class="tcard-top">
+      <div class="tavatar" style="background:linear-gradient(135deg,#BF5AF2,#8b3dbf);box-shadow:0 0 10px rgba(191,90,242,0.3);">JJ<div class="tdot" style="background:#FF9F0A;"></div></div>
+      <div><div class="tname">Jason J.</div><div class="teff" style="color:#FF453A;">85%</div></div>
+    </div>
+    <div class="tbar"><div class="tbar-fill" style="width:55%;background:linear-gradient(90deg,#FF453A,#cc1a0a);"></div></div>
+    <div class="tstats"><span class="tstat">0 Active ROs</span><span class="tstat">1.2h Today</span></div>
+  </div>
+
+  <button class="add-tech">+ Add Technician</button>
+</div>
+
+<!-- KANBAN -->
+<div class="kanban">
+  <div class="colhdrs">
+    <div class="colhdr col-ondeck"><span class="cname">On Deck</span><span class="ccnt">5</span></div>
+    <div class="colhdr col-inprog"><span class="cname">In Progress</span><span class="ccnt">10</span></div>
+    <div class="colhdr col-done"><span class="cname">Completed / QC</span><span class="ccnt">3</span></div>
+  </div>
+  <div class="kgrid">
+
+    <!-- ON DECK -->
+    <div class="kcol">
+      <div class="rocard ondeck">
+        <div class="cphoto svc-oil">
+          <div class="svc-ico" style="color:#FF9F0A;">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M16 4C16 4 8 14 8 20C8 24.4 11.6 28 16 28C20.4 28 24 24.4 24 20C24 14 16 4 16 4Z" fill="currentColor" opacity="0.9"/><path d="M20 23C20 25.2 18.2 26.5 16 27" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+            <span class="svc-tag">Oil Change</span>
+          </div>
+        </div>
+        <div class="cbody">
+          <div>
+            <div class="crow1"><span class="cro">RO-87862</span></div>
+            <div class="crow2"><div class="cvehicle">2023 Subaru WRX</div><div class="cjob">Oil Change + Inspection</div></div>
+          </div>
+          <div>
+            <div class="crow3">
+              <div class="ctimer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 20m</div>
+              <div class="ctech"><div class="tchip" style="background:linear-gradient(135deg,#0A84FF,#0044bb);">TS</div><span class="tchip-name">Tyler S.</span></div>
+            </div>
+            <div class="cpbar"><div class="cpfill" style="width:15%;background:#0A84FF;box-shadow:0 0 4px #0A84FF;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rocard ondeck">
+        <div class="cphoto svc-brake">
+          <div class="svc-ico" style="color:#FF453A;">
+            <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="11" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="1.5"/><circle cx="16" cy="16" r="2.5" fill="currentColor"/><path d="M16 5V9M16 23V27M5 16H9M23 16H27" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>
+            <span class="svc-tag">Brakes</span>
+          </div>
+        </div>
+        <div class="cbody">
+          <div>
+            <div class="crow1"><span class="cro">RO-87817</span></div>
+            <div class="crow2"><div class="cvehicle">2021 Honda Accord</div><div class="cjob">Brake Service</div></div>
+          </div>
+          <div>
+            <div class="crow3">
+              <div class="ctimer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 30m</div>
+              <div class="ctech"><div class="tchip" style="background:linear-gradient(135deg,#FF9F0A,#cc7000);">LA</div><span class="tchip-name">Luis A.</span></div>
+            </div>
+            <div class="cpbar"><div class="cpfill" style="width:20%;background:#0A84FF;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rocard urgent">
+        <div class="cphoto svc-align">
+          <div class="svc-ico" style="color:#0A84FF;">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M6 16H26M22 12L26 16L22 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10H26M6 22H26" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/></svg>
+            <span class="svc-tag">Alignment</span>
+          </div>
+        </div>
+        <div class="cbody">
+          <div>
+            <div class="crow1"><span class="cro">RO-87847</span></div>
+            <div class="crow2"><div class="cvehicle">2022 Ford F-150</div><div class="cjob">Alignment</div></div>
+          </div>
+          <div>
+            <div class="crow3">
+              <div class="ctimer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 40m</div>
+              <div class="ctech"><div class="tchip" style="background:linear-gradient(135deg,#30D158,#1a8c38);">DP</div><span class="tchip-name">Derek P.</span></div>
+            </div>
+            <div class="cpbar"><div class="cpfill" style="width:25%;background:#FF453A;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty"><div class="empty-txt">Empty</div><div class="empty-sub">Drag RO Here</div></div>
+    </div>
+
+    <!-- IN PROGRESS -->
+    <div class="kcol">
+      <div class="rocard inprog">
+        <div class="cphoto svc-diag">
+          <div class="svc-ico" style="color:#BF5AF2;">
+            <svg viewBox="0 0 32 32" fill="none"><circle cx="14" cy="14" r="8" stroke="currentColor" stroke-width="2"/><path d="M20 20L27 27" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M11 14H17M14 11V17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/></svg>
+            <span class="svc-tag">Diagnostic</span>
+          </div>
+        </div>
+        <div class="cbody">
+          <div>
+            <div class="crow1"><span class="cro">RO-87868</span></div>
+            <div class="crow2"><div class="cvehicle">2023 Toyota Highlander</div><div class="cjob">Diagnostic</div></div>
+          </div>
+          <div>
+            <div class="crow3">
+              <div class="ctimer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 1h 24m</div>
+              <div class="ctech"><div class="tchip" style="background:linear-gradient(135deg,#BF5AF2,#8b3dbf);">JJ</div><span class="tchip-name">Jason J.</span></div>
+              <div class="camount">$842</div>
+            </div>
+            <div class="cpbar"><div class="cpfill" style="width:55%;background:#FF9F0A;box-shadow:0 0 4px rgba(255,159,10,0.5);"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rocard inprog">
+        <div class="cphoto svc-brake">
+          <div class="svc-ico" style="color:#FF453A;">
+            <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="11" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="1.5"/><circle cx="16" cy="16" r="2.5" fill="currentColor"/><path d="M16 5V9M16 23V27M5 16H9M23 16H27" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>
+            <span class="svc-tag">Brakes</span>
+          </div>
+        </div>
+        <div class="cbody">
+          <div>
+            <div class="crow1"><span class="cro">RO-87801</span></div>
+            <div class="crow2"><div class="cvehicle">2021 Lexus RX 350</div><div class="cjob">Brake Pads + Rotors</div></div>
+          </div>
+          <div>
+            <div class="crow3">
+              <div class="ctimer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 1h 05m</div>
+              <div class="ctech"><div class="tchip" style="background:linear-gradient(135deg,#FF9F0A,#cc7000);">LA</div><span class="tchip-name">Luis A.</span></div>
+              <div class="camount">$1,285</div>
+            </div>
+            <div class="cpbar"><div class="cpfill" style="width:70%;background:#FF9F0A;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rocard urgent">
+        <div class="cphoto svc-repair">
+          <div class="svc-ico" style="color:#FF9F0A;">
+            <svg viewBox="0 0 32 32" fill="none"><path d="M20 5C23.5 7 24.5 11 23 14L27 18C28 19 28 21 27 22C26 23 24 23 23 22L19 18C16 19.5 12 18.5 10 15C8 12 9 8 11 6L14 9L15 13L19 14L20 10L17 7Z" fill="currentColor" opacity="0.85"/></svg>
+            <span class="svc-tag">Repair</span>
+          </div>
+        </div>
+        <div class="cbody">
+          <div>
+            <div class="crow1"><span class="cro">RO-87836</span></div>
+            <div class="crow2"><div class="cvehicle">2020 BMW 330i</div><div class="cjob">Oil Leak Repair</div></div>
+          </div>
+          <div>
+            <div class="crow3">
+              <div class="ctimer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 2h 15m</div>
+              <div class="ctech"><div class="tchip" style="background:linear-gradient(135deg,#0A84FF,#0044bb);">TS</div><span class="tchip-name">Tyler S.</span></div>
+              <div class="camount">$1,642</div>
+            </div>
+            <div class="cpbar"><div class="cpfill" style="width:85%;background:#FF453A;box-shadow:0 0 4px rgba(255,69,58,0.5);"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rocard inprog">
+        <div class="cphoto svc-trans">
+          <div class="svc-ico" style="color:#FF6B35;">
+            <svg viewBox="0 0 32 32" fill="none"><circle cx="10" cy="18" r="6" stroke="currentColor" stroke-width="1.8"/><circle cx="22" cy="13" r="5" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="18" r="2" fill="currentColor"/><circle cx="22" cy="13" r="2" fill="currentColor"/><path d="M10 12V8M10 22V26M16 18L17 15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>
+            <span class="svc-tag">Trans</span>
+          </div>
+        </div>
+        <div class="cbody">
+          <div>
+            <div class="crow1"><span class="cro">RO-87822</span></div>
+            <div class="crow2"><div class="cvehicle">2019 Chevy Silverado</div><div class="cjob">Transmission Service</div></div>
+          </div>
+          <div>
+            <div class="crow3">
+              <div class="ctimer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 1h 40m</div>
+              <div class="ctech"><div class="tchip" style="background:linear-gradient(135deg,#30D158,#1a8c38);">DP</div><span class="tchip-name">Derek P.</span></div>
+              <div class="camount">$1,125</div>
+            </div>
+            <div class="cpbar"><div class="cpfill" style="width:60%;background:#FF9F0A;"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPLETED -->
+    <div class="kcol">
+      <div class="rocard done">
+        <div class="cphoto svc-tire">
+          <div class="svc-ico" style="color:#32ADE6;">
+            <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="11" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="4" fill="currentColor" opacity="0.5"/><path d="M16 5V9M16 23V27M5 16H9M23 16H27M8 8L11 11M21 21L24 24M8 24L11 21M21 11L24 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/></svg>
+            <span class="svc-tag">Tires</span>
+          </div>
+        </div>
+        <div class="cbody">
+          <div>
+            <div class="crow1"><span class="cro">RO-87834</span><div class="ccheck">✓</div></div>
+            <div class="crow2"><div class="cvehicle">2022 Tesla Model 3</div><div class="cjob">Tire Rotation</div></div>
+          </div>
+          <div>
+            <div class="crow3">
+              <div class="ctimer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 45m</div>
+              <div class="ctech"><div class="tchip" style="background:linear-gradient(135deg,#BF5AF2,#8b3dbf);">JJ</div><span class="tchip-name">Jason J.</span></div>
+              <div class="camount">$285</div>
+            </div>
+            <div class="cpbar"><div class="cpfill" style="width:100%;background:#30D158;box-shadow:0 0 4px rgba(48,209,88,0.5);"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rocard done">
+        <div class="cphoto svc-inspect">
+          <div class="svc-ico" style="color:#30D158;">
+            <svg viewBox="0 0 32 32" fill="none"><rect x="8" y="7" width="16" height="19" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M12 4H20C21 4 22 4.9 22 6V8C22 9.1 21 10 20 10H12C11 10 10 9.1 10 8V6C10 4.9 11 4 12 4Z" fill="currentColor" opacity="0.4"/><path d="M12 18L15 21L21 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="svc-tag">MPI</span>
+          </div>
+        </div>
+        <div class="cbody">
+          <div>
+            <div class="crow1"><span class="cro">RO-87861</span><div class="ccheck">✓</div></div>
+            <div class="crow2"><div class="cvehicle">2023 Honda CR-V</div><div class="cjob">Multi-Point Inspection</div></div>
+          </div>
+          <div>
+            <div class="crow3">
+              <div class="ctimer"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> 30m</div>
+              <div class="ctech"><div class="tchip" style="background:linear-gradient(135deg,#0A84FF,#0044bb);">TS</div><span class="tchip-name">Tyler S.</span></div>
+              <div class="camount">$185</div>
+            </div>
+            <div class="cpbar"><div class="cpfill" style="width:100%;background:#30D158;box-shadow:0 0 4px rgba(48,209,88,0.5);"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty"><div class="empty-txt">Empty</div><div class="empty-sub">Drag RO Here</div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- RIGHT SIDEBAR -->
+<div class="rsidebar">
+  <div class="rsinner">
+    <div class="slabel">Queue</div>
+    <div class="qitem"><div><div class="qro">RO-87802</div><span class="qbadge bapproval">WAITING APPROVAL</span></div><div class="qtimer">⏱ 1h 24m</div></div>
+    <div class="qitem"><div><div class="qro">RO-87839</div><span class="qbadge bapproval">WAITING APPROVAL</span></div><div class="qtimer">⏱ 58m</div></div>
+    <div class="qitem"><div><div class="qro">RO-87864</div><span class="qbadge bparts">WAITING PARTS</span></div><div class="qtimer">⏱ 42m</div></div>
+    <div class="qitem"><div><div class="qro">RO-87877</div><span class="qbadge bparts">WAITING PARTS</span></div><div class="qtimer">⏱ 35m</div></div>
+    <div class="qitem"><div><div class="qro">RO-87837</div><span class="qbadge bondeck">ON DECK</span></div><div class="qtimer">⏱ 20m</div></div>
+    <div class="qitem"><div><div class="qro">RO-87854</div><span class="qbadge bondeck">ON DECK</span></div><div class="qtimer">⏱ 15m</div></div>
+    <div class="qitem"><div><div class="qro">RO-87801</div><span class="qbadge" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.35);">Oil · Tyres</span></div><div class="qtimer">⏱ —</div></div>
+    <div class="qitem"><div><div class="qro">RO-87836</div><span class="qbadge" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.35);">Oil · Brake</span></div><div class="qtimer">⏱ —</div></div>
+  </div>
+  <button class="view-all-btn">View All (12)</button>
+</div>
+
+</div><!-- /body -->
+
+<!-- BOTTOM -->
+<div class="bottom">
+  <div class="bsec" style="flex:2.2;">
+    <div class="bhdr">
+      <span class="btitle">Waiting on Parts</span>
+      <span class="bbadge" style="background:rgba(191,90,242,0.15);color:#BF5AF2;">4</span>
+    </div>
+    <div class="bcards">
+      <div class="pcard">
+        <div class="psvc svc-repair" style="background:rgba(255,159,10,0.12);border:0.5px solid rgba(255,159,10,0.2);color:#FF9F0A;">
+          <svg viewBox="0 0 32 32" fill="none"><path d="M20 5C23.5 7 24.5 11 23 14L27 18C28 19 28 21 27 22C26 23 24 23 23 22L19 18C16 19.5 12 18.5 10 15C8 12 9 8 11 6L14 9L15 13L19 14L20 10L17 7Z" fill="currentColor" opacity="0.85"/></svg>
+        </div>
+        <div class="pinfo"><div class="pro">RO-87844</div><div class="pveh">2022 Subaru WRX</div><div class="pjob">Front Struts</div><div class="peta"><span class="peta-l">ETA</span><span class="peta-d">MAY 25</span></div></div>
+      </div>
+      <div class="pcard">
+        <div class="psvc" style="background:rgba(255,69,58,0.12);border:0.5px solid rgba(255,69,58,0.2);color:#FF453A;">
+          <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="11" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="1.5"/><circle cx="16" cy="16" r="2.5" fill="currentColor"/><path d="M16 5V9M16 23V27M5 16H9M23 16H27" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/></svg>
+        </div>
+        <div class="pinfo"><div class="pro">RO-87741</div><div class="pveh">2019 Toyota Highlander</div><div class="pjob">Brake Calipers</div><div class="peta"><span class="peta-l">ETA</span><span class="peta-d">MAY 25</span></div></div>
+      </div>
+      <div class="pcard">
+        <div class="psvc" style="background:rgba(10,132,255,0.12);border:0.5px solid rgba(10,132,255,0.2);color:#0A84FF;">
+          <svg viewBox="0 0 32 32" fill="none"><path d="M6 16H26M22 12L26 16L22 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10H26M6 22H26" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity="0.45"/></svg>
+        </div>
+        <div class="pinfo"><div class="pro">RO-87601</div><div class="pveh">2023 Toyota Highlander</div><div class="pjob">Control Arm</div><div class="peta"><span class="peta-l">ETA</span><span class="peta-d">MAY 26</span></div></div>
+      </div>
+      <div class="pcard">
+        <div class="psvc" style="background:rgba(48,209,88,0.12);border:0.5px solid rgba(48,209,88,0.2);color:#30D158;">
+          <svg viewBox="0 0 32 32" fill="none"><rect x="8" y="7" width="16" height="19" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M12 4H20C21 4 22 4.9 22 6V8C22 9.1 21 10 20 10H12C11 10 10 9.1 10 8V6C10 4.9 11 4 12 4Z" fill="currentColor" opacity="0.4"/><path d="M12 18L15 21L21 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="pinfo"><div class="pro">RO-87811</div><div class="pveh">2021 Toyota Grand Highlander</div><div class="pjob">Radiator</div><div class="peta"><span class="peta-l">ETA</span><span class="peta-d">MAY 26</span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bsec">
+    <div class="bhdr"><span class="btitle">Main Shop Work</span><span class="bbadge" style="background:rgba(239,68,68,0.15);color:#EF4444;">10</span></div>
+    <div class="bempty"><span class="bempty-txt">No tickets in queue</span></div>
+  </div>
+  <div class="bsec">
+    <div class="bhdr"><span class="btitle">PDIs</span><span class="bbadge" style="background:rgba(147,51,234,0.15);color:#9333EA;">2</span></div>
+    <div class="bempty"><span class="bempty-txt">No tickets in queue</span></div>
+  </div>
+</div>
+
+</body>
+</html>
