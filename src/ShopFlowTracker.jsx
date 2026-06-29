@@ -4953,64 +4953,64 @@ function UsedCarReconScreen({ records, currentUser, techs, mainROs, onCreateReco
         )}
 
         {/* ── 2. Waiting on Parts ──────────────────────────── */}
-        {bkts.waitingOnParts.length > 0 && (
-          <div style={{ marginBottom:14 }}>
-            <ReconSectionHeader title="Waiting on Parts" count={bkts.waitingOnParts.length} isCollapsed={isCol('waitingOnParts')} onToggle={() => toggle('waitingOnParts')} accent="#FFD60A" icon="⏳" />
-            {!isCol('waitingOnParts') && (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {bkts.waitingOnParts.map(r => {
-                  const bn = computeReconBottleneck(r);
-                  return (
-                    <div key={r.id}>
-                      {bn && <div style={{ fontSize:10, fontWeight:700, color:bn.partEta===today?WARN:'#FFD60A', paddingLeft:4, marginBottom:3 }}>ETA: {bn.partEta}{bn.partEta===today?' — Today!':''}</div>}
-                      {reconCard(r)}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+        <div style={{ marginBottom:14 }}>
+          <ReconSectionHeader title="Waiting on Parts" count={bkts.waitingOnParts.length} isCollapsed={isCol('waitingOnParts')} onToggle={() => toggle('waitingOnParts')} accent="#FFD60A" icon="⏳" />
+          {!isCol('waitingOnParts') && (
+            bkts.waitingOnParts.length === 0
+              ? <div style={{ textAlign:'center', padding:'16px 0 8px', color:TEXT3, fontSize:12 }}>No vehicles</div>
+              : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {bkts.waitingOnParts.map(r => {
+                    const bn = computeReconBottleneck(r);
+                    return (
+                      <div key={r.id}>
+                        {bn && <div style={{ fontSize:10, fontWeight:700, color:bn.partEta===today?WARN:'#FFD60A', paddingLeft:4, marginBottom:3 }}>ETA: {bn.partEta}{bn.partEta===today?' — Today!':''}</div>}
+                        {reconCard(r)}
+                      </div>
+                    );
+                  })}
+                </div>
+          )}
+        </div>
 
         {/* ── 3. In Shop ───────────────────────────────────── */}
-        {bkts.inShop.length > 0 && (
-          <div style={{ marginBottom:14 }}>
-            <ReconSectionHeader title="In Shop" count={bkts.inShop.length} isCollapsed={isCol('inShop')} onToggle={() => toggle('inShop')} accent={SUCCESS} icon="🔧" />
-            {!isCol('inShop') && (
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {bkts.inShop.map(r => reconCard(r))}
-              </div>
-            )}
-          </div>
-        )}
+        <div style={{ marginBottom:14 }}>
+          <ReconSectionHeader title="In Shop" count={bkts.inShop.length} isCollapsed={isCol('inShop')} onToggle={() => toggle('inShop')} accent={SUCCESS} icon="🔧" />
+          {!isCol('inShop') && (
+            bkts.inShop.length === 0
+              ? <div style={{ textAlign:'center', padding:'16px 0 8px', color:TEXT3, fontSize:12 }}>No vehicles</div>
+              : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {bkts.inShop.map(r => reconCard(r))}
+                </div>
+          )}
+        </div>
 
         {/* ── 4. Wholesale ─────────────────────────────────── */}
-        {bkts.wholesale.length > 0 && (
-          <div style={{ marginBottom:14 }}>
-            <ReconSectionHeader title="Wholesale" count={bkts.wholesale.length} isCollapsed={isCol('wholesale')} onToggle={() => toggle('wholesale')} accent={DANGER} icon="💲" />
-            {!isCol('wholesale') && (
-              <div>
-                {(isAdmin || isUCManager) && bkts.wholesale.length > 1 && (
-                  archiveConfirm ? (
-                    <div style={{ background:'rgba(255,61,78,0.08)', border:'1px solid rgba(255,61,78,0.2)', borderRadius:12, padding:'12px 14px', marginBottom:10, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
-                      <span style={{ fontSize:13, color:TEXT2, flex:1 }}>Archive all {bkts.wholesale.length} wholesale cars?</span>
-                      <button onClick={handleArchiveAll} style={{ padding:'8px 16px', background:DANGER, color:'#fff', border:'none', borderRadius:10, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>Confirm</button>
-                      <button onClick={() => setArchiveConfirm(false)} style={{ padding:'8px 12px', background:'rgba(255,255,255,0.07)', color:TEXT3, border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, fontWeight:600, fontSize:12, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>Cancel</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setArchiveConfirm(true)}
-                      style={{ width:'100%', marginBottom:10, padding:'9px 14px', background:'rgba(255,61,78,0.05)', color:DANGER, border:'1px solid rgba(255,61,78,0.18)', borderRadius:12, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:"'Geist',system-ui,sans-serif", touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                      Archive All ({bkts.wholesale.length})
-                    </button>
-                  )
-                )}
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {bkts.wholesale.map(r => reconCard(r, { showArchive:true }))}
+        <div style={{ marginBottom:14 }}>
+          <ReconSectionHeader title="Wholesale" count={bkts.wholesale.length} isCollapsed={isCol('wholesale')} onToggle={() => toggle('wholesale')} accent={DANGER} icon="💲" />
+          {!isCol('wholesale') && (
+            bkts.wholesale.length === 0
+              ? <div style={{ textAlign:'center', padding:'16px 0 8px', color:TEXT3, fontSize:12 }}>No vehicles</div>
+              : <div>
+                  {(isAdmin || isUCManager) && bkts.wholesale.length > 1 && (
+                    archiveConfirm ? (
+                      <div style={{ background:'rgba(255,61,78,0.08)', border:'1px solid rgba(255,61,78,0.2)', borderRadius:12, padding:'12px 14px', marginBottom:10, display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+                        <span style={{ fontSize:13, color:TEXT2, flex:1 }}>Archive all {bkts.wholesale.length} wholesale cars?</span>
+                        <button onClick={handleArchiveAll} style={{ padding:'8px 16px', background:DANGER, color:'#fff', border:'none', borderRadius:10, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>Confirm</button>
+                        <button onClick={() => setArchiveConfirm(false)} style={{ padding:'8px 12px', background:'rgba(255,255,255,0.07)', color:TEXT3, border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, fontWeight:600, fontSize:12, cursor:'pointer', fontFamily:'inherit', touchAction:'manipulation' }}>Cancel</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setArchiveConfirm(true)}
+                        style={{ width:'100%', marginBottom:10, padding:'9px 14px', background:'rgba(255,61,78,0.05)', color:DANGER, border:'1px solid rgba(255,61,78,0.18)', borderRadius:12, fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:"'Geist',system-ui,sans-serif", touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                        Archive All ({bkts.wholesale.length})
+                      </button>
+                    )
+                  )}
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {bkts.wholesale.map(r => reconCard(r, { showArchive:true }))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {showNewCar && (
